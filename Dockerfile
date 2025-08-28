@@ -47,9 +47,16 @@ WORKDIR /app
 # Expose port (Railway will map this to the PORT env var)
 EXPOSE 8000
 
-# Health check
+# Health check - use the same PORT logic as startup script
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD ["sh", "-c", "curl -f http://localhost:${PORT:-8000}/health || exit 1"]
+    CMD ["/bin/sh", "-c", "PORT=${PORT:-8000} && curl -f http://localhost:$PORT/health || exit 1"]
 
-# Start the application
-CMD ["sh", "-c", "python -m uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 4"]
+# Create a startup script to handle PORT properly
+RUN echo '#!/bin/sh\n\
+PORT=${PORT:-8000}\n\
+echo "Starting application on port $PORT"\n\
+exec python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 4' > /app/start.sh && \
+chmod +x /app/start.sh
+
+# Start the application using the script
+CMD ["/app/start.sh"]
