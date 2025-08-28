@@ -6,11 +6,13 @@ from typing import Any, Dict, List, Optional, cast
 from app.core.config import settings
 from app.core.redis_client import get_cache, set_cache
 
-genai: Optional[Any] = None
 try:
     import google.generativeai as genai
+
+    genai_available = True
 except ImportError:
-    pass
+    genai = None  # type: ignore[assignment]
+    genai_available = False
 
 logger = logging.getLogger(__name__)
 
@@ -446,7 +448,7 @@ Create a recommendation that really highlights their {focus.replace('_', ' ')} s
 
     async def _generate_single_option(self, prompt: str, temperature_modifier: float) -> str:
         """Generate a single recommendation option."""
-        if not self.model or not genai:
+        if not self.model or not genai_available:
             raise ValueError("AI model not initialized")
 
         # Adjust temperature for variety
@@ -558,7 +560,7 @@ Just give me the updated recommendation text, nothing else.
 
     async def _generate_refined_regeneration(self, prompt: str) -> str:
         """Generate refined recommendation for regeneration."""
-        if not self.model or not genai:
+        if not self.model or not genai_available:
             raise ValueError("AI model not initialized")
 
         config = genai.types.GenerationConfig(
