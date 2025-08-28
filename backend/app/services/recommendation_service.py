@@ -66,6 +66,7 @@ class RecommendationService:
             logger.info(f"   • Repositories: {len(github_data.get('repositories', []))}")
             logger.info(f"   • Languages: {len(github_data.get('languages', []))}")
             logger.info(f"   • Commits analyzed: {github_data.get('commit_analysis', {}).get('total_commits_analyzed', 0)}")
+            logger.debug(f"➡️ GitHub data used for recommendation: {github_data}")  # Log github_data
 
             # Get or create GitHub profile record
             logger.info("💾 STEP 2: DATABASE OPERATIONS")
@@ -349,6 +350,7 @@ class RecommendationService:
                 logger.info(f"   • Repositories: {len(github_data.get('repositories', []))}")
                 logger.info(f"   • Languages: {len(github_data.get('languages', []))}")
                 logger.info(f"   • Commits analyzed: {github_data.get('commit_analysis', {}).get('total_commits_analyzed', 0)}")
+            logger.debug(f"➡️ GitHub data used for recommendation options: {github_data}")  # Log github_data
 
             # Get or create GitHub profile record
             logger.info("💾 STEP 2: DATABASE OPERATIONS")
@@ -437,6 +439,7 @@ class RecommendationService:
             if not github_data:
                 logger.error(f"❌ Failed to analyze GitHub profile for {github_username}")
                 raise ValueError(f"Could not analyze GitHub profile for {github_username}")
+            logger.debug(f"➡️ GitHub data used for recommendation regeneration: {github_data}")  # Log github_data
 
             # Get or create GitHub profile record
             logger.info("💾 STEP 2: DATABASE OPERATIONS")

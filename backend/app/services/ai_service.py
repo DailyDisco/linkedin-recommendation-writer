@@ -152,13 +152,9 @@ class AIService:
             )
         else:
             # Profile context
-            prompt_parts.extend(
-                [
-                    "\nHere's what I know about them:",
-                    f"- Name: {user_data.get('full_name', 'Not provided')}",
-                    f"- Bio: {user_data.get('bio', 'Not provided')}",
-                ]
-            )
+            prompt_parts.append("\nHere's what I know about them:")
+            if user_data.get("full_name"):
+                prompt_parts.append(f"- Name: {user_data['full_name']}")
 
         # Add technical skills based on data source
         if github_data.get("repository_info"):
@@ -254,8 +250,8 @@ class AIService:
             "\nGuidelines:",
             "- Write in first person as someone who has worked with this developer",
             "- Be specific about technical achievements and skills",
-            "- Use natural, conversational language like you're talking to a colleague",
-            "- Focus on both technical competence and collaborative abilities",
+            "- Use natural, conversational language, like you're talking to a colleague.",
+            "- Focus on both technical competence and collaborative abilities, providing specific examples and positive anecdotes from their work.",
             "- DO NOT mention any company names, employers, or employment history",
             "- Focus on technical skills and collaborative abilities only",
             f"- Target length: {self._get_length_guideline(length)} words",
@@ -267,15 +263,17 @@ class AIService:
         if length == "short":
             base_guidelines.extend(
                 [
-                    "- Structure as 2 paragraphs: introduction with key skills, then specific example",
+                    "- Structure as 2 paragraphs: introduction with key skills and a specific example,",
+                    " then a concluding positive anecdote.",
                     "- Keep it concise but impactful",
-                    "- Focus on 1-2 key strengths",
+                    "- Focus on 1-2 key strengths with concrete evidence",
                 ]
             )
         elif length == "medium":
             base_guidelines.extend(
                 [
-                    "- Structure as 3 paragraphs: introduction, technical skills with examples, personal qualities",
+                    "- Structure as 3 paragraphs: introduction, 2-3 specific technical achievements with examples,",
+                    " and a concluding paragraph on personal qualities/collaboration with an anecdote.",
                     "- Provide 2-3 specific examples or achievements",
                     "- Balance technical expertise with personal qualities",
                 ]
@@ -283,7 +281,9 @@ class AIService:
         else:  # long
             base_guidelines.extend(
                 [
-                    "- Structure as 4-5 paragraphs: introduction, technical background, specific achievements, collaboration skills, conclusion",
+                    "- Structure as 4-5 paragraphs: introduction, detailed technical background with 2-3 achievements,",
+                    " specific project contributions/problem-solving, collaboration skills with an anecdote,",
+                    " and a strong conclusion.",
                     "- Include 3-4 detailed examples",
                     "- Show development journey and growth",
                 ]
