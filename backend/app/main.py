@@ -145,7 +145,7 @@ if os.path.exists(frontend_build_path):
     async def serve_frontend(path: str) -> Union[JSONResponse, FileResponse]:
         """Serve frontend for SPA routing."""
         # If the path is an API route, let it pass through
-        if path.startswith("api/") or path in ["docs", "redoc", "health"]:
+        if path.startswith("api/") or path in ["docs", "redoc"]:
             return JSONResponse(status_code=404, content={"error": "Not found"})
 
         # Try to serve the file if it exists

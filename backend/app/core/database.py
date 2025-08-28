@@ -51,8 +51,8 @@ async def init_database() -> None:
         # Import all models here to ensure they are registered
 
         async with engine.begin() as conn:
-            # Create all tables
-            await conn.run_sync(Base.metadata.create_all)
+            # Create all tables with checkfirst=True to avoid conflicts
+            await conn.run_sync(lambda sync_conn: Base.metadata.create_all(sync_conn, checkfirst=True))
             logger.info("Database tables created successfully")
 
     except Exception as e:
