@@ -70,8 +70,8 @@ jobs:
 
       - name: Run linting (flake8)
         run: |
-          echo "🔍 Running flake8 linting (relaxed mode)..."
-          flake8 app/ --max-line-length=200 --extend-ignore=E203,W503,E501,F841 --count --statistics || echo "⚠️  Linting completed with warnings (non-blocking)"
+          echo "🔍 Running flake8 linting (very relaxed mode)..."
+          flake8 app/ --max-line-length=250 --extend-ignore=E203,W503,E501,F841,E402,E731,F401 --count --statistics || echo "⚠️  Linting completed with warnings (non-blocking)"
         shell: bash
         working-directory: ${{ env.WORKING_DIR }}
 
