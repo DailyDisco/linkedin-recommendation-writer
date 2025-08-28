@@ -50,6 +50,42 @@ class Recommendation(Base):
     # Relationships
     user = relationship("User", back_populates="recommendations")
     github_profile = relationship("GitHubProfile", back_populates="recommendations")
+    versions = relationship("RecommendationVersion", back_populates="recommendation", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<Recommendation(id={self.id}, title={self.title[:50]}...)>"
+
+
+class RecommendationVersion(Base):
+    """Version history for recommendations to track changes over time."""
+
+    __tablename__ = "recommendation_versions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    recommendation_id = Column(Integer, ForeignKey("recommendations.id"), nullable=False)
+
+    # Version information
+    version_number = Column(Integer, nullable=False)  # 1, 2, 3, etc.
+    change_type = Column(String, nullable=False)  # 'created', 'refined', 'keyword_refinement', 'manual_edit'
+    change_description = Column(Text, nullable=True)  # Description of what changed
+
+    # Content at this version
+    title = Column(String, nullable=False)
+    content = Column(Text, nullable=False)
+
+    # Generation parameters at this version
+    generation_parameters = Column(JSON, nullable=True)
+
+    # Quality metrics at this version
+    confidence_score = Column(Integer, default=0)
+    word_count = Column(Integer, default=0)
+
+    # Metadata
+    created_at = Column(DateTime, default=datetime.utcnow)
+    created_by = Column(String, nullable=True)  # 'system', 'user', etc.
+
+    # Relationships
+    recommendation = relationship("Recommendation", back_populates="versions")
+
+    def __repr__(self) -> str:
+        return f"<RecommendationVersion(id={self.id}, recommendation_id={self.recommendation_id}, version={self.version_number})>"

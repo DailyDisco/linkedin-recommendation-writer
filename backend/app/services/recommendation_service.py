@@ -8,8 +8,22 @@ from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.github_profile import GitHubProfile
-from app.models.recommendation import Recommendation
-from app.schemas.recommendation import RecommendationCreate, RecommendationOptionsResponse, RecommendationResponse
+from app.models.recommendation import Recommendation, RecommendationVersion
+from app.schemas.recommendation import (
+    ContributorInfo,
+    MultiContributorRequest,
+    MultiContributorResponse,
+    RecommendationCreate,
+    RecommendationOptionsResponse,
+    RecommendationResponse,
+    RecommendationVersionDetail,
+    RecommendationVersionHistoryResponse,
+    RecommendationVersionInfo,
+    SkillGapAnalysisRequest,
+    SkillGapAnalysisResponse,
+    SkillMatch,
+    VersionComparisonResponse,
+)
 from app.services.ai_service import AIService
 from app.services.github_service import GitHubService
 
@@ -34,12 +48,15 @@ class RecommendationService:
         self,
         db: AsyncSession,
         github_username: str,
+        user_id: Optional[int] = None,  # Added user_id
         recommendation_type: str = "professional",
         tone: str = "professional",
         length: str = "medium",
         custom_prompt: Optional[str] = None,
         target_role: Optional[str] = None,
         specific_skills: Optional[List[str]] = None,
+        include_keywords: Optional[List[str]] = None,
+        exclude_keywords: Optional[List[str]] = None,
     ) -> RecommendationResponse:
         """Create a new recommendation."""
 
@@ -92,6 +109,8 @@ class RecommendationService:
                 custom_prompt=custom_prompt,
                 target_role=target_role,
                 specific_skills=specific_skills,
+                include_keywords=include_keywords,
+                exclude_keywords=exclude_keywords,
             )
 
             ai_end = time.time()
@@ -107,6 +126,7 @@ class RecommendationService:
             save_start = time.time()
 
             recommendation_data = RecommendationCreate(
+                user_id=user_id,  # Pass user_id
                 github_profile_id=int(github_profile.id),
                 title=ai_result["title"],
                 content=ai_result["content"],
@@ -157,6 +177,7 @@ class RecommendationService:
         self,
         db: AsyncSession,
         github_username: Optional[str] = None,
+        user_id: Optional[int] = None,  # Added user_id
         recommendation_type: Optional[str] = None,
         limit: int = 10,
         offset: int = 0,
@@ -164,6 +185,9 @@ class RecommendationService:
         """Get recommendations with optional filtering."""
 
         query = select(Recommendation).join(GitHubProfile)
+
+        if user_id:
+            query = query.where(Recommendation.user_id == user_id)
 
         if github_username:
             query = query.where(GitHubProfile.github_username == github_username)
@@ -188,10 +212,15 @@ class RecommendationService:
 
         return response_list
 
-    async def get_recommendation_by_id(self, db: AsyncSession, recommendation_id: int) -> Optional[RecommendationResponse]:
+    async def get_recommendation_by_id(
+        self, db: AsyncSession, recommendation_id: int, user_id: Optional[int] = None
+    ) -> Optional[RecommendationResponse]:
         """Get a specific recommendation by ID."""
 
         query = select(Recommendation).where(Recommendation.id == recommendation_id)
+        if user_id:
+            query = query.where(Recommendation.user_id == user_id)
+
         result = await db.execute(query)
         recommendation = result.scalar_one_or_none()
 
@@ -211,7 +240,7 @@ class RecommendationService:
         """Get existing or create new GitHub profile record."""
 
         # Handle merged repository-contributor data
-        if github_data.get("analysis_type") == "repository_contributor":
+        if github_data.get("analysis_context_type") == "repository_contributor":
             user_data = github_data["user_data"]
             username = github_data.get("contributor_username", user_data["github_username"])
         else:
@@ -279,13 +308,16 @@ class RecommendationService:
         self,
         db: AsyncSession,
         github_username: str,
+        user_id: Optional[int] = None,  # Added user_id
         recommendation_type: str = "professional",
         tone: str = "professional",
         length: str = "medium",
         custom_prompt: Optional[str] = None,
         target_role: Optional[str] = None,
         specific_skills: Optional[List[str]] = None,
-        analysis_type: str = "profile",
+        include_keywords: Optional[List[str]] = None,
+        exclude_keywords: Optional[List[str]] = None,
+        analysis_context_type: str = "profile",
         repository_url: Optional[str] = None,
     ) -> RecommendationOptionsResponse:
         """Create multiple recommendation options."""
@@ -302,7 +334,7 @@ class RecommendationService:
 
             # Determine analysis type and get GitHub data
             github_data: Optional[Dict[str, Any]] = None
-            if analysis_type == "repo_only" and repository_url:
+            if analysis_context_type == "repo_only" and repository_url:
                 logger.info(f"📁 Analyzing repository: {repository_url}")
                 # Extract repository name from URL
                 if "/" in repository_url:
@@ -333,14 +365,14 @@ class RecommendationService:
             logger.info(f"⏱️  GitHub analysis completed in {github_end - github_start:.2f} seconds")
 
             if not github_data:
-                if analysis_type == "repo_only":
+                if analysis_context_type == "repo_only":
                     logger.error(f"❌ Failed to analyze GitHub repository: {repository_url}")
                     raise ValueError(f"Could not analyze GitHub repository: {repository_url}")
                 else:
                     logger.error(f"❌ Failed to analyze GitHub profile for {github_username}")
                     raise ValueError(f"Could not analyze GitHub profile for {github_username}")
 
-            if analysis_type == "repo_only":
+            if analysis_context_type == "repo_only":
                 logger.info("✅ Repository analysis successful:")
                 logger.info(f"   • Repository: {github_data.get('repository_info', {}).get('name', 'N/A')}")
                 logger.info(f"   • Language: {github_data.get('repository_info', {}).get('language', 'N/A')}")
@@ -376,6 +408,8 @@ class RecommendationService:
                 custom_prompt=custom_prompt,
                 target_role=target_role,
                 specific_skills=specific_skills,
+                include_keywords=include_keywords,
+                exclude_keywords=exclude_keywords,
             )
 
             ai_end = time.time()
@@ -415,6 +449,7 @@ class RecommendationService:
         original_content: str,
         refinement_instructions: str,
         github_username: str,
+        user_id: Optional[int] = None,  # Added user_id
         recommendation_type: str = "professional",
         tone: str = "professional",
         length: str = "medium",
@@ -479,6 +514,7 @@ class RecommendationService:
 
             recommendation_data = RecommendationCreate(
                 github_profile_id=int(github_profile.id),
+                user_id=user_id,  # Pass user_id
                 title=ai_result["title"],
                 content=ai_result["content"],
                 recommendation_type=recommendation_type,
@@ -523,6 +559,1226 @@ class RecommendationService:
             logger.error(f"⏱️  Failed after {time.time() - start_time:.2f} seconds")
             await db.rollback()
             raise
+
+    async def refine_recommendation_with_keywords(
+        self,
+        db: AsyncSession,
+        recommendation_id: int,
+        include_keywords: Optional[List[str]] = None,
+        exclude_keywords: Optional[List[str]] = None,
+        refinement_instructions: Optional[str] = None,
+    ) -> RecommendationResponse:
+        """Refine an existing recommendation based on keyword constraints."""
+        import time
+
+        start_time = time.time()
+
+        try:
+            logger.info("🔧 KEYWORD REFINEMENT STARTED")
+            logger.info("=" * 60)
+            logger.info(f"📝 Recommendation ID: {recommendation_id}")
+            logger.info(f"➕ Include keywords: {include_keywords}")
+            logger.info(f"➖ Exclude keywords: {exclude_keywords}")
+
+            # Get the original recommendation
+            query = select(Recommendation).where(Recommendation.id == recommendation_id)
+            result = await db.execute(query)
+            original_recommendation = result.scalar_one_or_none()
+
+            if not original_recommendation:
+                logger.error(f"❌ Recommendation with ID {recommendation_id} not found")
+                raise ValueError(f"Recommendation with ID {recommendation_id} not found")
+
+            # Get GitHub profile data for context
+            github_profile_query = select(GitHubProfile).where(GitHubProfile.id == original_recommendation.github_profile_id)
+            github_profile_result = await db.execute(github_profile_query)
+            github_profile = github_profile_result.scalar_one_or_none()
+
+            if not github_profile:
+                logger.error(f"❌ GitHub profile not found for recommendation {recommendation_id}")
+                raise ValueError(f"GitHub profile not found for recommendation {recommendation_id}")
+
+            # Reconstruct GitHub data for AI processing
+            github_data = {
+                "user_data": {
+                    "github_username": github_profile.github_username,
+                    "github_id": github_profile.github_id,
+                    "full_name": github_profile.full_name,
+                    "bio": github_profile.bio,
+                    "company": github_profile.company,
+                    "location": github_profile.location,
+                    "email": github_profile.email,
+                    "blog": github_profile.blog,
+                    "avatar_url": github_profile.avatar_url,
+                    "public_repos": github_profile.public_repos,
+                    "followers": github_profile.followers,
+                    "following": github_profile.following,
+                    "public_gists": github_profile.public_gists,
+                },
+                "repositories": github_profile.repositories_data or [],
+                "languages": github_profile.languages_data or [],
+                "skills": github_profile.skills_analysis or {},
+                "analysis_context_type": "profile",
+            }
+
+            # Extract original parameters
+            original_params = original_recommendation.generation_parameters or {}
+            recommendation_type = original_params.get("recommendation_type", "professional")
+            tone = original_params.get("tone", "professional")
+            length = original_params.get("length", "medium")
+
+            # Generate refined recommendation
+            logger.info("🤖 STEP 1: AI KEYWORD REFINEMENT")
+            logger.info("-" * 50)
+            ai_start = time.time()
+
+            ai_result = await self.ai_service.refine_recommendation_with_keywords(
+                original_content=original_recommendation.content,
+                github_data=github_data,
+                include_keywords=include_keywords,
+                exclude_keywords=exclude_keywords,
+                refinement_instructions=refinement_instructions,
+                recommendation_type=recommendation_type,
+                tone=tone,
+                length=length,
+            )
+
+            ai_end = time.time()
+            logger.info(f"⏱️  AI refinement completed in {ai_end - ai_start:.2f} seconds")
+            logger.info("✅ Keyword refinement successful:")
+            logger.info(f"   • Word count: {ai_result['word_count']}")
+            logger.info(f"   • Confidence score: {ai_result['confidence_score']}")
+            logger.info(f"   • Keywords included: {len(ai_result['include_keywords_used'])}")
+            logger.info(f"   • Keywords avoided: {len(ai_result['exclude_keywords_avoided'])}")
+
+            # Create new recommendation record for the refined version
+            logger.info("💾 STEP 2: SAVING REFINED RECOMMENDATION")
+            logger.info("-" * 50)
+            save_start = time.time()
+
+            # Update generation parameters to include refinement info
+            refined_params = original_params.copy()
+            refined_params.update(
+                {
+                    "keyword_refinement": True,
+                    "original_recommendation_id": recommendation_id,
+                    "include_keywords": include_keywords or [],
+                    "exclude_keywords": exclude_keywords or [],
+                    "refinement_instructions": refinement_instructions,
+                    "refined_at": datetime.utcnow().isoformat(),
+                }
+            )
+
+            recommendation_data = RecommendationCreate(
+                github_profile_id=original_recommendation.github_profile_id,
+                title=ai_result["refined_title"],
+                content=ai_result["refined_content"],
+                recommendation_type=recommendation_type,
+                tone=tone,
+                length=length,
+                ai_model=refined_params.get("model", "gemini"),
+                generation_prompt=refinement_instructions,
+                generation_parameters=refined_params,
+                confidence_score=ai_result["confidence_score"],
+                word_count=ai_result["word_count"],
+                selected_option_id=original_recommendation.selected_option_id,
+                selected_option_name=original_recommendation.selected_option_name,
+                selected_option_focus=original_recommendation.selected_option_focus,
+                generated_options=original_recommendation.generated_options,
+            )
+
+            refined_recommendation = Recommendation(**recommendation_data.dict())
+            db.add(refined_recommendation)
+            await db.commit()
+            await db.refresh(refined_recommendation)
+
+            save_end = time.time()
+            logger.info(f"⏱️  Database save completed in {save_end - save_start:.2f} seconds")
+            logger.info(f"✅ Refined recommendation saved with ID: {refined_recommendation.id}")
+
+            # Convert to response
+            response = RecommendationResponse.from_orm(refined_recommendation)
+            response.github_username = github_profile.github_username
+
+            # Add refinement-specific metadata
+            response.__dict__.update(
+                {
+                    "refinement_summary": ai_result["refinement_summary"],
+                    "include_keywords_used": ai_result["include_keywords_used"],
+                    "exclude_keywords_avoided": ai_result["exclude_keywords_avoided"],
+                    "validation_issues": ai_result.get("validation_issues", []),
+                    "original_recommendation_id": recommendation_id,
+                }
+            )
+
+            end_time = time.time()
+            total_time = end_time - start_time
+
+            logger.info("🎉 KEYWORD REFINEMENT COMPLETED")
+            logger.info("-" * 50)
+            logger.info(f"⏱️  Total processing time: {total_time:.2f} seconds")
+            logger.info("📊 Refinement Results:")
+            logger.info(f"   • Original ID: {recommendation_id}")
+            logger.info(f"   • Refined ID: {refined_recommendation.id}")
+            logger.info(f"   • Confidence Score: {ai_result['confidence_score']}")
+            logger.info("=" * 60)
+
+            return response
+
+        except Exception as e:
+            logger.error(f"💥 ERROR in keyword refinement for recommendation {recommendation_id}: {e}")
+            logger.error(f"⏱️  Failed after {time.time() - start_time:.2f} seconds")
+            await db.rollback()
+            raise
+
+    async def generate_repository_readme(
+        self,
+        repository_full_name: str,
+        style: str = "comprehensive",
+        include_sections: Optional[List[str]] = None,
+        target_audience: str = "developers",
+    ) -> Dict[str, Any]:
+        """Generate a README for a GitHub repository."""
+        import time
+
+        start_time = time.time()
+
+        try:
+            logger.info("📖 README GENERATION STARTED")
+            logger.info("=" * 60)
+            logger.info(f"📁 Repository: {repository_full_name}")
+            logger.info(f"🎨 Style: {style}")
+            logger.info(f"👥 Target Audience: {target_audience}")
+
+            # Analyze the repository using GitHub service
+            logger.info("🔍 STEP 1: REPOSITORY ANALYSIS")
+            logger.info("-" * 50)
+            repo_start = time.time()
+
+            repository_data = await self.github_service.analyze_repository(repository_full_name=repository_full_name, force_refresh=False)
+
+            if not repository_data:
+                logger.error(f"❌ Failed to analyze repository {repository_full_name}")
+                raise ValueError(f"Could not analyze repository {repository_full_name}")
+
+            repo_end = time.time()
+            logger.info(f"⏱️  Repository analysis completed in {repo_end - repo_start:.2f} seconds")
+            logger.info("✅ Repository analysis successful:")
+            logger.info(f"   • Repository: {repository_data.get('repository_info', {}).get('name', 'N/A')}")
+            logger.info(f"   • Language: {repository_data.get('repository_info', {}).get('language', 'N/A')}")
+            logger.info(f"   • Stars: {repository_data.get('repository_info', {}).get('stars', 0)}")
+
+            # Perform additional README-specific analysis
+            logger.info("🔧 STEP 2: README-SPECIFIC ANALYSIS")
+            logger.info("-" * 50)
+            analysis_start = time.time()
+
+            # Get repository object for deeper analysis
+            if not self.github_service.github_client:
+                raise ValueError("GitHub client not configured")
+
+            try:
+                owner, repo_name = repository_full_name.split("/", 1)
+                repo = self.github_service.github_client.get_repo(repository_full_name)
+
+                # Perform README-specific analysis
+                repository_analysis = self.github_service._analyze_repository_content_for_readme(repository_data.get("repository_info", {}), repo)
+
+                # Extract API endpoints if applicable
+                main_files = repository_analysis.get("main_files", [])
+                if main_files:
+                    api_endpoints = self.github_service._extract_api_endpoints_from_code(repo, main_files)
+                    repository_analysis["api_endpoints"] = api_endpoints
+
+            except Exception as e:
+                logger.warning(f"Could not perform deep repository analysis: {e}")
+                repository_analysis = {
+                    "existing_readme": False,
+                    "main_files": [],
+                    "has_tests": False,
+                    "has_ci_cd": False,
+                    "has_docker": False,
+                    "key_features": [],
+                }
+
+            analysis_end = time.time()
+            logger.info(f"⏱️  README-specific analysis completed in {analysis_end - analysis_start:.2f} seconds")
+            logger.info("✅ README analysis successful:")
+            logger.info(f"   • Existing README: {repository_analysis.get('existing_readme', False)}")
+            logger.info(f"   • Main files: {len(repository_analysis.get('main_files', []))}")
+            logger.info(f"   • Has tests: {repository_analysis.get('has_tests', False)}")
+            logger.info(f"   • Has CI/CD: {repository_analysis.get('has_ci_cd', False)}")
+
+            # Generate README content
+            logger.info("🤖 STEP 3: AI README GENERATION")
+            logger.info("-" * 50)
+            ai_start = time.time()
+
+            ai_result = await self.ai_service._generate_readme_content(
+                repository_data=repository_data,
+                repository_analysis=repository_analysis,
+                style=style,
+                include_sections=include_sections,
+                target_audience=target_audience,
+            )
+
+            ai_end = time.time()
+            logger.info(f"⏱️  AI README generation completed in {ai_end - ai_start:.2f} seconds")
+            logger.info("✅ README generation successful:")
+            logger.info(f"   • Content length: {ai_result['word_count']} words")
+            logger.info(f"   • Sections: {len(ai_result['sections'])}")
+            logger.info(f"   • Confidence score: {ai_result['confidence_score']}")
+
+            end_time = time.time()
+            total_time = end_time - start_time
+
+            logger.info("🎉 README GENERATION COMPLETED")
+            logger.info("-" * 50)
+            logger.info(f"⏱️  Total processing time: {total_time:.2f} seconds")
+            logger.info("📊 Final Results:")
+            logger.info(f"   • Repository: {repository_full_name}")
+            logger.info(f"   • Style: {style}")
+            logger.info(f"   • Confidence Score: {ai_result['confidence_score']}")
+            logger.info("=" * 60)
+
+            return {
+                "repository_name": repository_data.get("repository_info", {}).get("name", ""),
+                "repository_full_name": repository_full_name,
+                "generated_content": ai_result["generated_content"],
+                "sections": ai_result["sections"],
+                "word_count": ai_result["word_count"],
+                "confidence_score": ai_result["confidence_score"],
+                "generation_parameters": ai_result["generation_parameters"],
+                "analysis_summary": ai_result["analysis_summary"],
+                "repository_analysis": repository_analysis,
+            }
+
+        except Exception as e:
+            logger.error(f"💥 ERROR in README generation for {repository_full_name}: {e}")
+            logger.error(f"⏱️  Failed after {time.time() - start_time:.2f} seconds")
+            raise
+
+    async def _create_recommendation_version(
+        self, db: AsyncSession, recommendation: Recommendation, change_type: str, change_description: Optional[str] = None, created_by: str = "system"
+    ) -> RecommendationVersion:
+        """Create a new version entry for a recommendation."""
+        # Get the next version number
+        query = (
+            select(RecommendationVersion)
+            .where(RecommendationVersion.recommendation_id == recommendation.id)
+            .order_by(desc(RecommendationVersion.version_number))
+        )
+
+        result = await db.execute(query)
+        last_version = result.scalar_one_or_none()
+
+        next_version_number = 1 if not last_version else last_version.version_number + 1
+
+        # Create the version entry
+        version = RecommendationVersion(
+            recommendation_id=recommendation.id,
+            version_number=next_version_number,
+            change_type=change_type,
+            change_description=change_description,
+            title=recommendation.title,
+            content=recommendation.content,
+            generation_parameters=recommendation.generation_parameters,
+            confidence_score=recommendation.confidence_score,
+            word_count=recommendation.word_count,
+            created_by=created_by,
+        )
+
+        db.add(version)
+        await db.commit()
+        await db.refresh(version)
+
+        logger.info(f"📝 Created version {next_version_number} for recommendation {recommendation.id}")
+        return version
+
+    async def get_recommendation_version_history(self, db: AsyncSession, recommendation_id: int) -> RecommendationVersionHistoryResponse:
+        """Get the version history for a recommendation."""
+        # Get the recommendation
+        query = select(Recommendation).where(Recommendation.id == recommendation_id)
+        result = await db.execute(query)
+        recommendation = result.scalar_one_or_none()
+
+        if not recommendation:
+            raise ValueError(f"Recommendation with ID {recommendation_id} not found")
+
+        # Get all versions
+        versions_query = (
+            select(RecommendationVersion)
+            .where(RecommendationVersion.recommendation_id == recommendation_id)
+            .order_by(desc(RecommendationVersion.version_number))
+        )
+
+        versions_result = await db.execute(versions_query)
+        versions = versions_result.scalars().all()
+
+        # Convert to response format
+        version_infos = []
+        for version in versions:
+            version_infos.append(
+                RecommendationVersionInfo(
+                    id=version.id,
+                    version_number=version.version_number,
+                    change_type=version.change_type,
+                    change_description=version.change_description,
+                    confidence_score=version.confidence_score,
+                    word_count=version.word_count,
+                    created_at=version.created_at,
+                    created_by=version.created_by,
+                )
+            )
+
+        # Get current version number (latest)
+        current_version = max([v.version_number for v in versions]) if versions else 1
+
+        return RecommendationVersionHistoryResponse(
+            recommendation_id=recommendation_id,
+            total_versions=len(versions),
+            current_version=current_version,
+            versions=version_infos,
+        )
+
+    async def compare_recommendation_versions(
+        self, db: AsyncSession, recommendation_id: int, version_a_id: int, version_b_id: int
+    ) -> VersionComparisonResponse:
+        """Compare two versions of a recommendation."""
+        # Get both versions
+        version_query = select(RecommendationVersion).where(
+            RecommendationVersion.recommendation_id == recommendation_id, RecommendationVersion.id.in_([version_a_id, version_b_id])
+        )
+
+        version_result = await db.execute(version_query)
+        versions = version_result.scalars().all()
+
+        if len(versions) != 2:
+            raise ValueError("One or both versions not found")
+
+        version_a = next(v for v in versions if v.id == version_a_id)
+        version_b = next(v for v in versions if v.id == version_b_id)
+
+        # Convert to detailed format
+        version_a_detail = RecommendationVersionDetail(
+            id=version_a.id,
+            recommendation_id=version_a.recommendation_id,
+            version_number=version_a.version_number,
+            change_type=version_a.change_type,
+            change_description=version_a.change_description,
+            title=version_a.title,
+            content=version_a.content,
+            generation_parameters=version_a.generation_parameters,
+            confidence_score=version_a.confidence_score,
+            word_count=version_a.word_count,
+            created_at=version_a.created_at,
+            created_by=version_a.created_by,
+        )
+
+        version_b_detail = RecommendationVersionDetail(
+            id=version_b.id,
+            recommendation_id=version_b.recommendation_id,
+            version_number=version_b.version_number,
+            change_type=version_b.change_type,
+            change_description=version_b.change_description,
+            title=version_b.title,
+            content=version_b.content,
+            generation_parameters=version_b.generation_parameters,
+            confidence_score=version_b.confidence_score,
+            word_count=version_b.word_count,
+            created_at=version_b.created_at,
+            created_by=version_b.created_by,
+        )
+
+        # Calculate differences
+        differences = self._calculate_version_differences(version_a_detail, version_b_detail)
+
+        return VersionComparisonResponse(
+            recommendation_id=recommendation_id,
+            version_a=version_a_detail,
+            version_b=version_b_detail,
+            differences=differences,
+        )
+
+    def _calculate_version_differences(self, version_a: RecommendationVersionDetail, version_b: RecommendationVersionDetail) -> Dict[str, Any]:
+        """Calculate differences between two recommendation versions."""
+        differences = {}
+
+        # Title differences
+        if version_a.title != version_b.title:
+            differences["title"] = {"version_a": version_a.title, "version_b": version_b.title, "changed": True}
+
+        # Content differences (basic word count comparison)
+        if version_a.word_count != version_b.word_count:
+            differences["content_length"] = {
+                "version_a_words": version_a.word_count,
+                "version_b_words": version_b.word_count,
+                "difference": version_b.word_count - version_a.word_count,
+            }
+
+        # Confidence score differences
+        if version_a.confidence_score != version_b.confidence_score:
+            differences["confidence_score"] = {
+                "version_a": version_a.confidence_score,
+                "version_b": version_b.confidence_score,
+                "improvement": version_b.confidence_score - version_a.confidence_score,
+            }
+
+        # Generation parameters differences
+        if version_a.generation_parameters != version_b.generation_parameters:
+            differences["generation_parameters"] = {
+                "version_a": version_a.generation_parameters,
+                "version_b": version_b.generation_parameters,
+                "changed": True,
+            }
+
+        # Change type differences
+        if version_a.change_type != version_b.change_type:
+            differences["change_type"] = {"version_a": version_a.change_type, "version_b": version_b.change_type, "changed": True}
+
+        return differences
+
+    async def revert_recommendation_to_version(
+        self, db: AsyncSession, recommendation_id: int, version_id: int, revert_reason: Optional[str] = None
+    ) -> RecommendationResponse:
+        """Revert a recommendation to a specific version."""
+        # Get the target version
+        version_query = select(RecommendationVersion).where(
+            RecommendationVersion.id == version_id, RecommendationVersion.recommendation_id == recommendation_id
+        )
+        version_result = await db.execute(version_query)
+        target_version = version_result.scalar_one_or_none()
+
+        if not target_version:
+            raise ValueError(f"Version {version_id} not found for recommendation {recommendation_id}")
+
+        # Get the current recommendation
+        rec_query = select(Recommendation).where(Recommendation.id == recommendation_id)
+        rec_result = await db.execute(rec_query)
+        recommendation = rec_result.scalar_one_or_none()
+
+        if not recommendation:
+            raise ValueError(f"Recommendation {recommendation_id} not found")
+
+        # Create a version of the current state before reverting
+        await self._create_recommendation_version(
+            db=db,
+            recommendation=recommendation,
+            change_type="revert_backup",
+            change_description=f"Backup before reverting to version {target_version.version_number}",
+            created_by="system",
+        )
+
+        # Update the recommendation with the target version's content
+        recommendation.title = target_version.title
+        recommendation.content = target_version.content
+        recommendation.generation_parameters = target_version.generation_parameters
+        recommendation.confidence_score = target_version.confidence_score
+        recommendation.word_count = target_version.word_count
+
+        # Create a new version entry for the revert
+        await self._create_recommendation_version(
+            db=db,
+            recommendation=recommendation,
+            change_type="reverted",
+            change_description=revert_reason or f"Reverted to version {target_version.version_number}",
+            created_by="user",
+        )
+
+        await db.commit()
+        await db.refresh(recommendation)
+
+        # Convert to response
+        response = RecommendationResponse.from_orm(recommendation)
+
+        # Get GitHub username
+        github_profile_query = select(GitHubProfile.github_username).where(GitHubProfile.id == recommendation.github_profile_id)
+        github_result = await db.execute(github_profile_query)
+        github_username = github_result.scalar_one_or_none()
+        response.github_username = github_username
+
+        logger.info(f"🔄 Successfully reverted recommendation {recommendation_id} to version {target_version.version_number}")
+        return response
+
+    def _get_role_skill_requirements(self, role: str, experience_level: str = "mid") -> Dict[str, Any]:
+        """Get skill requirements for common job roles."""
+        role_requirements = {
+            "frontend_developer": {
+                "junior": {
+                    "required": ["HTML", "CSS", "JavaScript"],
+                    "preferred": ["React", "Vue", "Angular", "Git", "Responsive Design"],
+                    "nice_to_have": ["TypeScript", "Webpack", "Testing", "Node.js"],
+                },
+                "mid": {
+                    "required": ["HTML", "CSS", "JavaScript", "React/Vue/Angular", "Git"],
+                    "preferred": ["TypeScript", "Testing", "Build Tools", "Performance Optimization"],
+                    "nice_to_have": ["GraphQL", "Mobile Development", "Design Systems", "CI/CD"],
+                },
+                "senior": {
+                    "required": ["HTML", "CSS", "JavaScript", "React/Vue/Angular", "TypeScript", "Testing"],
+                    "preferred": ["Architecture", "Performance", "Mentoring", "Code Review", "CI/CD"],
+                    "nice_to_have": ["Leadership", "System Design", "DevOps", "Product Management"],
+                },
+            },
+            "backend_developer": {
+                "junior": {
+                    "required": ["Python/Java/Node.js", "SQL", "REST APIs"],
+                    "preferred": ["Git", "Testing", "Linux/Unix", "Docker"],
+                    "nice_to_have": ["ORM", "Caching", "Security", "Microservices"],
+                },
+                "mid": {
+                    "required": ["Python/Java/Node.js", "SQL", "REST APIs", "Testing", "Git"],
+                    "preferred": ["ORM", "Caching", "Security", "Docker", "AWS/GCP/Azure"],
+                    "nice_to_have": ["Microservices", "GraphQL", "Message Queues", "Monitoring"],
+                },
+                "senior": {
+                    "required": ["Python/Java/Node.js", "SQL", "REST APIs", "Testing", "Architecture"],
+                    "preferred": ["Microservices", "Cloud Platforms", "Security", "Performance", "Mentoring"],
+                    "nice_to_have": ["System Design", "DevOps", "Leadership", "Product Strategy"],
+                },
+            },
+            "fullstack_developer": {
+                "junior": {
+                    "required": ["HTML", "CSS", "JavaScript", "Python/Java/Node.js", "SQL"],
+                    "preferred": ["React/Vue", "Git", "REST APIs", "Testing"],
+                    "nice_to_have": ["TypeScript", "Docker", "AWS/GCP", "Responsive Design"],
+                },
+                "mid": {
+                    "required": ["HTML", "CSS", "JavaScript", "Python/Java/Node.js", "SQL", "REST APIs"],
+                    "preferred": ["React/Vue", "TypeScript", "Testing", "Docker", "AWS/GCP"],
+                    "nice_to_have": ["GraphQL", "Microservices", "CI/CD", "Performance Optimization"],
+                },
+                "senior": {
+                    "required": ["HTML", "CSS", "JavaScript", "Python/Java/Node.js", "SQL", "Architecture"],
+                    "preferred": ["TypeScript", "Microservices", "Cloud Platforms", "Testing", "Performance"],
+                    "nice_to_have": ["Leadership", "System Design", "DevOps", "Product Management"],
+                },
+            },
+            "data_scientist": {
+                "junior": {
+                    "required": ["Python", "SQL", "Statistics", "Pandas", "NumPy"],
+                    "preferred": ["Machine Learning", "Matplotlib", "Jupyter", "Git"],
+                    "nice_to_have": ["R", "TensorFlow", "Scikit-learn", "Tableau"],
+                },
+                "mid": {
+                    "required": ["Python", "SQL", "Statistics", "Machine Learning", "Pandas", "NumPy"],
+                    "preferred": ["TensorFlow/PyTorch", "Scikit-learn", "Data Visualization", "Big Data"],
+                    "nice_to_have": ["Deep Learning", "Spark", "AWS/GCP", "Experimentation"],
+                },
+                "senior": {
+                    "required": ["Python", "SQL", "Statistics", "Machine Learning", "Deep Learning"],
+                    "preferred": ["Big Data", "MLOps", "Experimentation", "Leadership", "Strategy"],
+                    "nice_to_have": ["System Design", "Product Management", "Research", "Publications"],
+                },
+            },
+            "devops_engineer": {
+                "junior": {
+                    "required": ["Linux/Unix", "Git", "Docker", "CI/CD"],
+                    "preferred": ["AWS/GCP/Azure", "Kubernetes", "Terraform", "Monitoring"],
+                    "nice_to_have": ["Python", "Shell Scripting", "Security", "Networking"],
+                },
+                "mid": {
+                    "required": ["Linux/Unix", "Docker", "Kubernetes", "CI/CD", "AWS/GCP/Azure"],
+                    "preferred": ["Terraform", "Monitoring", "Security", "Python", "Shell Scripting"],
+                    "nice_to_have": ["Service Mesh", "GitOps", "Site Reliability", "Automation"],
+                },
+                "senior": {
+                    "required": ["Linux/Unix", "Docker", "Kubernetes", "CI/CD", "Infrastructure as Code"],
+                    "preferred": ["Site Reliability", "Security", "Automation", "Leadership", "Strategy"],
+                    "nice_to_have": ["Platform Engineering", "Multi-cloud", "Compliance", "Cost Optimization"],
+                },
+            },
+        }
+
+        # Normalize role name
+        normalized_role = role.lower().replace(" ", "_").replace("-", "_")
+
+        # Find matching role or use closest match
+        if normalized_role in role_requirements:
+            return role_requirements[normalized_role].get(experience_level, role_requirements[normalized_role]["mid"])
+        else:
+            # Try to find partial matches
+            for role_key in role_requirements:
+                if role_key in normalized_role or normalized_role in role_key:
+                    return role_requirements[role_key].get(experience_level, role_requirements[role_key]["mid"])
+
+            # Default fallback
+            return {
+                "required": ["Programming", "Git", "Communication"],
+                "preferred": ["Testing", "Documentation", "Teamwork"],
+                "nice_to_have": ["Leadership", "Problem Solving", "Continuous Learning"],
+            }
+
+    def _analyze_skill_match(self, user_skill: str, required_skills: List[str], user_skills_data: Dict[str, Any]) -> SkillMatch:
+        """Analyze how well a user's skill matches job requirements."""
+        # Extract user's skills from different categories
+        user_technical_skills = set(user_skills_data.get("technical_skills", []))
+        user_frameworks = set(user_skills_data.get("frameworks", []))
+        user_tools = set(user_skills_data.get("tools", []))
+        user_domains = set(user_skills_data.get("domains", []))
+        user_dependencies = set(user_skills_data.get("dependencies_found", []))
+
+        # Combine all user skills for matching
+        all_user_skills = user_technical_skills | user_frameworks | user_tools | user_domains | user_dependencies
+
+        # Normalize skills for comparison
+        user_skill_lower = user_skill.lower()
+        user_skills_lower = {skill.lower() for skill in all_user_skills}
+
+        # Find matches
+        evidence = []
+        match_score = 0
+
+        # Direct match
+        if user_skill_lower in user_skills_lower:
+            match_score += 40
+            evidence.append("Direct match found in profile")
+
+        # Partial matches
+        for user_skill_name in all_user_skills:
+            user_skill_name_lower = user_skill_name.lower()
+            if (user_skill_lower in user_skill_name_lower or user_skill_name_lower in user_skill_lower) and user_skill_lower != user_skill_name_lower:
+                match_score += 20
+                evidence.append(f"Related skill: {user_skill_name}")
+                break
+
+        # Check for related technologies
+        related_tech = self._get_related_technologies(user_skill)
+        for tech in related_tech:
+            if tech.lower() in user_skills_lower:
+                match_score += 15
+                evidence.append(f"Related technology: {tech}")
+
+        # Determine match level
+        if match_score >= 40:
+            match_level = "strong"
+        elif match_score >= 20:
+            match_level = "moderate"
+        elif match_score >= 5:
+            match_level = "weak"
+        else:
+            match_level = "missing"
+            evidence.append("No relevant skills found in profile")
+
+        # Boost confidence for strong evidence
+        confidence_score = min(match_score + 20, 100)
+
+        return SkillMatch(skill=user_skill, match_level=match_level, evidence=evidence, confidence_score=confidence_score)
+
+    def _get_related_technologies(self, skill: str) -> List[str]:
+        """Get related technologies for a given skill."""
+        related_tech_map = {
+            "javascript": ["node.js", "express", "react", "vue", "angular"],
+            "python": ["django", "flask", "fastapi", "pandas", "numpy", "tensorflow"],
+            "java": ["spring", "hibernate", "maven", "gradle"],
+            "react": ["javascript", "typescript", "redux", "next.js"],
+            "docker": ["kubernetes", "containerization", "devops"],
+            "aws": ["cloud", "ec2", "s3", "lambda", "terraform"],
+            "testing": ["jest", "pytest", "junit", "selenium", "cypress"],
+            "git": ["version control", "github", "gitlab", "collaboration"],
+            "sql": ["database", "postgresql", "mysql", "mongodb", "orm"],
+            "machine learning": ["python", "tensorflow", "pytorch", "scikit-learn", "pandas"],
+        }
+
+        skill_lower = skill.lower()
+        for key, related in related_tech_map.items():
+            if key in skill_lower or skill_lower in key:
+                return related
+
+        return []
+
+    def _generate_skill_recommendations(self, skill_analysis: List[SkillMatch], target_role: str) -> Dict[str, List[str]]:
+        """Generate recommendations based on skill analysis."""
+        recommendations = []
+        learning_resources = []
+
+        missing_skills = [match.skill for match in skill_analysis if match.match_level == "missing"]
+        weak_skills = [match.skill for match in skill_analysis if match.match_level == "weak"]
+
+        # Generate specific recommendations
+        for skill in missing_skills[:5]:  # Focus on top 5 missing skills
+            if "javascript" in skill.lower():
+                recommendations.append(f"Learn {skill} fundamentals and practice with small projects")
+                learning_resources.append("freeCodeCamp JavaScript curriculum")
+                learning_resources.append("MDN Web Docs")
+            elif "python" in skill.lower():
+                recommendations.append(f"Master {skill} basics and build data processing applications")
+                learning_resources.append("Python Crash Course book")
+                learning_resources.append("Codecademy Python course")
+            elif "react" in skill.lower():
+                recommendations.append("Build React applications and learn component patterns")
+                learning_resources.append("React Official Documentation")
+                learning_resources.append("React for Beginners course")
+            elif "docker" in skill.lower():
+                recommendations.append(f"Learn containerization with {skill} and Kubernetes basics")
+                learning_resources.append("Docker Getting Started guide")
+                learning_resources.append("Kubernetes documentation")
+            elif "testing" in skill.lower():
+                recommendations.append("Implement comprehensive testing strategies for your projects")
+                learning_resources.append("Testing JavaScript book")
+                learning_resources.append("Jest documentation")
+            else:
+                recommendations.append(f"Develop proficiency in {skill} through hands-on projects")
+                learning_resources.append(f"Search for '{skill} tutorials' on YouTube")
+                learning_resources.append(f"Read documentation for {skill}")
+
+        # Add general recommendations
+        if len(missing_skills) > 3:
+            recommendations.append("Focus on building a portfolio project that demonstrates multiple required skills")
+            learning_resources.append("GitHub learning paths")
+
+        if weak_skills:
+            recommendations.append(f"Strengthen your knowledge in: {', '.join(weak_skills[:3])}")
+
+        return {
+            "recommendations": recommendations[:8],  # Limit to 8 recommendations
+            "learning_resources": learning_resources[:6],  # Limit to 6 resources
+        }
+
+    async def analyze_skill_gaps(self, request: SkillGapAnalysisRequest) -> SkillGapAnalysisResponse:
+        """Analyze skill gaps for a target role."""
+        import time
+
+        start_time = time.time()
+
+        try:
+            logger.info("📊 SKILL GAP ANALYSIS STARTED")
+            logger.info("=" * 60)
+            logger.info(f"👤 GitHub Username: {request.github_username}")
+            logger.info(f"🎯 Target Role: {request.target_role}")
+            logger.info(f"🏢 Industry: {request.industry}")
+            logger.info(f"📈 Experience Level: {request.experience_level}")
+
+            # Get GitHub profile data
+            logger.info("🔍 STEP 1: FETCHING GITHUB PROFILE")
+            logger.info("-" * 50)
+
+            github_data = await self.github_service.analyze_github_profile(username=request.github_username, force_refresh=False)
+
+            if not github_data:
+                logger.error(f"❌ Failed to analyze GitHub profile for {request.github_username}")
+                raise ValueError(f"Could not analyze GitHub profile for {request.github_username}")
+
+            logger.info("✅ GitHub profile analysis successful")
+
+            # Get skill requirements for the target role
+            logger.info("📋 STEP 2: ANALYZING ROLE REQUIREMENTS")
+            logger.info("-" * 50)
+
+            role_requirements = self._get_role_skill_requirements(request.target_role, request.experience_level)
+
+            logger.info(f"📋 Role requirements loaded: {len(role_requirements['required'])} required skills")
+
+            # Analyze skill matches
+            logger.info("🔍 STEP 3: ANALYZING SKILL MATCHES")
+            logger.info("-" * 50)
+
+            user_skills = github_data.get("skills", {})
+            skill_analysis = []
+
+            # Analyze required skills
+            for skill in role_requirements["required"]:
+                match = self._analyze_skill_match(skill, role_requirements["required"], user_skills)
+                skill_analysis.append(match)
+
+            # Analyze preferred skills (partial weight)
+            for skill in role_requirements["preferred"][:5]:  # Top 5 preferred skills
+                match = self._analyze_skill_match(skill, role_requirements["required"], user_skills)
+                match.confidence_score = int(match.confidence_score * 0.8)  # Reduce weight for preferred skills
+                skill_analysis.append(match)
+
+            logger.info(f"✅ Analyzed {len(skill_analysis)} skills")
+
+            # Calculate overall match score
+            required_matches = [match for match in skill_analysis if match.match_level in ["strong", "moderate"]]
+            overall_match_score = int((len(required_matches) / len(role_requirements["required"])) * 100)
+            overall_match_score = min(overall_match_score, 100)
+
+            # Generate insights
+            logger.info("💡 STEP 4: GENERATING INSIGHTS")
+            logger.info("-" * 50)
+
+            # Identify strengths and gaps
+            strengths = []
+            gaps = []
+
+            for match in skill_analysis:
+                if match.match_level == "strong":
+                    strengths.append(match.skill)
+                elif match.match_level in ["missing", "weak"]:
+                    gaps.append(match.skill)
+
+            # Generate recommendations
+            recommendations_data = self._generate_skill_recommendations(skill_analysis, request.target_role)
+
+            # Create analysis summary
+            analysis_summary = self._create_gap_analysis_summary(overall_match_score, len(strengths), len(gaps), request.target_role)
+
+            logger.info("🎉 SKILL GAP ANALYSIS COMPLETED")
+            logger.info("-" * 50)
+            logger.info(f"📊 Overall Match Score: {overall_match_score}%")
+            logger.info(f"💪 Strengths Identified: {len(strengths)}")
+            logger.info(f"🎯 Gaps Identified: {len(gaps)}")
+            logger.info("=" * 60)
+
+            return SkillGapAnalysisResponse(
+                github_username=request.github_username,
+                target_role=request.target_role,
+                overall_match_score=overall_match_score,
+                skill_analysis=skill_analysis,
+                strengths=strengths,
+                gaps=gaps,
+                recommendations=recommendations_data["recommendations"],
+                learning_resources=recommendations_data["learning_resources"],
+                analysis_summary=analysis_summary,
+                generated_at=datetime.utcnow(),
+            )
+
+        except Exception as e:
+            logger.error(f"💥 ERROR in skill gap analysis for {request.github_username}: {e}")
+            logger.error(f"⏱️  Failed after {time.time() - start_time:.2f} seconds")
+            raise
+
+    def _create_gap_analysis_summary(self, match_score: int, strengths_count: int, gaps_count: int, target_role: str) -> str:
+        """Create a summary of the skill gap analysis."""
+        if match_score >= 80:
+            summary = f"Excellent match for {target_role} role! You have strong foundational skills with {strengths_count} key strengths."
+        elif match_score >= 60:
+            summary = f"Good match for {target_role} role. You have {strengths_count} strengths but {gaps_count} areas for improvement."
+        elif match_score >= 40:
+            summary = f"Moderate match for {target_role} role. Consider developing {gaps_count} key skills to strengthen your profile."
+        else:
+            summary = f"Significant gaps for {target_role} role. Focus on building {gaps_count} core skills to become competitive."
+
+        if gaps_count > 0:
+            summary += " Prioritize learning the missing skills to improve your overall match score."
+
+        return summary
+
+    def _analyze_contributor_focus(self, contributor_commits: List[Dict[str, Any]], languages: List[str]) -> str:
+        """Analyze a contributor's focus area based on their commits and languages."""
+        if not contributor_commits:
+            return "general"
+
+        # Analyze commit messages for focus areas
+        commit_messages = [commit.get("message", "").lower() for commit in contributor_commits]
+
+        focus_scores = {"frontend": 0, "backend": 0, "testing": 0, "devops": 0, "documentation": 0, "design": 0}
+
+        # Keywords for different focus areas
+        focus_keywords = {
+            "frontend": ["frontend", "ui", "ux", "component", "react", "vue", "angular", "css", "html", "javascript"],
+            "backend": ["backend", "api", "server", "database", "sql", "python", "java", "node", "php"],
+            "testing": ["test", "spec", "jest", "pytest", "selenium", "cypress", "coverage"],
+            "devops": ["docker", "kubernetes", "ci", "cd", "pipeline", "deploy", "aws", "terraform"],
+            "documentation": ["readme", "docs", "documentation", "comment", "guide"],
+            "design": ["design", "architecture", "structure", "pattern", "system"],
+        }
+
+        for message in commit_messages:
+            for focus, keywords in focus_keywords.items():
+                if any(keyword in message for keyword in keywords):
+                    focus_scores[focus] += 1
+
+        # Language-based focus hints
+        language_hints = {
+            "frontend": ["javascript", "typescript", "html", "css"],
+            "backend": ["python", "java", "php", "ruby", "go", "rust"],
+            "devops": ["shell", "yaml", "dockerfile"],
+        }
+
+        for focus, langs in language_hints.items():
+            if any(lang in " ".join(languages).lower() for lang in langs):
+                focus_scores[focus] += 2
+
+        # Return the focus with highest score
+        if max(focus_scores.values()) > 0:
+            return max(focus_scores.items(), key=lambda x: x[1])[0]
+
+        return "general"
+
+    def _extract_key_contributions(self, contributor_commits: List[Dict[str, Any]], max_contributions: int = 3) -> List[str]:
+        """Extract key contributions from a contributor's commits."""
+        if not contributor_commits:
+            return []
+
+        contributions = []
+
+        # Look for significant commits (those with many files changed or important keywords)
+        significant_commits = []
+        for commit in contributor_commits:
+            files_changed = commit.get("files_changed", 0)
+            message = commit.get("message", "").lower()
+
+            # Score significance
+            significance_score = 0
+            significance_score += files_changed * 2  # Files changed
+            significance_score += len(message.split()) // 10  # Message length
+            if any(word in message for word in ["add", "implement", "create", "build", "feature"]):
+                significance_score += 5
+            if any(word in message for word in ["fix", "resolve", "correct", "bug"]):
+                significance_score += 3
+
+            significant_commits.append((commit, significance_score))
+
+        # Sort by significance and take top contributions
+        significant_commits.sort(key=lambda x: x[1], reverse=True)
+
+        for commit, _ in significant_commits[:max_contributions]:
+            message = commit.get("message", "").strip()
+            if message:
+                # Clean up the message for presentation
+                if message.startswith("feat: ") or message.startswith("fix: "):
+                    message = message.split(": ", 1)[1]
+                message = message[0].upper() + message[1:]
+                contributions.append(message)
+
+        return contributions
+
+    async def generate_multi_contributor_recommendation(self, request: MultiContributorRequest) -> MultiContributorResponse:
+        """Generate a recommendation highlighting multiple contributors to a repository."""
+        import time
+
+        start_time = time.time()
+
+        try:
+            logger.info("👥 MULTI-CONTRIBUTOR RECOMMENDATION STARTED")
+            logger.info("=" * 60)
+            logger.info(f"📁 Repository: {request.repository_full_name}")
+            logger.info(f"👥 Max Contributors: {request.max_contributors}")
+            logger.info(f"📈 Min Contributions: {request.min_contributions}")
+
+            # Get repository contributors
+            logger.info("🔍 STEP 1: FETCHING REPOSITORY CONTRIBUTORS")
+            logger.info("-" * 50)
+
+            contributors_data = await self.github_service.get_repository_contributors(
+                request.repository_full_name, max_contributors=request.max_contributors * 2, force_refresh=False  # Get more to filter
+            )
+
+            if not contributors_data:
+                logger.error(f"❌ Failed to get contributors for {request.repository_full_name}")
+                raise ValueError(f"Could not get contributors for {request.repository_full_name}")
+
+            contributors = contributors_data.get("contributors", [])
+            logger.info(f"✅ Found {len(contributors)} total contributors")
+
+            # Filter contributors by minimum contributions
+            qualified_contributors = [c for c in contributors if c.get("contributions", 0) >= request.min_contributions][: request.max_contributors]
+
+            if len(qualified_contributors) < 2:
+                logger.warning(f"⚠️  Only {len(qualified_contributors)} qualified contributors found")
+                # Continue anyway, but note the limitation
+
+            logger.info(f"✅ Analyzing {len(qualified_contributors)} qualified contributors")
+
+            # Analyze each contributor
+            logger.info("🔍 STEP 2: ANALYZING INDIVIDUAL CONTRIBUTORS")
+            logger.info("-" * 50)
+
+            analyzed_contributors = []
+
+            for i, contributor in enumerate(qualified_contributors):
+                username = contributor.get("username")
+                logger.info(f"   • Analyzing contributor {i+1}: {username}")
+
+                try:
+                    # Get contributor's GitHub profile
+                    contributor_profile = await self.github_service.analyze_github_profile(username=username, force_refresh=False)
+
+                    if contributor_profile:
+                        # Extract key information
+                        user_data = contributor_profile.get("user_data", {})
+                        skills = contributor_profile.get("skills", {})
+                        languages = contributor_profile.get("languages", [])
+
+                        # Get contributor's commits to this repository
+                        # Note: This is a simplified approach - in a real implementation,
+                        # you'd want to filter commits by repository
+                        commit_analysis = contributor_profile.get("commit_analysis", {})
+                        contributor_commits = []
+                        if commit_analysis.get("total_commits_analyzed", 0) > 0:
+                            # This is approximate - ideally we'd get repo-specific commits
+                            contributor_commits = [
+                                {"message": f"Contribution to {request.repository_full_name}", "files_changed": contributor.get("contributions", 0)}
+                            ]
+
+                        # Analyze contributor focus
+                        primary_languages = [lang.get("language") for lang in languages[:3]]
+                        contribution_focus = self._analyze_contributor_focus(contributor_commits, primary_languages)
+
+                        # Extract key contributions
+                        key_contributions = self._extract_key_contributions(contributor_commits)
+
+                        # Get top skills
+                        technical_skills = skills.get("technical_skills", [])[:3]
+                        frameworks = skills.get("frameworks", [])[:2]
+                        top_skills = technical_skills + frameworks
+
+                        contributor_info = ContributorInfo(
+                            username=username,
+                            full_name=user_data.get("full_name") or user_data.get("name"),
+                            contributions=contributor.get("contributions", 0),
+                            primary_languages=primary_languages,
+                            top_skills=top_skills,
+                            contribution_focus=contribution_focus,
+                            key_contributions=key_contributions,
+                        )
+
+                        analyzed_contributors.append(contributor_info)
+
+                except Exception as e:
+                    logger.warning(f"Could not analyze contributor {username}: {e}")
+                    # Add basic info for contributor we couldn't analyze fully
+                    contributor_info = ContributorInfo(
+                        username=username,
+                        full_name=contributor.get("full_name") or username,
+                        contributions=contributor.get("contributions", 0),
+                        primary_languages=[],
+                        top_skills=[],
+                        contribution_focus="general",
+                        key_contributions=[],
+                    )
+                    analyzed_contributors.append(contributor_info)
+
+            # Generate team insights
+            logger.info("💡 STEP 3: GENERATING TEAM INSIGHTS")
+            logger.info("-" * 50)
+
+            team_highlights = self._generate_team_highlights(analyzed_contributors, contributors_data)
+            collaboration_insights = self._generate_collaboration_insights(analyzed_contributors)
+            technical_diversity = self._calculate_technical_diversity(analyzed_contributors)
+
+            # Generate the multi-contributor recommendation
+            logger.info("🤖 STEP 4: GENERATING AI RECOMMENDATION")
+            logger.info("-" * 50)
+
+            ai_result = await self.ai_service._generate_multi_contributor_recommendation(
+                repository_data={"repository_info": {"name": request.repository_full_name.split("/")[-1]}},
+                contributors=analyzed_contributors,
+                team_highlights=team_highlights,
+                collaboration_insights=collaboration_insights,
+                technical_diversity=technical_diversity,
+                recommendation_type=request.recommendation_type,
+                tone=request.tone,
+                length=request.length,
+                focus_areas=request.focus_areas,
+            )
+
+            logger.info("🎉 MULTI-CONTRIBUTOR RECOMMENDATION COMPLETED")
+            logger.info("-" * 50)
+            logger.info(f"📊 Contributors Analyzed: {len(analyzed_contributors)}")
+            logger.info(f"📝 Recommendation Length: {ai_result['word_count']} words")
+            logger.info(f"🎯 Confidence Score: {ai_result['confidence_score']}")
+            logger.info("=" * 60)
+
+            return MultiContributorResponse(
+                repository_name=request.repository_full_name.split("/")[-1],
+                repository_full_name=request.repository_full_name,
+                total_contributors=len(contributors),
+                contributors_analyzed=len(analyzed_contributors),
+                contributors=analyzed_contributors,
+                recommendation=ai_result["recommendation"],
+                team_highlights=team_highlights,
+                collaboration_insights=collaboration_insights,
+                technical_diversity=technical_diversity,
+                word_count=ai_result["word_count"],
+                confidence_score=ai_result["confidence_score"],
+                generated_at=datetime.utcnow(),
+            )
+
+        except Exception as e:
+            logger.error(f"💥 ERROR in multi-contributor recommendation for {request.repository_full_name}: {e}")
+            logger.error(f"⏱️  Failed after {time.time() - start_time:.2f} seconds")
+            raise
+
+    def _generate_team_highlights(self, contributors: List[ContributorInfo], contributors_data: Dict[str, Any]) -> List[str]:
+        """Generate highlights about the team as a whole."""
+        highlights = []
+
+        if not contributors:
+            return highlights
+
+        # Total contributions
+        total_contributions = sum(c.contributions for c in contributors)
+        highlights.append(f"Team of {len(contributors)} contributors with {total_contributions} total contributions")
+
+        # Technical diversity
+        all_languages = set()
+        for contributor in contributors:
+            all_languages.update(contributor.primary_languages)
+
+        if len(all_languages) > 1:
+            highlights.append(f"Technically diverse team working with {len(all_languages)} programming languages")
+
+        # Collaboration indicators
+        focus_areas = [c.contribution_focus for c in contributors if c.contribution_focus != "general"]
+        if len(set(focus_areas)) > 1:
+            highlights.append("Well-balanced team with complementary technical expertise")
+
+        # High contributors
+        high_contributors = [c for c in contributors if c.contributions > 10]
+        if high_contributors:
+            highlights.append(f"{len(high_contributors)} highly active contributors driving project success")
+
+        return highlights[:5]  # Limit to top 5 highlights
+
+    def _generate_collaboration_insights(self, contributors: List[ContributorInfo]) -> List[str]:
+        """Generate insights about team collaboration."""
+        insights = []
+
+        if not contributors:
+            return insights
+
+        # Focus area distribution
+        focus_counts = {}
+        for contributor in contributors:
+            focus = contributor.contribution_focus
+            focus_counts[focus] = focus_counts.get(focus, 0) + 1
+
+        # Identify collaboration patterns
+        if (
+            len([c for c in contributors if c.contribution_focus == "frontend"]) > 0
+            and len([c for c in contributors if c.contribution_focus == "backend"]) > 0
+        ):
+            insights.append("Strong frontend-backend collaboration for full-stack development")
+
+        if len([c for c in contributors if c.contribution_focus == "testing"]) > 0:
+            insights.append("Dedicated quality assurance with specialized testing expertise")
+
+        if len([c for c in contributors if c.contribution_focus == "devops"]) > 0:
+            insights.append("DevOps expertise ensuring smooth deployment and infrastructure management")
+
+        # Skill diversity
+        all_skills = set()
+        for contributor in contributors:
+            all_skills.update(contributor.top_skills)
+
+        if len(all_skills) > len(contributors) * 2:
+            insights.append("High skill diversity enabling comprehensive project coverage")
+
+        return insights[:4]  # Limit to top 4 insights
+
+    def _calculate_technical_diversity(self, contributors: List[ContributorInfo]) -> Dict[str, int]:
+        """Calculate technical diversity across the team."""
+        language_counts = {}
+        skill_counts = {}
+
+        for contributor in contributors:
+            # Count languages
+            for language in contributor.primary_languages:
+                language_counts[language] = language_counts.get(language, 0) + 1
+
+            # Count skills
+            for skill in contributor.top_skills:
+                skill_counts[skill] = skill_counts.get(skill, 0) + 1
+
+        # Combine into a single diversity metric
+        diversity = {}
+        diversity.update(language_counts)
+        diversity.update(skill_counts)
+
+        return dict(sorted(diversity.items(), key=lambda x: x[1], reverse=True)[:10])
 
     def _merge_repository_and_contributor_data(
         self,
@@ -575,11 +1831,11 @@ class RecommendationService:
                 merged_data["commit_analysis"]["repository_context"] = repository_data.get("repository_info", {}).get("full_name", "")
 
         # Add metadata about the analysis type
-        merged_data["analysis_type"] = "repository_contributor"
+        merged_data["analysis_context_type"] = "repository_contributor"
         merged_data["target_repository"] = repository_data.get("repository_info", {}).get("full_name", "")
         merged_data["contributor_username"] = contributor_username
 
-        logger.info(f"✅ Merged data created with analysis_type: {merged_data['analysis_type']}")
+        logger.info(f"✅ Merged data created with analysis_context_type: {merged_data['analysis_context_type']}")
         return merged_data
 
     async def create_recommendation_from_option(
@@ -588,7 +1844,8 @@ class RecommendationService:
         github_username: str,
         selected_option: Dict[str, Any],
         all_options: List[Dict[str, Any]],
-        analysis_type: str = "profile",
+        user_id: Optional[int] = None,  # Added user_id
+        analysis_context_type: str = "profile",
         repository_url: Optional[str] = None,
     ) -> RecommendationResponse:
         """Create a recommendation from a selected option."""
@@ -605,7 +1862,7 @@ class RecommendationService:
 
             # Determine analysis type and get GitHub data
             github_data: Optional[Dict[str, Any]] = None
-            if analysis_type == "repo_only" and repository_url:
+            if analysis_context_type == "repo_only" and repository_url:
                 logger.info(f"📁 Analyzing repository: {repository_url}")
                 # Extract repository name from URL
                 if "/" in repository_url:
@@ -636,7 +1893,7 @@ class RecommendationService:
             logger.info(f"⏱️  GitHub analysis completed in {github_end - github_start:.2f} seconds")
 
             if not github_data:
-                if analysis_type == "repo_only":
+                if analysis_context_type == "repo_only":
                     logger.error(f"❌ Failed to analyze GitHub repository: {repository_url}")
                     raise ValueError(f"Could not analyze GitHub repository: {repository_url}")
                 else:
@@ -668,12 +1925,13 @@ class RecommendationService:
                 "selected_option_id": selected_option.get("id"),
                 "selected_option_name": selected_option.get("name"),
                 "selected_option_focus": selected_option.get("focus"),
-                "analysis_type": analysis_type,
+                "analysis_context_type": analysis_context_type,
                 "repository_url": repository_url,
             }
 
             recommendation_data = RecommendationCreate(
                 github_profile_id=int(github_profile.id),
+                user_id=user_id,  # Pass user_id
                 title=selected_option.get(
                     "title",
                     f"Professional Recommendation for {github_username}",
