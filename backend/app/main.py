@@ -15,13 +15,16 @@ from fastapi.responses import JSONResponse
 
 from app.api.v1 import api_router
 from app.core.config import settings
-from app.core.database import (check_database_health, init_database,
-                               run_migrations)
+from app.core.database import check_database_health, init_database, run_migrations
 from app.core.exceptions import BaseApplicationError
 from app.core.logging_config import setup_logging
-from app.core.middleware import (ErrorHandlingMiddleware, LoggingMiddleware,
-                                 RateLimitingMiddleware, RequestIDMiddleware,
-                                 SecurityHeadersMiddleware)
+from app.core.middleware import (
+    ErrorHandlingMiddleware,
+    LoggingMiddleware,
+    RateLimitingMiddleware,
+    RequestIDMiddleware,
+    SecurityHeadersMiddleware,
+)
 from app.core.redis_client import check_redis_health, init_redis
 
 # Setup logging
