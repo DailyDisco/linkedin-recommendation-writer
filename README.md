@@ -20,9 +20,11 @@ Try the live application: **[linkedin-recommendation-writer-production.up.railwa
 
 ## 🚀 Railway Deployment (Recommended)
 
-**Deploy to Railway in 5 minutes:**
+### Option 1: Full-Stack Deployment (Easiest)
 
-1. **Go to Railway Dashboard**: https://railway.app/dashboard
+**Deploy everything to Railway in 5 minutes:**
+
+1. **Go to Railway Dashboard**: [https://railway.app/dashboard](https://railway.app/dashboard)
 2. **Click "New Project"**
 3. **Choose "Deploy from GitHub repo"**
 4. **Select your repository**
@@ -34,6 +36,81 @@ Try the live application: **[linkedin-recommendation-writer-production.up.railwa
 - ✅ **Backend API running**
 - ✅ **PostgreSQL database**
 - ✅ **Redis cache**
+
+### Option 2: Separate Frontend/Backend (Advanced)
+
+For better performance and scalability, deploy frontend and backend separately.
+
+#### Deploy Backend to Railway
+
+1. **Create Railway Project**:
+
+   - Go to [https://railway.app/dashboard](https://railway.app/dashboard)
+   - Click "New Project" → "Deploy from GitHub repo"
+   - Select your repository
+
+2. **Configure Environment Variables**:
+
+   - In Railway dashboard, go to your project → Variables
+   - Add these variables:
+
+     ```bash
+     GITHUB_TOKEN=your_github_token_here
+     GEMINI_API_KEY=your_gemini_api_key_here
+     POSTGRES_PASSWORD=your_secure_password_here
+     ```
+
+3. **Add Database Services**:
+
+   - In your Railway project, click "Add Plugin"
+   - Add PostgreSQL and Redis plugins
+   - Railway will automatically set `DATABASE_URL` and `REDIS_URL`
+
+4. **Get Backend URL**:
+   - After deployment, copy your Railway app URL (e.g., `https://your-app.up.railway.app`)
+   - This will be your API base URL
+
+#### Deploy Frontend to Vercel
+
+1. **Connect Repository**:
+
+   - Go to [https://vercel.com/dashboard](https://vercel.com/dashboard)
+   - Click "New Project"
+   - Import your GitHub repository
+
+2. **Configure Build Settings**:
+
+   - **Framework Preset**: Vite
+   - **Root Directory**: Leave empty (root)
+   - **Build Command**: `npm run build`
+   - **Output Directory**: `dist`
+
+3. **Set Environment Variables**:
+
+   - Add these environment variables in Vercel:
+
+     ```bash
+     VITE_API_URL=https://your-railway-backend.up.railway.app
+     VITE_APP_ENV=production
+     ```
+
+4. **Deploy**:
+   - Vercel will automatically build and deploy
+   - Get your frontend URL (e.g., `https://your-app.vercel.app`)
+
+### Railway Environment Setup
+
+After deployment, configure these environment variables in Railway:
+
+| Variable            | Description                           | Required |
+| ------------------- | ------------------------------------- | -------- |
+| `GITHUB_TOKEN`      | GitHub Personal Access Token          | ✅       |
+| `GEMINI_API_KEY`    | Google Gemini API Key                 | ✅       |
+| `POSTGRES_PASSWORD` | Database password                     | ✅       |
+| `DATABASE_URL`      | Auto-set by Railway PostgreSQL plugin | 🔄       |
+| `REDIS_URL`         | Auto-set by Railway Redis plugin      | 🔄       |
+
+**Note**: `DATABASE_URL` and `REDIS_URL` are automatically configured when you add the PostgreSQL and Redis plugins to your Railway project.
 
 ### Local Development
 
@@ -49,16 +126,48 @@ make setup
 
 Access your local app at:
 
-- **Frontend**: http://localhost:5173
-- **Backend**: http://localhost:8000
-- **API Docs**: http://localhost:8000/docs
+- **Frontend**: [http://localhost:5173](http://localhost:5173)
+- **Backend**: [http://localhost:8000](http://localhost:8000)
+- **API Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
 
 ## 📋 Prerequisites
 
-- **Docker & Docker Compose** (v20.10+)
-- **Git** (v2.30+)
-- **GitHub Personal Access Token** - Get from [GitHub Settings > Developer settings > Personal access tokens](https://github.com/settings/tokens)
-- **Google Gemini API Key** - Get from [Google AI Studio](https://makersuite.google.com/app/apikey)
+### Accounts & API Keys
+
+- **GitHub Account** - For repository access and API token
+- **Google AI Account** - For Gemini API access
+- **Railway Account** (Recommended) - For backend deployment
+- **Vercel Account** (Optional) - For frontend deployment
+
+### API Keys Setup
+
+- **GitHub Personal Access Token**:
+  - Go to [GitHub Settings > Developer settings > Personal access tokens](https://github.com/settings/tokens)
+  - Generate token with `repo`, `read:user`, `read:org` scopes
+- **Google Gemini API Key**:
+  - Visit [Google AI Studio](https://makersuite.google.com/app/apikey)
+  - Create and copy your API key
+
+### Development Tools
+
+- **Docker & Docker Compose** (v20.10+) - For containerized development
+- **Git** (v2.30+) - For version control
+- **Node.js** (v18+) - For frontend development
+- **Python** (v3.9+) - For backend development (optional)
+
+### Deployment Platforms
+
+- **Railway** - Backend, database, and full-stack deployment
+- **Vercel** - Frontend deployment (optional)
+- **GitHub** - Repository hosting
+
+### Quick Start Checklist
+
+- ✅ Create GitHub Personal Access Token
+- ✅ Get Google Gemini API Key
+- ✅ Set up Railway account
+- ✅ Fork/clone this repository
+- ✅ Choose your deployment method (Railway recommended)
 
 ## 🛠️ Installation
 
@@ -77,48 +186,181 @@ make setup
 
 ## ⚙️ Configuration
 
-Create a `.env` file with these required variables:
+### Environment Variables
+
+Configure these environment variables based on your deployment method:
+
+#### Required Variables (All Deployments)
 
 ```bash
-# Required API Keys
-GITHUB_TOKEN=your_github_token_here
-GEMINI_API_KEY=your_gemini_api_key_here
+# GitHub API Access
+GITHUB_TOKEN=your_github_personal_access_token
+
+# AI Service
+GEMINI_API_KEY=your_google_gemini_api_key
+```
+
+#### Railway Deployment (Auto-configured)
+
+```bash
+# These are automatically set by Railway plugins:
+DATABASE_URL=postgresql://user:pass@containers-us-west-xxx.railway.app:xxxx/railway
+REDIS_URL=redis://default:pass@containers-us-west-xxx.railway.app:xxxx
+
+# Set this manually in Railway dashboard:
+POSTGRES_PASSWORD=your_secure_database_password
+```
+
+#### Vercel Frontend Deployment
+
+```bash
+# Frontend environment variables
+VITE_API_URL=https://your-railway-backend.up.railway.app
+VITE_APP_ENV=production
+```
+
+#### Local Development (.env file)
+
+```bash
+# Create .env file in project root
+GITHUB_TOKEN=your_github_token
+GEMINI_API_KEY=your_gemini_key
 
 # Database (optional - will use defaults if not set)
-POSTGRES_PASSWORD=your_secure_password_here
+POSTGRES_PASSWORD=your_secure_password
 DATABASE_URL=postgresql://postgres:your_password@localhost:5432/linkedin_recommendations
 
 # Redis (optional - will use defaults if not set)
 REDIS_URL=redis://localhost:6379/0
 ```
 
-## 🚀 Deployment Options
-
-### Railway (Recommended - Single Project)
-
-**Easiest deployment - everything in one project:**
-
-1. Push your code to GitHub
-2. Go to Railway Dashboard
-3. New Project → Deploy from GitHub → Select your repo
-4. Railway auto-detects Dockerfile and deploys
-5. Add PostgreSQL and Redis plugins to the same project
-
-**Result:** One URL with frontend + backend + database + cache!
-
-### Docker (Local Development)
+#### Docker Production
 
 ```bash
-make setup-prod
+# Docker environment variables
+GITHUB_TOKEN=your_github_token
+GEMINI_API_KEY=your_gemini_key
+DATABASE_URL=postgresql://postgres:your_password@db:5432/linkedin_recommendations
+REDIS_URL=redis://redis:6379/0
 ```
 
-### Advanced: Separate Services
+### Getting API Keys
 
-If you need separate frontend/backend deployments:
+#### GitHub Personal Access Token
 
-- Deploy frontend to Vercel/Netlify
-- Deploy backend to Railway
-- Set `VITE_API_URL` to your Railway backend URL
+1. Go to [GitHub Settings > Developer settings > Personal access tokens](https://github.com/settings/tokens)
+2. Click "Generate new token (classic)"
+3. Select scopes: `repo`, `read:user`, `read:org`
+4. Copy the token (keep it secure!)
+
+#### Google Gemini API Key
+
+1. Go to [Google AI Studio](https://makersuite.google.com/app/apikey)
+2. Click "Create API Key"
+3. Copy the API key
+4. Enable billing if needed for production use
+
+### Security Notes
+
+- 🔐 **Never commit API keys** to version control
+- 🔐 **Use Railway/Vercel environment variables** for production
+- 🔐 **Rotate keys regularly** and update deployments
+- 🔐 **Monitor API usage** to avoid unexpected charges
+
+## 🚀 Deployment Options
+
+### Option A: Railway Full-Stack (Recommended)
+
+**Best for simplicity and performance:**
+
+1. **Push code to GitHub**
+2. **Railway Dashboard** → New Project → Deploy from GitHub → Select repo
+3. **Railway auto-detects** Dockerfile and deploys automatically
+4. **Add plugins**: PostgreSQL and Redis (one-click in Railway)
+5. **Set environment variables** in Railway dashboard
+
+**Result:** Single URL with everything deployed together!
+
+**Pros:** ✅ Simple, ✅ Fast setup, ✅ Everything managed together
+**Cons:** ⚠️ Less flexible for scaling individual components
+
+### Option B: Vercel + Railway (Scalable)
+
+**Best for performance and custom domains:**
+
+#### Backend (Railway)
+
+```bash
+# Deploy to Railway with database plugins
+# URL: https://your-backend.up.railway.app
+```
+
+#### Frontend (Vercel)
+
+```bash
+# Deploy to Vercel with VITE_API_URL pointing to Railway
+# URL: https://your-frontend.vercel.app
+```
+
+**Pros:** ✅ Better performance, ✅ Custom domains, ✅ Independent scaling
+**Cons:** ⚠️ More complex setup, ⚠️ Multiple services to manage
+
+### Option C: Docker Production
+
+**For self-hosted deployments:**
+
+```bash
+# Build and run production containers
+make setup-prod
+
+# Or manually:
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+**Environment variables needed:**
+
+```bash
+GITHUB_TOKEN=your_token
+GEMINI_API_KEY=your_key
+DATABASE_URL=postgresql://...
+REDIS_URL=redis://...
+```
+
+### Deployment Comparison
+
+| Feature       | Railway Full-Stack | Vercel + Railway | Docker      |
+| ------------- | ------------------ | ---------------- | ----------- |
+| Setup Time    | 5 minutes          | 15 minutes       | 30+ minutes |
+| Cost          | Low                | Medium           | Variable    |
+| Scalability   | Good               | Excellent        | Excellent   |
+| Custom Domain | ✅                 | ✅               | ✅          |
+| Database      | ✅                 | ✅               | Manual      |
+| Cache         | ✅                 | ✅               | Manual      |
+
+### Troubleshooting Deployment
+
+**Railway Issues:**
+
+- Check Railway logs in dashboard
+- Verify environment variables are set
+- Ensure Dockerfile is in root directory
+
+**Vercel Issues:**
+
+- Check build logs in Vercel dashboard
+- Verify `VITE_API_URL` is set correctly
+- Ensure build commands match your setup
+
+**CORS Issues:**
+
+- Add your frontend URL to backend CORS settings
+- Check that `VITE_API_URL` matches your backend URL exactly
+
+**Database Connection:**
+
+- Verify PostgreSQL plugin is added to Railway project
+- Check `DATABASE_URL` is accessible
+- Run database migrations if needed
 
 ## 🔧 Development
 
@@ -141,8 +383,8 @@ make shell-frontend # Frontend container
 
 Once running, visit:
 
-- **API Docs**: http://localhost:8000/docs
-- **Frontend**: http://localhost:5173
+- **API Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **Frontend**: [http://localhost:5173](http://localhost:5173)
 
 ## 🤝 Contributing
 

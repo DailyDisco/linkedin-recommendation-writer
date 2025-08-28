@@ -439,12 +439,13 @@ class AIService:
 
     def _build_option_prompt(self, base_prompt: str, custom_instruction: str, focus: str) -> str:
         """Build a customized prompt for a specific option."""
-        return """{base_prompt}
+        focus_formatted = focus.replace("_", " ")
+        return f"""{base_prompt}
 
 FOR THIS VERSION, FOCUS ON:
 {custom_instruction}
 
-Create a recommendation that really highlights their {focus.replace('_', ' ')} skills while keeping it natural and conversational.
+Create a recommendation that really highlights their {focus_formatted} skills while keeping it natural and conversational.
 """
 
     async def _generate_single_option(self, prompt: str, temperature_modifier: float) -> str:
