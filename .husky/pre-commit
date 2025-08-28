@@ -10,25 +10,6 @@ PURPLE='\033[0;35m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
-# Function to run command and return status
-run_cmd() {
-  local cmd="$1"
-  local desc="$2"
-
-  echo -e "${BLUE}🔄 Running: ${NC}$desc"
-  echo -e "${CYAN}Command: ${NC}$cmd"
-
-  # Use a subshell to ensure directory changes don't affect the main script
-  if (eval "$cmd"); then
-    echo -e "${GREEN}✅ $desc completed successfully${NC}"
-    return 0
-  else
-    local exit_code=$?
-    echo -e "${RED}❌ $desc failed${NC}"
-    return $exit_code
-  fi
-}
-
 # Check if we're in a git repository
 if ! git rev-parse --git-dir >/dev/null 2>&1; then
   echo -e "${RED}❌ Not in a git repository${NC}"
