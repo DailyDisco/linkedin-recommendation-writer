@@ -1271,7 +1271,7 @@ class GitHubService:
             commits = repo.get_commits()[:limit]  # Get first 'limit' commits
 
             commit_data = []
-            for commit in commits:  # type: ignore
+            for commit in commits:  # type: ignore[var-annotated]
                 commit_data.append(
                     {
                         "sha": commit.sha,
