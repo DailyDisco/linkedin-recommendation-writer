@@ -30,9 +30,7 @@ router = APIRouter()
 async def generate_recommendation(
     request: RecommendationRequest,
     db: AsyncSession = Depends(get_database_session),
-    recommendation_service: RecommendationService = Depends(
-        get_recommendation_service
-    ),
+    recommendation_service: RecommendationService = Depends(get_recommendation_service),
 ):
     """Generate a new LinkedIn recommendation."""
 
@@ -44,13 +42,8 @@ async def generate_recommendation(
     logger.info(f"   • Type: {request.recommendation_type}")
     logger.info(f"   • Tone: {request.tone}")
     logger.info(f"   • Length: {request.length}")
-    logger.info(
-        f"   • Custom Prompt: {'Yes' if request.custom_prompt else 'No'}"
-    )
-    logger.info(
-        f"   • Specific Skills: "
-        f"{len(request.include_specific_skills or [])} skills"
-    )
+    logger.info(f"   • Custom Prompt: {'Yes' if request.custom_prompt else 'No'}")
+    logger.info(f"   • Specific Skills: " f"{len(request.include_specific_skills or [])} skills")
 
     try:
         logger.info("🎯 Starting recommendation creation process...")
@@ -68,9 +61,7 @@ async def generate_recommendation(
         logger.info("✅ RECOMMENDATION GENERATION COMPLETED SUCCESSFULLY")
         logger.info("📊 Final Stats:")
         logger.info(f"   • Word Count: {recommendation.word_count}")
-        logger.info(
-            f"   • Confidence Score: {recommendation.confidence_score}"
-        )
+        logger.info(f"   • Confidence Score: {recommendation.confidence_score}")
         logger.info(f"   • Title: {recommendation.title[:50]}...")
         logger.info("=" * 80)
 
@@ -89,9 +80,7 @@ async def generate_recommendation(
 async def generate_recommendation_options(
     request: RecommendationRequest,
     db: AsyncSession = Depends(get_database_session),
-    recommendation_service: RecommendationService = Depends(
-        get_recommendation_service
-    ),
+    recommendation_service: RecommendationService = Depends(get_recommendation_service),
 ):
     """Generate multiple recommendation options."""
 
@@ -103,25 +92,21 @@ async def generate_recommendation_options(
     logger.info(f"   • Type: {request.recommendation_type}")
     logger.info(f"   • Tone: {request.tone}")
     logger.info(f"   • Length: {request.length}")
-    logger.info(
-        f"   • Custom Prompt: {'Yes' if request.custom_prompt else 'No'}"
-    )
+    logger.info(f"   • Custom Prompt: {'Yes' if request.custom_prompt else 'No'}")
 
     try:
         logger.info("🎯 Starting multiple options generation process...")
-        options_response = (
-            await recommendation_service.create_recommendation_options(
-                db=db,
-                github_username=request.github_username,
-                recommendation_type=request.recommendation_type,
-                tone=request.tone,
-                length=request.length,
-                custom_prompt=request.custom_prompt,
-                target_role=request.target_role,
-                specific_skills=request.include_specific_skills,
-                analysis_type=getattr(request, "analysis_type", "profile"),
-                repository_url=getattr(request, "repository_url", None),
-            )
+        options_response = await recommendation_service.create_recommendation_options(
+            db=db,
+            github_username=request.github_username,
+            recommendation_type=request.recommendation_type,
+            tone=request.tone,
+            length=request.length,
+            custom_prompt=request.custom_prompt,
+            target_role=request.target_role,
+            specific_skills=request.include_specific_skills,
+            analysis_type=getattr(request, "analysis_type", "profile"),
+            repository_url=getattr(request, "repository_url", None),
         )
 
         logger.info("✅ MULTIPLE OPTIONS GENERATION COMPLETED SUCCESSFULLY")
@@ -144,9 +129,7 @@ async def generate_recommendation_options(
 async def create_recommendation_from_option(
     request: RecommendationFromOptionRequest,
     db: AsyncSession = Depends(get_database_session),
-    recommendation_service: RecommendationService = Depends(
-        get_recommendation_service
-    ),
+    recommendation_service: RecommendationService = Depends(get_recommendation_service),
 ):
     """Create a recommendation from a selected option."""
 
@@ -160,30 +143,20 @@ async def create_recommendation_from_option(
     logger.info(f"   • Total Options Generated: {len(request.all_options)}")
 
     try:
-        logger.info(
-            "🎯 Starting recommendation creation from selected option..."
-        )
-        recommendation = (
-            await recommendation_service.create_recommendation_from_option(
-                db=db,
-                github_username=request.github_username,
-                selected_option=request.selected_option.model_dump(),
-                all_options=[
-                    option.model_dump() for option in request.all_options
-                ],
-                analysis_type=request.analysis_type or "profile",
-                repository_url=request.repository_url,
-            )
+        logger.info("🎯 Starting recommendation creation from selected option...")
+        recommendation = await recommendation_service.create_recommendation_from_option(
+            db=db,
+            github_username=request.github_username,
+            selected_option=request.selected_option.model_dump(),
+            all_options=[option.model_dump() for option in request.all_options],
+            analysis_type=request.analysis_type or "profile",
+            repository_url=request.repository_url,
         )
 
-        logger.info(
-            "✅ RECOMMENDATION CREATION FROM OPTION COMPLETED SUCCESSFULLY"
-        )
+        logger.info("✅ RECOMMENDATION CREATION FROM OPTION COMPLETED SUCCESSFULLY")
         logger.info("📊 Final Stats:")
         logger.info(f"   • Word Count: {recommendation.word_count}")
-        logger.info(
-            f"   • Confidence Score: {recommendation.confidence_score}"
-        )
+        logger.info(f"   • Confidence Score: {recommendation.confidence_score}")
         logger.info(f"   • Selected Option: {request.selected_option.name}")
         logger.info("=" * 80)
 
@@ -193,9 +166,7 @@ async def create_recommendation_from_option(
         logger.error(f"❌ Validation Error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(
-            f"💥 CRITICAL ERROR creating recommendation from option: {e}"
-        )
+        logger.error(f"💥 CRITICAL ERROR creating recommendation from option: {e}")
         logger.error("=" * 80)
         raise HTTPException(status_code=500, detail="Internal server error")
 
@@ -204,9 +175,7 @@ async def create_recommendation_from_option(
 async def regenerate_recommendation(
     request: dict,  # Will contain original content and refinement instructions
     db: AsyncSession = Depends(get_database_session),
-    recommendation_service: RecommendationService = Depends(
-        get_recommendation_service
-    ),
+    recommendation_service: RecommendationService = Depends(get_recommendation_service),
 ):
     """Regenerate a recommendation with refinement instructions."""
 
@@ -218,51 +187,35 @@ async def regenerate_recommendation(
         original_content = request.get("original_content")
         refinement_instructions = request.get("refinement_instructions")
         github_username = request.get("github_username")
-        recommendation_type = request.get(
-            "recommendation_type", "professional"
-        )
+        recommendation_type = request.get("recommendation_type", "professional")
         tone = request.get("tone", "professional")
         length = request.get("length", "medium")
 
-        if (
-            not original_content
-            or not refinement_instructions
-            or not github_username
-        ):
-            raise HTTPException(
-                status_code=400, detail="Missing required fields"
-            )
+        if not original_content or not refinement_instructions or not github_username:
+            raise HTTPException(status_code=400, detail="Missing required fields")
 
         logger.info("📋 Regeneration Details:")
         logger.info(f"   • GitHub Username: {github_username}")
         logger.info(f"   • Type: {recommendation_type}")
         logger.info(f"   • Tone: {tone}")
         logger.info(f"   • Length: {length}")
-        logger.info(
-            f"   • Original Content Length: {len(original_content)} characters"
-        )
-        logger.info(
-            f"   • Refinement Instructions: {refinement_instructions[:100]}..."
-        )
+        logger.info(f"   • Original Content Length: {len(original_content)} characters")
+        logger.info(f"   • Refinement Instructions: {refinement_instructions[:100]}...")
 
-        recommendation = (
-            await recommendation_service.regenerate_recommendation(
-                db=db,
-                original_content=original_content,
-                refinement_instructions=refinement_instructions,
-                github_username=github_username,
-                recommendation_type=recommendation_type,
-                tone=tone,
-                length=length,
-            )
+        recommendation = await recommendation_service.regenerate_recommendation(
+            db=db,
+            original_content=original_content,
+            refinement_instructions=refinement_instructions,
+            github_username=github_username,
+            recommendation_type=recommendation_type,
+            tone=tone,
+            length=length,
         )
 
         logger.info("✅ RECOMMENDATION REGENERATION COMPLETED SUCCESSFULLY")
         logger.info("📊 Final Stats:")
         logger.info(f"   • Word Count: {recommendation.word_count}")
-        logger.info(
-            f"   • Confidence Score: {recommendation.confidence_score}"
-        )
+        logger.info(f"   • Confidence Score: {recommendation.confidence_score}")
         logger.info("=" * 80)
 
         return recommendation
@@ -278,17 +231,11 @@ async def regenerate_recommendation(
 
 @router.get("/", response_model=RecommendationListResponse)
 async def list_recommendations(
-    github_username: Optional[str] = Query(
-        None, description="Filter by GitHub username"
-    ),
-    recommendation_type: Optional[str] = Query(
-        None, description="Filter by recommendation type"
-    ),
+    github_username: Optional[str] = Query(None, description="Filter by GitHub username"),
+    recommendation_type: Optional[str] = Query(None, description="Filter by recommendation type"),
     pagination: PaginationParams = Depends(get_pagination_params),
     db: AsyncSession = Depends(get_database_session),
-    recommendation_service: RecommendationService = Depends(
-        get_recommendation_service
-    ),
+    recommendation_service: RecommendationService = Depends(get_recommendation_service),
 ):
     """List recommendations with optional filtering."""
 
@@ -320,16 +267,12 @@ async def list_recommendations(
 async def get_recommendation(
     recommendation_id: int,
     db: AsyncSession = Depends(get_database_session),
-    recommendation_service: RecommendationService = Depends(
-        get_recommendation_service
-    ),
+    recommendation_service: RecommendationService = Depends(get_recommendation_service),
 ):
     """Get a specific recommendation by ID."""
 
     try:
-        recommendation = await recommendation_service.get_recommendation_by_id(
-            db=db, recommendation_id=recommendation_id
-        )
+        recommendation = await recommendation_service.get_recommendation_by_id(db=db, recommendation_id=recommendation_id)
 
         if not recommendation:
             raise HTTPException(
@@ -350,9 +293,7 @@ async def get_recommendation(
 async def delete_recommendation(
     recommendation_id: int,
     db: AsyncSession = Depends(get_database_session),
-    recommendation_service: RecommendationService = Depends(
-        get_recommendation_service
-    ),
+    recommendation_service: RecommendationService = Depends(get_recommendation_service),
 ):
     """Delete a recommendation."""
 

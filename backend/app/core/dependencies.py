@@ -123,9 +123,7 @@ async def validate_github_username(username: str) -> str:
     import re
 
     if not re.match(r"^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$", username):
-        raise HTTPException(
-            status_code=400, detail="Invalid GitHub username format"
-        )
+        raise HTTPException(status_code=400, detail="Invalid GitHub username format")
 
     return username
 
@@ -138,9 +136,7 @@ class PaginationParams:
         if page < 1:
             raise HTTPException(status_code=400, detail="Page must be >= 1")
         if page_size < 1 or page_size > 100:
-            raise HTTPException(
-                status_code=400, detail="Page size must be between 1 and 100"
-            )
+            raise HTTPException(status_code=400, detail="Page size must be between 1 and 100")
 
         self.page = page
         self.page_size = page_size
@@ -148,8 +144,6 @@ class PaginationParams:
         self.limit = page_size
 
 
-def get_pagination_params(
-    page: int = 1, page_size: int = 10
-) -> PaginationParams:
+def get_pagination_params(page: int = 1, page_size: int = 10) -> PaginationParams:
     """Dependency provider for pagination parameters."""
     return PaginationParams(page, page_size)

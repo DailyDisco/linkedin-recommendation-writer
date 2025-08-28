@@ -4,6 +4,8 @@ import asyncio
 import logging
 import re
 from collections import Counter
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 from github import Github
 from github.GithubException import GithubException
@@ -20,9 +22,7 @@ class GitHubService:
     # Async batch processing configuration
     MAX_CONCURRENT_REQUESTS = 3  # Limit concurrent GitHub API requests
     REPOSITORY_BATCH_SIZE = 5  # Process repositories in batches
-    MAX_COMMITS_PER_REPO = (
-        30  # Max commits per repository for better distribution
-    )
+    MAX_COMMITS_PER_REPO = 30  # Max commits per repository for better distribution
     COMMIT_ANALYSIS_CACHE_TTL = 14400  # 4 hours cache for expensive operations
 
     def __init__(self):
@@ -32,9 +32,7 @@ class GitHubService:
             logger.info("🔧 Initializing GitHub client with token")
             self.github_client = Github(settings.GITHUB_TOKEN)
         else:
-            logger.warning(
-                "⚠️  GitHub token not configured - GitHub API calls will fail"
-            )
+            logger.warning("⚠️  GitHub token not configured - GitHub API calls will fail")
 
     async def analyze_github_profile(
         self,
@@ -60,12 +58,8 @@ class GitHubService:
             cached_data = await get_cache(cache_key)
             if cached_data:
                 logger.info("💨 CACHE HIT! Returning cached GitHub data")
-                logger.info(
-                    f"   • Cached repositories: {len(cached_data.get('repositories', []))}"
-                )
-                logger.info(
-                    f"   • Cached commits: {cached_data.get('commit_analysis', {}).get('total_commits_analyzed', 0)}"
-                )
+                logger.info(f"   • Cached repositories: {len(cached_data.get('repositories', []))}")
+                logger.info(f"   • Cached commits: {cached_data.get('commit_analysis', {}).get('total_commits_analyzed', 0)}")
                 return cached_data
             logger.info("🚀 CACHE MISS: Proceeding with fresh analysis")
 
@@ -73,15 +67,9 @@ class GitHubService:
             # Check if GitHub client is initialized
             if not self.github_client:
                 logger.error("❌ GitHub client not initialized")
-                logger.error(
-                    "💡 Make sure GITHUB_TOKEN environment variable is set"
-                )
-                logger.error(
-                    "   • Check your .env file or environment variables"
-                )
-                logger.error(
-                    "   • Token should start with 'ghp_' or 'github_pat_'"
-                )
+                logger.error("💡 Make sure GITHUB_TOKEN environment variable is set")
+                logger.error("   • Check your .env file or environment variables")
+                logger.error("   • Token should start with 'ghp_' or 'github_pat_'")
                 return None
 
             # Get user data
@@ -100,14 +88,10 @@ class GitHubService:
                 return None
 
             user_end = time.time()
-            logger.info(
-                f"⏱️  User data fetched in {user_end - user_start:.2f} seconds"
-            )
+            logger.info(f"⏱️  User data fetched in {user_end - user_start:.2f} seconds")
             logger.info("✅ User data retrieved:")
             logger.info(f"   • Name: {user_data.get('full_name', 'N/A')}")
-            logger.info(
-                f"   • Public repos: {user_data.get('public_repos', 0)}"
-            )
+            logger.info(f"   • Public repos: {user_data.get('public_repos', 0)}")
             logger.info(f"   • Followers: {user_data.get('followers', 0)}")
 
             # Get repositories
@@ -115,14 +99,10 @@ class GitHubService:
             logger.info("-" * 40)
             repos_start = time.time()
 
-            repositories = await self._get_repositories(
-                username, max_repositories
-            )
+            repositories = await self._get_repositories(username, max_repositories)
 
             repos_end = time.time()
-            logger.info(
-                f"⏱️  Repositories fetched in {repos_end - repos_start:.2f} seconds"
-            )
+            logger.info(f"⏱️  Repositories fetched in {repos_end - repos_start:.2f} seconds")
             logger.info(f"✅ Found {len(repositories)} repositories")
 
             # Analyze languages
@@ -133,9 +113,7 @@ class GitHubService:
             languages = await self._analyze_languages(repositories)
 
             lang_end = time.time()
-            logger.info(
-                f"⏱️  Language analysis completed in {lang_end - lang_start:.2f} seconds"
-            )
+            logger.info(f"⏱️  Language analysis completed in {lang_end - lang_start:.2f} seconds")
             logger.info(f"✅ Found {len(languages)} programming languages")
             if languages:
                 top_langs = [lang["language"] for lang in languages[:3]]
@@ -149,16 +127,10 @@ class GitHubService:
             skills = await self._extract_skills(user_data, repositories)
 
             skills_end = time.time()
-            logger.info(
-                f"⏱️  Skills extraction completed in {skills_end - skills_start:.2f} seconds"
-            )
+            logger.info(f"⏱️  Skills extraction completed in {skills_end - skills_start:.2f} seconds")
             logger.info("✅ Skills extracted:")
-            logger.info(
-                f"   • Technical skills: {len(skills.get('technical_skills', []))}"
-            )
-            logger.info(
-                f"   • Frameworks: {len(skills.get('frameworks', []))}"
-            )
+            logger.info(f"   • Technical skills: {len(skills.get('technical_skills', []))}")
+            logger.info(f"   • Frameworks: {len(skills.get('frameworks', []))}")
             logger.info(f"   • Tools: {len(skills.get('tools', []))}")
 
             # Analyze commits (up to 150)
@@ -166,24 +138,16 @@ class GitHubService:
             logger.info("-" * 40)
             commits_start = time.time()
 
-            commit_analysis = await self._analyze_commits(
-                username, repositories
-            )
+            commit_analysis = await self._analyze_commits(username, repositories)
 
             commits_end = time.time()
-            logger.info(
-                f"⏱️  Commit analysis completed in {commits_end - commits_start:.2f} seconds"
-            )
+            logger.info(f"⏱️  Commit analysis completed in {commits_end - commits_start:.2f} seconds")
             logger.info("✅ Commit analysis results:")
-            logger.info(
-                f"   • Total commits analyzed: {commit_analysis.get('total_commits_analyzed', 0)}"
-            )
+            logger.info(f"   • Total commits analyzed: {commit_analysis.get('total_commits_analyzed', 0)}")
 
             excellence = commit_analysis.get("excellence_areas", {})
             if excellence.get("primary_strength"):
-                logger.info(
-                    f"   • Primary strength: {excellence['primary_strength'].replace('_', ' ').title()}"
-                )
+                logger.info(f"   • Primary strength: {excellence['primary_strength'].replace('_', ' ').title()}")
 
             # Compile analysis
             analysis = {
@@ -200,17 +164,11 @@ class GitHubService:
             logger.info("-" * 40)
             cache_start = time.time()
 
-            await set_cache(
-                cache_key, analysis, ttl=self.COMMIT_ANALYSIS_CACHE_TTL
-            )
+            await set_cache(cache_key, analysis, ttl=self.COMMIT_ANALYSIS_CACHE_TTL)
 
             cache_end = time.time()
-            logger.info(
-                f"⏱️  Results cached in {cache_end - cache_start:.2f} seconds"
-            )
-            logger.info(
-                f"✅ Cache TTL: {self.COMMIT_ANALYSIS_CACHE_TTL/3600:.1f} hours"
-            )
+            logger.info(f"⏱️  Results cached in {cache_end - cache_start:.2f} seconds")
+            logger.info(f"✅ Cache TTL: {self.COMMIT_ANALYSIS_CACHE_TTL/3600:.1f} hours")
 
             analysis_end = time.time()
             total_time = analysis_end - analysis_start
@@ -219,33 +177,19 @@ class GitHubService:
             logger.info("-" * 40)
             logger.info(f"⏱️  Total analysis time: {total_time:.2f} seconds")
             logger.info("📊 Step breakdown:")
-            logger.info(
-                f"   • User Data: {user_end - user_start:.2f}s ({((user_end - user_start)/total_time)*100:.1f}%)"
-            )
-            logger.info(
-                f"   • Repositories: {repos_end - repos_start:.2f}s ({((repos_end - repos_start)/total_time)*100:.1f}%)"
-            )
-            logger.info(
-                f"   • Languages: {lang_end - lang_start:.2f}s ({((lang_end - lang_start)/total_time)*100:.1f}%)"
-            )
-            logger.info(
-                f"   • Skills: {skills_end - skills_start:.2f}s ({((skills_end - skills_start)/total_time)*100:.1f}%)"
-            )
-            logger.info(
-                f"   • Commits: {commits_end - commits_start:.2f}s ({((commits_end - commits_start)/total_time)*100:.1f}%)"
-            )
-            logger.info(
-                f"   • Caching: {cache_end - cache_start:.2f}s ({((cache_end - cache_start)/total_time)*100:.1f}%)"
-            )
+            logger.info(f"   • User Data: {user_end - user_start:.2f}s ({((user_end - user_start)/total_time)*100:.1f}%)")
+            logger.info(f"   • Repositories: {repos_end - repos_start:.2f}s ({((repos_end - repos_start)/total_time)*100:.1f}%)")
+            logger.info(f"   • Languages: {lang_end - lang_start:.2f}s ({((lang_end - lang_start)/total_time)*100:.1f}%)")
+            logger.info(f"   • Skills: {skills_end - skills_start:.2f}s ({((skills_end - skills_start)/total_time)*100:.1f}%)")
+            logger.info(f"   • Commits: {commits_end - commits_start:.2f}s ({((commits_end - commits_start)/total_time)*100:.1f}%)")
+            logger.info(f"   • Caching: {cache_end - cache_start:.2f}s ({((cache_end - cache_start)/total_time)*100:.1f}%)")
             logger.info("=" * 60)
 
             return analysis
 
         except Exception as e:
             logger.error(f"💥 ERROR analyzing GitHub profile {username}: {e}")
-            logger.error(
-                f"⏱️  Failed after {time.time() - analysis_start:.2f} seconds"
-            )
+            logger.error(f"⏱️  Failed after {time.time() - analysis_start:.2f} seconds")
             return None
 
     async def _get_user_data(self, username: str) -> Optional[Dict[str, Any]]:
@@ -254,9 +198,7 @@ class GitHubService:
             logger.info(f"🔍 Looking up GitHub user: {username}")
 
             if not self.github_client:
-                logger.error(
-                    "❌ GitHub client not initialized - check GITHUB_TOKEN configuration"
-                )
+                logger.error("❌ GitHub client not initialized - check GITHUB_TOKEN configuration")
                 raise ValueError("GitHub token not configured")
 
             logger.info("📡 Making GitHub API call to get user data...")
@@ -281,38 +223,24 @@ class GitHubService:
                 "followers": user.followers,
                 "following": user.following,
                 "public_gists": user.public_gists,
-                "created_at": user.created_at.isoformat()
-                if user.created_at
-                else None,
-                "updated_at": user.updated_at.isoformat()
-                if user.updated_at
-                else None,
+                "created_at": user.created_at.isoformat() if user.created_at else None,
+                "updated_at": user.updated_at.isoformat() if user.updated_at else None,
             }
 
         except GithubException as e:
             logger.error(f"❌ GitHub API error for user {username}:")
-            logger.error(
-                f"   • Status: {e.status if hasattr(e, 'status') else 'Unknown'}"
-            )
-            logger.error(
-                f"   • Data: {e.data if hasattr(e, 'data') else 'No data'}"
-            )
+            logger.error(f"   • Status: {e.status if hasattr(e, 'status') else 'Unknown'}")
+            logger.error(f"   • Data: {e.data if hasattr(e, 'data') else 'No data'}")
             logger.error(f"   • Message: {str(e)}")
             return None
         except Exception as e:
-            logger.error(
-                f"💥 Unexpected error fetching user data for {username}:"
-            )
+            logger.error(f"💥 Unexpected error fetching user data for {username}:")
             logger.error(f"   • Error type: {type(e).__name__}")
             logger.error(f"   • Error message: {str(e)}")
-            logger.error(
-                f"   • Stack trace: {e.__trace__ if hasattr(e, '__trace__') else 'No trace'}"
-            )
+            logger.error(f"   • Stack trace: {e.__trace__ if hasattr(e, '__trace__') else 'No trace'}")
             return None
 
-    async def _get_repositories(
-        self, username: str, max_count: int
-    ) -> List[Dict[str, Any]]:
+    async def _get_repositories(self, username: str, max_count: int) -> List[Dict[str, Any]]:
         """Get user's repositories with details."""
         try:
             if not self.github_client:
@@ -321,7 +249,7 @@ class GitHubService:
             user = self.github_client.get_user(username)
             repos = user.get_repos(sort="updated", direction="desc")
 
-            # repositories = ...  # Removed unused variable
+            repositories = []
             count = 0
 
             for repo in repos:
@@ -338,16 +266,8 @@ class GitHubService:
                     "stars": repo.stargazers_count,
                     "forks": repo.forks_count,
                     "size": repo.size,
-                    "created_at": (
-                        repo.created_at.isoformat()
-                        if repo.created_at
-                        else None
-                    ),
-                    "updated_at": (
-                        repo.updated_at.isoformat()
-                        if repo.updated_at
-                        else None
-                    ),
+                    "created_at": (repo.created_at.isoformat() if repo.created_at else None),
+                    "updated_at": (repo.updated_at.isoformat() if repo.updated_at else None),
                     "topics": list(repo.get_topics()),
                     "url": repo.html_url,
                     "clone_url": repo.clone_url,
@@ -363,9 +283,7 @@ class GitHubService:
             logger.error(f"Error fetching repositories for {username}: {e}")
             return []
 
-    async def _analyze_languages(
-        self, repositories: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+    async def _analyze_languages(self, repositories: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Analyze programming languages used across repositories."""
         language_stats = {}
         total_repos = len(repositories)
@@ -382,17 +300,11 @@ class GitHubService:
                     }
 
                 language_stats[language]["repository_count"] += 1
-                language_stats[language]["lines_of_code"] += repo.get(
-                    "size", 0
-                )
+                language_stats[language]["lines_of_code"] += repo.get("size", 0)
 
         # Calculate percentages
         for lang_data in language_stats.values():
-            lang_data["percentage"] = (
-                (lang_data["repository_count"] / total_repos * 100)
-                if total_repos > 0
-                else 0
-            )
+            lang_data["percentage"] = (lang_data["repository_count"] / total_repos * 100) if total_repos > 0 else 0
 
         # Sort by repository count
         return sorted(
@@ -401,9 +313,7 @@ class GitHubService:
             reverse=True,
         )
 
-    async def _extract_skills(
-        self, user_data: Dict[str, Any], repositories: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+    async def _extract_skills(self, user_data: Dict[str, Any], repositories: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Extract skills from user profile and repositories."""
         technical_skills = set()
         frameworks = set()
@@ -411,11 +321,7 @@ class GitHubService:
         domains = set()
 
         # Extract from languages
-        languages = {
-            repo.get("language")
-            for repo in repositories
-            if repo.get("language")
-        }
+        languages = {repo.get("language") for repo in repositories if repo.get("language")}
         technical_skills.update(languages)
 
         # Extract from repository topics and descriptions
@@ -457,11 +363,7 @@ class GitHubService:
                 ]
                 for keyword in tool_keywords:
                     if keyword in description_lower:
-                        tools.add(
-                            keyword.upper()
-                            if keyword in ["aws", "gcp"]
-                            else keyword.title()
-                        )
+                        tools.add(keyword.upper() if keyword in ["aws", "gcp"] else keyword.title())
 
         # Extract from bio
         bio = user_data.get("bio", "")
@@ -497,56 +399,33 @@ class GitHubService:
             if not self.github_client:
                 return self._empty_commit_analysis()
 
-            logger.info(
-                f"🎯 COMMIT ANALYSIS: Targeting {max_commits} commits from contributor: {username}"
-            )
+            logger.info(f"🎯 COMMIT ANALYSIS: Targeting {max_commits} commits from contributor: {username}")
 
             # Create semaphore to limit concurrent GitHub API requests (avoid rate limiting)
             semaphore = asyncio.Semaphore(self.MAX_CONCURRENT_REQUESTS)
 
             # Split repositories into batches for processing
-            repo_batches = [
-                repositories[i : i + self.REPOSITORY_BATCH_SIZE]
-                for i in range(
-                    0, len(repositories), self.REPOSITORY_BATCH_SIZE
-                )
-            ]
+            repo_batches = [repositories[i : i + self.REPOSITORY_BATCH_SIZE] for i in range(0, len(repositories), self.REPOSITORY_BATCH_SIZE)]
 
             all_commits = []
             commits_collected = 0
 
             # For contributor-focused analysis, we want to maximize commits from this specific user
             # Calculate optimal commits per repo, but prioritize repositories with more activity
-            optimal_commits_per_repo = (
-                self._calculate_contributor_optimal_commits_per_repo(
-                    len(repositories), max_commits
-                )
-            )
+            optimal_commits_per_repo = self._calculate_contributor_optimal_commits_per_repo(len(repositories), max_commits)
 
-            logger.info(
-                f"📝 Fetching commits specifically from contributor '{username}' across {len(repositories)} repositories"
-            )
-            logger.info(
-                f"🎯 Target: {max_commits} commits total from this contributor"
-            )
-            logger.info(
-                f"📊 Strategy: Up to {optimal_commits_per_repo} commits per repository"
-            )
-            logger.info(
-                f"⚡ Processing in {len(repo_batches)} batches with {self.MAX_CONCURRENT_REQUESTS} concurrent requests"
-            )
+            logger.info(f"📝 Fetching commits specifically from contributor '{username}' across {len(repositories)} repositories")
+            logger.info(f"🎯 Target: {max_commits} commits total from this contributor")
+            logger.info(f"📊 Strategy: Up to {optimal_commits_per_repo} commits per repository")
+            logger.info(f"⚡ Processing in {len(repo_batches)} batches with {self.MAX_CONCURRENT_REQUESTS} concurrent requests")
 
             # Process repository batches concurrently
             for batch_idx, repo_batch in enumerate(repo_batches):
                 if commits_collected >= max_commits:
                     break
 
-                logger.info(
-                    f"🔄 Processing batch {batch_idx + 1}/{len(repo_batches)} with {len(repo_batch)} repositories"
-                )
-                logger.info(
-                    f"📊 Current progress: {commits_collected}/{max_commits} commits collected from {username}"
-                )
+                logger.info(f"🔄 Processing batch {batch_idx + 1}/{len(repo_batches)} with {len(repo_batch)} repositories")
+                logger.info(f"📊 Current progress: {commits_collected}/{max_commits} commits collected from {username}")
 
                 # Create tasks for concurrent fetching within batch
                 batch_tasks = []
@@ -556,20 +435,14 @@ class GitHubService:
 
                     # Calculate commits for this repo (prioritize getting commits from this contributor)
                     remaining_commits = max_commits - commits_collected
-                    commits_per_repo = min(
-                        optimal_commits_per_repo, remaining_commits
-                    )
+                    commits_per_repo = min(optimal_commits_per_repo, remaining_commits)
 
                     # Enhanced task for contributor-specific commit fetching
-                    task = self._fetch_contributor_commits_async(
-                        semaphore, username, repo_data, commits_per_repo
-                    )
+                    task = self._fetch_contributor_commits_async(semaphore, username, repo_data, commits_per_repo)
                     batch_tasks.append(task)
 
                 # Execute batch concurrently
-                batch_results = await asyncio.gather(
-                    *batch_tasks, return_exceptions=True
-                )
+                batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
 
                 # Process results
                 for result in batch_results:
@@ -578,35 +451,25 @@ class GitHubService:
                         continue
 
                     if isinstance(result, list) and result:
-                        commits_to_add = min(
-                            len(result), max_commits - commits_collected
-                        )
+                        commits_to_add = min(len(result), max_commits - commits_collected)
                         all_commits.extend(result[:commits_to_add])
                         commits_collected += commits_to_add
 
                         if commits_collected >= max_commits:
                             break
 
-                logger.info(
-                    f"✅ Batch {batch_idx + 1} completed. Progress: {commits_collected}/{max_commits} commits from {username}"
-                )
+                logger.info(f"✅ Batch {batch_idx + 1} completed. Progress: {commits_collected}/{max_commits} commits from {username}")
 
                 # Break if we've collected enough commits
                 if commits_collected >= max_commits:
-                    logger.info(
-                        f"🎯 TARGET REACHED: Collected {max_commits} commits from {username}"
-                    )
+                    logger.info(f"🎯 TARGET REACHED: Collected {max_commits} commits from {username}")
                     break
 
             logger.info("🎉 COMMIT COLLECTION COMPLETED")
-            logger.info(
-                f"📊 Final results: {len(all_commits)} commits analyzed from contributor '{username}'"
-            )
+            logger.info(f"📊 Final results: {len(all_commits)} commits analyzed from contributor '{username}'")
 
             if len(all_commits) < max_commits:
-                logger.info(
-                    f"ℹ️  Note: Only {len(all_commits)} commits available (target was {max_commits})"
-                )
+                logger.info(f"ℹ️  Note: Only {len(all_commits)} commits available (target was {max_commits})")
 
             # Analyze the collected commits with contributor focus
             return self._perform_commit_analysis(all_commits)
@@ -637,9 +500,7 @@ class GitHubService:
                 return repo_commits
 
             except Exception as e:
-                logger.warning(
-                    f"Error fetching commits from {repo_data['name']}: {e}"
-                )
+                logger.warning(f"Error fetching commits from {repo_data['name']}: {e}")
                 return []
 
     async def _fetch_contributor_commits_async(
@@ -664,9 +525,7 @@ class GitHubService:
                 return repo_commits
 
             except Exception as e:
-                logger.warning(
-                    f"Error fetching commits from contributor {contributor_username} in {repo_data['name']}: {e}"
-                )
+                logger.warning(f"Error fetching commits from contributor {contributor_username} in {repo_data['name']}: {e}")
                 return []
 
     def _fetch_repo_commits_sync(
@@ -678,9 +537,7 @@ class GitHubService:
         """Synchronous helper to fetch commits from a repository (runs in thread pool)."""
         try:
             user = self.github_client.get_user(username)
-            repo = self.github_client.get_repo(
-                f"{username}/{repo_data['name']}"
-            )
+            repo = self.github_client.get_repo(f"{username}/{repo_data['name']}")
             commits = repo.get_commits(author=user)
 
             repo_commits = []
@@ -693,18 +550,10 @@ class GitHubService:
                 try:
                     commit_data = {
                         "message": commit.commit.message,
-                        "date": (
-                            commit.commit.author.date.isoformat()
-                            if commit.commit.author.date
-                            else None
-                        ),
+                        "date": (commit.commit.author.date.isoformat() if commit.commit.author.date else None),
                         "repository": repo_data["name"],
                         "sha": commit.sha,
-                        "files_changed": (
-                            len(commit.files)
-                            if hasattr(commit, "files")
-                            else 0
-                        ),
+                        "files_changed": (len(commit.files) if hasattr(commit, "files") else 0),
                     }
                     repo_commits.append(commit_data)
                     commits_collected += 1
@@ -713,9 +562,7 @@ class GitHubService:
                     logger.debug(f"Error processing commit {commit.sha}: {e}")
                     continue
 
-            logger.debug(
-                f"Fetched {len(repo_commits)} commits from {repo_data['name']}"
-            )
+            logger.debug(f"Fetched {len(repo_commits)} commits from {repo_data['name']}")
             return repo_commits
 
         except Exception as e:
@@ -738,47 +585,27 @@ class GitHubService:
 
             # First, try to access as contributor's own repo
             try:
-                repo = self.github_client.get_repo(
-                    f"{contributor_username}/{repo_data['name']}"
-                )
-                logger.debug(
-                    f"✅ Accessing {repo_data['name']} as {contributor_username}'s own repository"
-                )
+                repo = self.github_client.get_repo(f"{contributor_username}/{repo_data['name']}")
+                logger.debug(f"✅ Accessing {repo_data['name']} as {contributor_username}'s own repository")
             except Exception:
                 # If that fails, try to access it via the full name if available
                 try:
                     if "full_name" in repo_data:
-                        repo = self.github_client.get_repo(
-                            repo_data["full_name"]
-                        )
-                        logger.debug(
-                            f"✅ Accessing {repo_data['full_name']} as contributed repository"
-                        )
+                        repo = self.github_client.get_repo(repo_data["full_name"])
+                        logger.debug(f"✅ Accessing {repo_data['full_name']} as contributed repository")
                     elif "url" in repo_data and "/repos/" in repo_data["url"]:
                         # Extract full name from URL
-                        repo_full_name = (
-                            repo_data["url"]
-                            .split("/repos/")[-1]
-                            .split("/")[0:2]
-                        )
+                        repo_full_name = repo_data["url"].split("/repos/")[-1].split("/")[0:2]
                         if len(repo_full_name) == 2:
-                            full_repo_name = (
-                                f"{repo_full_name[0]}/{repo_full_name[1]}"
-                            )
+                            full_repo_name = f"{repo_full_name[0]}/{repo_full_name[1]}"
                             repo = self.github_client.get_repo(full_repo_name)
-                            logger.debug(
-                                f"✅ Accessing {full_repo_name} via URL extraction"
-                            )
+                            logger.debug(f"✅ Accessing {full_repo_name} via URL extraction")
                 except Exception as e2:
-                    logger.debug(
-                        f"❌ Could not access repository {repo_data['name']}: {e2}"
-                    )
+                    logger.debug(f"❌ Could not access repository {repo_data['name']}: {e2}")
                     return []
 
             if not repo:
-                logger.debug(
-                    f"❌ Could not access repository {repo_data['name']}"
-                )
+                logger.debug(f"❌ Could not access repository {repo_data['name']}")
                 return []
 
             # Get commits specifically from this contributor
@@ -787,9 +614,7 @@ class GitHubService:
             repo_commits = []
             commits_collected = 0
 
-            logger.debug(
-                f"🔍 Scanning {repo_data['name']} for commits from {contributor_username}"
-            )
+            logger.debug(f"🔍 Scanning {repo_data['name']} for commits from {contributor_username}")
 
             for commit in commits:
                 if commits_collected >= max_commits_per_repo:
@@ -798,19 +623,11 @@ class GitHubService:
                 try:
                     commit_data = {
                         "message": commit.commit.message,
-                        "date": (
-                            commit.commit.author.date.isoformat()
-                            if commit.commit.author.date
-                            else None
-                        ),
+                        "date": (commit.commit.author.date.isoformat() if commit.commit.author.date else None),
                         "repository": repo_data["name"],
                         "repository_full_name": repo.full_name,
                         "sha": commit.sha,
-                        "files_changed": (
-                            len(commit.files)
-                            if hasattr(commit, "files")
-                            else 0
-                        ),
+                        "files_changed": (len(commit.files) if hasattr(commit, "files") else 0),
                         "contributor": contributor_username,
                     }
                     repo_commits.append(commit_data)
@@ -821,25 +638,17 @@ class GitHubService:
                     continue
 
             if repo_commits:
-                logger.debug(
-                    f"✅ Found {len(repo_commits)} commits from {contributor_username} in {repo_data['name']}"
-                )
+                logger.debug(f"✅ Found {len(repo_commits)} commits from {contributor_username} in {repo_data['name']}")
             else:
-                logger.debug(
-                    f"ℹ️  No commits found from {contributor_username} in {repo_data['name']}"
-                )
+                logger.debug(f"ℹ️  No commits found from {contributor_username} in {repo_data['name']}")
 
             return repo_commits
 
         except Exception as e:
-            logger.warning(
-                f"Error fetching contributor commits from {repo_data['name']}: {e}"
-            )
+            logger.warning(f"Error fetching contributor commits from {repo_data['name']}: {e}")
             return []
 
-    def _calculate_optimal_commits_per_repo(
-        self, total_repos: int, max_commits: int
-    ) -> int:
+    def _calculate_optimal_commits_per_repo(self, total_repos: int, max_commits: int) -> int:
         """Calculate optimal commits per repository for better distribution."""
         if total_repos == 0:
             return self.MAX_COMMITS_PER_REPO
@@ -856,9 +665,7 @@ class GitHubService:
 
         return optimal
 
-    def _calculate_contributor_optimal_commits_per_repo(
-        self, total_repos: int, max_commits: int
-    ) -> int:
+    def _calculate_contributor_optimal_commits_per_repo(self, total_repos: int, max_commits: int) -> int:
         """Calculate optimal commits per repository specifically for contributor analysis."""
         if total_repos == 0:
             return self.MAX_COMMITS_PER_REPO
@@ -879,19 +686,13 @@ class GitHubService:
 
         # If we have very few repos, we can afford to get more commits per repo
         if total_repos <= 2:
-            optimal = min(
-                75, max_commits // max(1, total_repos)
-            )  # Higher for few repos
+            optimal = min(75, max_commits // max(1, total_repos))  # Higher for few repos
         elif total_repos <= 5:
-            optimal = min(
-                50, max_commits // max(1, total_repos)
-            )  # Moderate for few repos
+            optimal = min(50, max_commits // max(1, total_repos))  # Moderate for few repos
 
         return optimal
 
-    def _perform_commit_analysis(
-        self, commits: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+    def _perform_commit_analysis(self, commits: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Perform detailed analysis on commit messages and patterns."""
         if not commits:
             return self._empty_commit_analysis()
@@ -899,9 +700,7 @@ class GitHubService:
         commit_messages = [commit["message"].lower() for commit in commits]
 
         # Analyze what the user excels at (action patterns)
-        excellence_patterns = self._analyze_excellence_patterns(
-            commit_messages
-        )
+        excellence_patterns = self._analyze_excellence_patterns(commit_messages)
 
         # Analyze tools and features added
         tools_and_features = self._analyze_tools_and_features(commit_messages)
@@ -910,9 +709,7 @@ class GitHubService:
         commit_patterns = self._analyze_commit_patterns(commits)
 
         # Extract technical contributions
-        technical_contributions = self._analyze_technical_contributions(
-            commit_messages
-        )
+        technical_contributions = self._analyze_technical_contributions(commit_messages)
 
         # Calculate contributor-specific metrics
         contributor_metrics = self._calculate_contributor_metrics(commits)
@@ -929,9 +726,7 @@ class GitHubService:
             "contributor_metrics": contributor_metrics,
         }
 
-    def _analyze_excellence_patterns(
-        self, commit_messages: List[str]
-    ) -> Dict[str, Any]:
+    def _analyze_excellence_patterns(self, commit_messages: List[str]) -> Dict[str, Any]:
         """Identify what the user excels at based on commit message patterns."""
         excellence_keywords = {
             "bug_fixing": [
@@ -1002,11 +797,7 @@ class GitHubService:
         total_commits = len(commit_messages)
 
         for category, keywords in excellence_keywords.items():
-            count = sum(
-                1
-                for message in commit_messages
-                if any(keyword in message for keyword in keywords)
-            )
+            count = sum(1 for message in commit_messages if any(keyword in message for keyword in keywords))
             if count > 0:
                 pattern_counts[category] = {
                     "count": count,
@@ -1024,14 +815,10 @@ class GitHubService:
 
         return {
             "patterns": sorted_patterns,
-            "primary_strength": (
-                list(sorted_patterns.keys())[0] if sorted_patterns else None
-            ),
+            "primary_strength": (list(sorted_patterns.keys())[0] if sorted_patterns else None),
         }
 
-    def _analyze_tools_and_features(
-        self, commit_messages: List[str]
-    ) -> Dict[str, Any]:
+    def _analyze_tools_and_features(self, commit_messages: List[str]) -> Dict[str, Any]:
         """Extract tools, libraries, and features mentioned in commits."""
         # Common tools and technologies to look for
         tool_patterns = {
@@ -1098,9 +885,7 @@ class GitHubService:
                 found_tools[category] = category_tools
 
         # Extract feature-related keywords using regex
-        feature_pattern = re.compile(
-            r"(?:add|implement|create|build)\s+([a-zA-Z\s]{3,20})"
-        )
+        feature_pattern = re.compile(r"(?:add|implement|create|build)\s+([a-zA-Z\s]{3,20})")
         for message in commit_messages:
             matches = feature_pattern.findall(message)
             feature_keywords.extend([match.strip() for match in matches])
@@ -1112,23 +897,15 @@ class GitHubService:
         return {
             "tools_by_category": found_tools,
             "features_implemented": top_features,
-            "total_unique_tools": sum(
-                len(tools) for tools in found_tools.values()
-            ),
+            "total_unique_tools": sum(len(tools) for tools in found_tools.values()),
         }
 
-    def _analyze_commit_patterns(
-        self, commits: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+    def _analyze_commit_patterns(self, commits: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Analyze commit frequency and timing patterns."""
         if not commits:
             return {}
 
-        dates = [
-            datetime.fromisoformat(commit["date"].replace("Z", "+00:00"))
-            for commit in commits
-            if commit["date"]
-        ]
+        dates = [datetime.fromisoformat(commit["date"].replace("Z", "+00:00")) for commit in commits if commit["date"]]
 
         if not dates:
             return {}
@@ -1139,27 +916,17 @@ class GitHubService:
         commits_per_day = len(commits) / max(total_days, 1)
 
         # Analyze file change patterns
-        files_changed = [
-            commit["files_changed"]
-            for commit in commits
-            if commit["files_changed"]
-        ]
-        avg_files_per_commit = (
-            sum(files_changed) / len(files_changed) if files_changed else 0
-        )
+        files_changed = [commit["files_changed"] for commit in commits if commit["files_changed"]]
+        avg_files_per_commit = sum(files_changed) / len(files_changed) if files_changed else 0
 
         return {
             "commits_per_day": round(commits_per_day, 2),
             "avg_files_per_commit": round(avg_files_per_commit, 1),
             "total_days_active": total_days,
-            "consistency_score": min(
-                commits_per_day * 10, 100
-            ),  # Scale to 0-100
+            "consistency_score": min(commits_per_day * 10, 100),  # Scale to 0-100
         }
 
-    def _analyze_technical_contributions(
-        self, commit_messages: List[str]
-    ) -> Dict[str, Any]:
+    def _analyze_technical_contributions(self, commit_messages: List[str]) -> Dict[str, Any]:
         """Analyze technical depth and contribution types."""
         technical_indicators = {
             "architecture": [
@@ -1198,19 +965,13 @@ class GitHubService:
 
         contributions = {}
         for category, indicators in technical_indicators.items():
-            count = sum(
-                1
-                for message in commit_messages
-                if any(indicator in message for indicator in indicators)
-            )
+            count = sum(1 for message in commit_messages if any(indicator in message for indicator in indicators))
             if count > 0:
                 contributions[category] = count
 
         return contributions
 
-    def _get_top_commit_repositories(
-        self, commits: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+    def _get_top_commit_repositories(self, commits: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Get repositories with most commits from the user."""
         repo_counts = Counter(commit["repository"] for commit in commits)
         top_repos = []
@@ -1226,9 +987,7 @@ class GitHubService:
 
         return top_repos
 
-    def _calculate_contributor_metrics(
-        self, commits: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+    def _calculate_contributor_metrics(self, commits: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Calculate contributor-specific metrics from commits."""
         if not commits:
             return {
@@ -1246,27 +1005,17 @@ class GitHubService:
             repo_counts[repo_name] = repo_counts.get(repo_name, 0) + 1
 
         repositories_with_commits = len(repo_counts)
-        avg_commits_per_repo = (
-            len(commits) / repositories_with_commits
-            if repositories_with_commits > 0
-            else 0
-        )
-        most_active_repo = (
-            max(repo_counts.items(), key=lambda x: x[1])
-            if repo_counts
-            else None
-        )
+        avg_commits_per_repo = len(commits) / repositories_with_commits if repositories_with_commits > 0 else 0
+        most_active_repo = max(repo_counts.items(), key=lambda x: x[1]) if repo_counts else None
 
         # Time span analysis
         dates = []
         for commit in commits:
             if commit.get("date"):
                 try:
-                    commit_date = datetime.fromisoformat(
-                        commit["date"].replace("Z", "+00:00")
-                    )
+                    commit_date = datetime.fromisoformat(commit["date"].replace("Z", "+00:00"))
                     dates.append(commit_date)
-                except Exception as e:
+                except Exception:
                     continue
 
         contribution_span_days = 0
@@ -1276,30 +1025,16 @@ class GitHubService:
 
         # Frequency analysis
         commit_frequency_analysis = {
-            "daily_average": (
-                len(commits) / max(1, contribution_span_days)
-                if contribution_span_days > 0
-                else 0
-            ),
-            "most_productive_repo": most_active_repo[0]
-            if most_active_repo
-            else None,
-            "most_productive_repo_commits": (
-                most_active_repo[1] if most_active_repo else 0
-            ),
-            "repository_diversity_score": (
-                min(100, (repositories_with_commits / len(commits)) * 100)
-                if commits
-                else 0
-            ),
+            "daily_average": (len(commits) / max(1, contribution_span_days) if contribution_span_days > 0 else 0),
+            "most_productive_repo": most_active_repo[0] if most_active_repo else None,
+            "most_productive_repo_commits": (most_active_repo[1] if most_active_repo else 0),
+            "repository_diversity_score": (min(100, (repositories_with_commits / len(commits)) * 100) if commits else 0),
         }
 
         return {
             "repositories_with_commits": repositories_with_commits,
             "avg_commits_per_repo": round(avg_commits_per_repo, 1),
-            "most_active_repository": most_active_repo[0]
-            if most_active_repo
-            else None,
+            "most_active_repository": most_active_repo[0] if most_active_repo else None,
             "commit_frequency_analysis": commit_frequency_analysis,
             "contribution_span_days": contribution_span_days,
         }
@@ -1326,9 +1061,7 @@ class GitHubService:
             },
         }
 
-    async def analyze_repository(
-        self, repository_full_name: str, force_refresh: bool = False
-    ) -> Optional[Dict[str, Any]]:
+    async def analyze_repository(self, repository_full_name: str, force_refresh: bool = False) -> Optional[Dict[str, Any]]:
         """Analyze a specific GitHub repository and return comprehensive data."""
         import time
 
@@ -1346,23 +1079,15 @@ class GitHubService:
             cached_data = await get_cache(cache_key)
             if cached_data:
                 logger.info("💨 CACHE HIT! Returning cached repository data")
-                logger.info(
-                    f"   • Repository: {cached_data.get('repository_info', {}).get('name', 'N/A')}"
-                )
-                logger.info(
-                    f"   • Language: {cached_data.get('repository_info', {}).get('language', 'N/A')}"
-                )
+                logger.info(f"   • Repository: {cached_data.get('repository_info', {}).get('name', 'N/A')}")
+                logger.info(f"   • Language: {cached_data.get('repository_info', {}).get('language', 'N/A')}")
                 return cached_data
-            logger.info(
-                "🚀 CACHE MISS: Proceeding with fresh repository analysis"
-            )
+            logger.info("🚀 CACHE MISS: Proceeding with fresh repository analysis")
 
         try:
             # Parse repository full name
             if "/" not in repository_full_name:
-                logger.error(
-                    f"❌ Invalid repository format: {repository_full_name}"
-                )
+                logger.error(f"❌ Invalid repository format: {repository_full_name}")
                 return None
 
             owner, repo_name = repository_full_name.split("/", 1)
@@ -1374,84 +1099,58 @@ class GitHubService:
 
             repo_info = await self._get_repository_info(owner, repo_name)
             if not repo_info:
-                logger.error(
-                    f"❌ Failed to fetch repository info for {repository_full_name}"
-                )
+                logger.error(f"❌ Failed to fetch repository info for {repository_full_name}")
                 return None
 
             repo_end = time.time()
-            logger.info(
-                f"⏱️  Repository info fetched in {repo_end - repo_start:.2f} seconds"
-            )
+            logger.info(f"⏱️  Repository info fetched in {repo_end - repo_start:.2f} seconds")
             logger.info("✅ Repository info retrieved:")
             logger.info(f"   • Name: {repo_info.get('name', 'N/A')}")
             logger.info(f"   • Language: {repo_info.get('language', 'N/A')}")
             logger.info(f"   • Stars: {repo_info.get('stars', 0)}")
-            logger.info(
-                f"   • Description: {repo_info.get('description', 'N/A')[:50]}..."
-            )
+            logger.info(f"   • Description: {repo_info.get('description', 'N/A')[:50]}...")
 
             # Get repository languages
             logger.info("💻 STEP 2: ANALYZING REPOSITORY LANGUAGES")
             logger.info("-" * 40)
             lang_start = time.time()
 
-            repo_languages = await self._get_repository_languages(
-                owner, repo_name
-            )
+            repo_languages = await self._get_repository_languages(owner, repo_name)
 
             lang_end = time.time()
-            logger.info(
-                f"⏱️  Language analysis completed in {lang_end - lang_start:.2f} seconds"
-            )
-            logger.info(
-                f"✅ Found {len(repo_languages)} programming languages in repository"
-            )
+            logger.info(f"⏱️  Language analysis completed in {lang_end - lang_start:.2f} seconds")
+            logger.info(f"✅ Found {len(repo_languages)} programming languages in repository")
 
             # Get repository commits (limited for performance)
             logger.info("📝 STEP 3: ANALYZING REPOSITORY COMMITS")
             logger.info("-" * 40)
             commits_start = time.time()
 
-            repo_commits = await self._get_repository_commits(
-                owner, repo_name, limit=50
-            )
+            repo_commits = await self._get_repository_commits(owner, repo_name, limit=50)
 
             commits_end = time.time()
-            logger.info(
-                f"⏱️  Commit analysis completed in {commits_end - commits_start:.2f} seconds"
-            )
-            logger.info(
-                f"✅ Analyzed {len(repo_commits)} commits from repository"
-            )
+            logger.info(f"⏱️  Commit analysis completed in {commits_end - commits_start:.2f} seconds")
+            logger.info(f"✅ Analyzed {len(repo_commits)} commits from repository")
 
             # Extract repository-specific skills and technologies
             logger.info("🔧 STEP 4: EXTRACTING REPOSITORY SKILLS")
             logger.info("-" * 40)
             skills_start = time.time()
 
-            repo_skills = await self._extract_repository_skills(
-                repo_info, repo_languages, repo_commits
-            )
+            repo_skills = await self._extract_repository_skills(repo_info, repo_languages, repo_commits)
 
             skills_end = time.time()
-            logger.info(
-                f"⏱️  Skills extraction completed in {skills_end - skills_start:.2f} seconds"
-            )
+            logger.info(f"⏱️  Skills extraction completed in {skills_end - skills_start:.2f} seconds")
 
             # Analyze repository-specific commit patterns
             logger.info("📊 STEP 5: ANALYZING COMMIT PATTERNS")
             logger.info("-" * 40)
             patterns_start = time.time()
 
-            commit_patterns = await self._analyze_repository_commit_patterns(
-                repo_commits, repo_languages
-            )
+            commit_patterns = await self._analyze_repository_commit_patterns(repo_commits, repo_languages)
 
             patterns_end = time.time()
-            logger.info(
-                f"⏱️  Pattern analysis completed in {patterns_end - patterns_start:.2f} seconds"
-            )
+            logger.info(f"⏱️  Pattern analysis completed in {patterns_end - patterns_start:.2f} seconds")
 
             # Compile final repository analysis
             analysis_end = time.time()
@@ -1468,9 +1167,7 @@ class GitHubService:
             }
 
             # Cache the result
-            await set_cache(
-                cache_key, result, ttl=self.COMMIT_ANALYSIS_CACHE_TTL
-            )
+            await set_cache(cache_key, result, ttl=self.COMMIT_ANALYSIS_CACHE_TTL)
 
             logger.info("🎉 REPOSITORY ANALYSIS COMPLETED")
             logger.info("-" * 40)
@@ -1482,14 +1179,10 @@ class GitHubService:
             return result
 
         except Exception as e:
-            logger.error(
-                f"💥 ERROR analyzing repository {repository_full_name}: {e}"
-            )
+            logger.error(f"💥 ERROR analyzing repository {repository_full_name}: {e}")
             return None
 
-    async def _get_repository_info(
-        self, owner: str, repo_name: str
-    ) -> Optional[Dict[str, Any]]:
+    async def _get_repository_info(self, owner: str, repo_name: str) -> Optional[Dict[str, Any]]:
         """Get basic repository information."""
         try:
             if not self.github_client:
@@ -1518,29 +1211,17 @@ class GitHubService:
                 "has_pages": repo.has_pages,
                 "archived": repo.archived,
                 "disabled": repo.disabled,
-                "created_at": repo.created_at.isoformat()
-                if repo.created_at
-                else None,
-                "updated_at": repo.updated_at.isoformat()
-                if repo.updated_at
-                else None,
-                "pushed_at": repo.pushed_at.isoformat()
-                if repo.pushed_at
-                else None,
+                "created_at": repo.created_at.isoformat() if repo.created_at else None,
+                "updated_at": repo.updated_at.isoformat() if repo.updated_at else None,
+                "pushed_at": repo.pushed_at.isoformat() if repo.pushed_at else None,
                 "topics": repo.get_topics(),
-                "visibility": getattr(
-                    repo, "visibility", "public"
-                ),  # For newer PyGitHub versions
+                "visibility": getattr(repo, "visibility", "public"),  # For newer PyGitHub versions
             }
         except Exception as e:
-            logger.error(
-                f"Error fetching repository info for {owner}/{repo_name}: {e}"
-            )
+            logger.error(f"Error fetching repository info for {owner}/{repo_name}: {e}")
             return None
 
-    async def _get_repository_languages(
-        self, owner: str, repo_name: str
-    ) -> List[Dict[str, Any]]:
+    async def _get_repository_languages(self, owner: str, repo_name: str) -> List[Dict[str, Any]]:
         """Get programming languages used in the repository."""
         try:
             if not self.github_client:
@@ -1554,9 +1235,7 @@ class GitHubService:
             language_stats = []
 
             for language, bytes_count in languages.items():
-                percentage = (
-                    (bytes_count / total_bytes * 100) if total_bytes > 0 else 0
-                )
+                percentage = (bytes_count / total_bytes * 100) if total_bytes > 0 else 0
                 language_stats.append(
                     {
                         "language": language,
@@ -1571,14 +1250,10 @@ class GitHubService:
 
             return language_stats
         except Exception as e:
-            logger.error(
-                f"Error fetching languages for {owner}/{repo_name}: {e}"
-            )
+            logger.error(f"Error fetching languages for {owner}/{repo_name}: {e}")
             return []
 
-    async def _get_repository_commits(
-        self, owner: str, repo_name: str, limit: int = 50
-    ) -> List[Dict[str, Any]]:
+    async def _get_repository_commits(self, owner: str, repo_name: str, limit: int = 50) -> List[Dict[str, Any]]:
         """Get recent commits from the repository."""
         try:
             if not self.github_client:
@@ -1594,54 +1269,20 @@ class GitHubService:
                         "sha": commit.sha,
                         "message": commit.commit.message,
                         "author": {
-                            "name": (
-                                commit.commit.author.name
-                                if commit.commit.author
-                                else None
-                            ),
-                            "email": (
-                                commit.commit.author.email
-                                if commit.commit.author
-                                else None
-                            ),
-                            "date": (
-                                commit.commit.author.date.isoformat()
-                                if commit.commit.author
-                                else None
-                            ),
+                            "name": (commit.commit.author.name if commit.commit.author else None),
+                            "email": (commit.commit.author.email if commit.commit.author else None),
+                            "date": (commit.commit.author.date.isoformat() if commit.commit.author else None),
                         },
                         "committer": {
-                            "name": (
-                                commit.commit.committer.name
-                                if commit.commit.committer
-                                else None
-                            ),
-                            "email": (
-                                commit.commit.committer.email
-                                if commit.commit.committer
-                                else None
-                            ),
-                            "date": (
-                                commit.commit.committer.date.isoformat()
-                                if commit.commit.committer
-                                else None
-                            ),
+                            "name": (commit.commit.committer.name if commit.commit.committer else None),
+                            "email": (commit.commit.committer.email if commit.commit.committer else None),
+                            "date": (commit.commit.committer.date.isoformat() if commit.commit.committer else None),
                         },
                         "stats": (
                             {
-                                "additions": (
-                                    commit.stats.additions
-                                    if commit.stats
-                                    else 0
-                                ),
-                                "deletions": (
-                                    commit.stats.deletions
-                                    if commit.stats
-                                    else 0
-                                ),
-                                "total": commit.stats.total
-                                if commit.stats
-                                else 0,
+                                "additions": (commit.stats.additions if commit.stats else 0),
+                                "deletions": (commit.stats.deletions if commit.stats else 0),
+                                "total": commit.stats.total if commit.stats else 0,
                             }
                             if commit.stats
                             else None
@@ -1666,9 +1307,7 @@ class GitHubService:
 
             return commit_data
         except Exception as e:
-            logger.error(
-                f"Error fetching commits for {owner}/{repo_name}: {e}"
-            )
+            logger.error(f"Error fetching commits for {owner}/{repo_name}: {e}")
             return []
 
     async def _extract_repository_skills(
@@ -1680,9 +1319,7 @@ class GitHubService:
         """Extract skills and technologies from repository data."""
         try:
             # Extract technical skills from languages
-            technical_skills = [
-                lang["language"] for lang in languages[:5]
-            ]  # Top 5 languages
+            technical_skills = [lang["language"] for lang in languages[:5]]  # Top 5 languages
 
             # Extract frameworks and tools from commit messages and file names
             frameworks = []
@@ -1797,28 +1434,14 @@ class GitHubService:
             }
 
             for domain, keywords in domain_keywords.items():
-                if any(
-                    keyword in repo_description or keyword in repo_name
-                    for keyword in keywords
-                ):
+                if any(keyword in repo_description or keyword in repo_name for keyword in keywords):
                     domains.append(domain)
 
             # Extract soft skills from commit patterns
             soft_skills = []
             if len(commits) > 10:
                 soft_skills.append("Consistent Contributor")
-            if (
-                len(
-                    set(
-                        [
-                            c.get("author", {}).get("name")
-                            for c in commits
-                            if c.get("author")
-                        ]
-                    )
-                )
-                > 1
-            ):
+            if len(set([c.get("author", {}).get("name") for c in commits if c.get("author")])) > 1:
                 soft_skills.append("Team Collaboration")
 
             return {
@@ -1838,9 +1461,7 @@ class GitHubService:
                 "soft_skills": [],
             }
 
-    async def _analyze_repository_commit_patterns(
-        self, commits: List[Dict[str, Any]], languages: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+    async def _analyze_repository_commit_patterns(self, commits: List[Dict[str, Any]], languages: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Analyze commit patterns specific to the repository."""
         try:
             if not commits:
@@ -1848,12 +1469,8 @@ class GitHubService:
 
             # Basic commit statistics
             total_commits = len(commits)
-            total_additions = sum(
-                [c.get("stats", {}).get("additions", 0) for c in commits]
-            )
-            total_deletions = sum(
-                [c.get("stats", {}).get("deletions", 0) for c in commits]
-            )
+            total_additions = sum([c.get("stats", {}).get("additions", 0) for c in commits])
+            total_deletions = sum([c.get("stats", {}).get("deletions", 0) for c in commits])
 
             # Analyze commit messages for patterns
             commit_messages = [c.get("message", "") for c in commits]
@@ -1879,19 +1496,11 @@ class GitHubService:
 
             pattern_counts = {}
             for pattern, keywords in message_patterns.items():
-                count = sum(
-                    1
-                    for msg in commit_messages
-                    if any(kw in msg.lower() for kw in keywords)
-                )
+                count = sum(1 for msg in commit_messages if any(kw in msg.lower() for kw in keywords))
                 pattern_counts[pattern] = count
 
             # Determine primary strength
-            primary_strength = (
-                max(pattern_counts.items(), key=lambda x: x[1])[0]
-                if pattern_counts
-                else None
-            )
+            primary_strength = max(pattern_counts.items(), key=lambda x: x[1])[0] if pattern_counts else None
 
             # Analyze file types and technologies
             file_extensions: Dict[str, int] = {}
@@ -1907,14 +1516,7 @@ class GitHubService:
             if languages:
                 primary_lang = languages[0]["language"]
                 tech_focus[f"{primary_lang} Development"] = len(
-                    [
-                        c
-                        for c in commits
-                        if any(
-                            primary_lang.lower() in str(c).lower()
-                            for c in c.get("files", [])
-                        )
-                    ]
+                    [c for c in commits if any(primary_lang.lower() in str(c).lower() for c in c.get("files", []))]
                 )
 
             return {
@@ -1923,27 +1525,16 @@ class GitHubService:
                 "analysis_method": "repository_specific",
                 "excellence_areas": {
                     "patterns": pattern_counts,
-                    "primary_strength": (
-                        primary_strength.replace("_", " ").title()
-                        if primary_strength
-                        else None
-                    ),
+                    "primary_strength": (primary_strength.replace("_", " ").title() if primary_strength else None),
                 },
                 "commit_statistics": {
                     "total_additions": total_additions,
                     "total_deletions": total_deletions,
-                    "avg_changes_per_commit": (
-                        total_additions + total_deletions
-                    )
-                    / max(total_commits, 1),
+                    "avg_changes_per_commit": (total_additions + total_deletions) / max(total_commits, 1),
                 },
                 "file_analysis": {
                     "file_types": file_extensions,
-                    "most_common_extension": (
-                        max(file_extensions.items(), key=lambda x: x[1])[0]
-                        if file_extensions
-                        else None
-                    ),
+                    "most_common_extension": (max(file_extensions.items(), key=lambda x: x[1])[0] if file_extensions else None),
                 },
                 "technical_contributions": tech_focus,
             }

@@ -17,9 +17,7 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 # Create async engine with configuration from settings
-engine = create_async_engine(
-    settings.DATABASE_URL, **settings.get_database_config()
-)
+engine = create_async_engine(settings.DATABASE_URL, **settings.get_database_config())
 
 # Create async session maker
 AsyncSessionLocal = async_sessionmaker(
@@ -69,7 +67,6 @@ async def init_database():
 async def run_migrations():
     """Run database migrations using Alembic."""
     try:
-
         from alembic import command
         from alembic.config import Config
 
@@ -83,9 +80,7 @@ async def run_migrations():
             command.upgrade(alembic_cfg, "head")
             logger.info("Database migrations completed successfully")
         else:
-            logger.warning(
-                "Alembic configuration not found, skipping migrations"
-            )
+            logger.warning("Alembic configuration not found, skipping migrations")
 
     except ImportError:
         logger.warning("Alembic not available, skipping migrations")

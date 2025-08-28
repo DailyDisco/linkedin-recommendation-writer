@@ -35,10 +35,7 @@ class RepositoryService:
         if not force_refresh:
             cached_data = await get_cache(cache_key)
             if cached_data:
-                logger.info(
-                    f"Returning cached contributors for repository: "
-                    f"{repo_name}"
-                )
+                logger.info(f"Returning cached contributors for repository: " f"{repo_name}")
                 return cached_data
 
         try:
@@ -58,12 +55,8 @@ class RepositoryService:
                 "forks": repo.forks_count,
                 "url": repo.html_url,
                 "topics": list(repo.get_topics()),
-                "created_at": repo.created_at.isoformat()
-                if repo.created_at
-                else None,
-                "updated_at": repo.updated_at.isoformat()
-                if repo.updated_at
-                else None,
+                "created_at": repo.created_at.isoformat() if repo.created_at else None,
+                "updated_at": repo.updated_at.isoformat() if repo.updated_at else None,
             }
 
             # Get contributors
@@ -81,19 +74,9 @@ class RepositoryService:
 
                     contributor_info = {
                         "username": contributor.login,
-                        "full_name": user.name
-                        if user.name
-                        else contributor.login,
-                        "first_name": (
-                            self._extract_first_name(user.name)
-                            if user.name
-                            else ""
-                        ),
-                        "last_name": (
-                            self._extract_last_name(user.name)
-                            if user.name
-                            else ""
-                        ),
+                        "full_name": user.name if user.name else contributor.login,
+                        "first_name": (self._extract_first_name(user.name) if user.name else ""),
+                        "last_name": (self._extract_last_name(user.name) if user.name else ""),
                         "email": user.email,
                         "bio": user.bio,
                         "company": user.company,
@@ -109,10 +92,7 @@ class RepositoryService:
                     count += 1
 
                 except Exception as e:
-                    logger.warning(
-                        f"Could not get details for contributor "
-                        f"{contributor.login}: {e}"
-                    )
+                    logger.warning(f"Could not get details for contributor " f"{contributor.login}: {e}")
                     # Add basic info even if detailed lookup fails
                     contributors_list.append(
                         {
@@ -126,9 +106,7 @@ class RepositoryService:
                             "location": None,
                             "avatar_url": contributor.avatar_url,
                             "contributions": contributor.contributions,
-                            "profile_url": (
-                                f"https://github.com/{contributor.login}"
-                            ),
+                            "profile_url": (f"https://github.com/{contributor.login}"),
                             "followers": 0,
                             "public_repos": 0,
                         }
@@ -152,14 +130,10 @@ class RepositoryService:
                 logger.error(f"Repository not found: {repo_name}")
                 return None
             else:
-                logger.error(
-                    f"GitHub API error for repository {repo_name}: {e}"
-                )
+                logger.error(f"GitHub API error for repository {repo_name}: {e}")
                 return None
         except Exception as e:
-            logger.error(
-                f"Error fetching contributors for repository {repo_name}: {e}"
-            )
+            logger.error(f"Error fetching contributors for repository {repo_name}: {e}")
             return None
 
     def _extract_first_name(self, full_name: str) -> str:

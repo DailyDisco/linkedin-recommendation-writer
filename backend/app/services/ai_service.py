@@ -1,6 +1,7 @@
 """AI service for generating recommendations using Google Gemini."""
 
 import logging
+from typing import Any, Dict, List, Optional
 
 try:
     import google.generativeai as genai
@@ -60,9 +61,7 @@ class AIService:
             )
 
             if settings.ENVIRONMENT == "development":
-                logger.info(
-                    f"✅ Prompt built with {len(initial_prompt)} characters"
-                )
+                logger.info(f"✅ Prompt built with {len(initial_prompt)} characters")
 
             # Check cache for final result
             cache_key = f"ai_recommendation_v3:{hash(initial_prompt)}"
@@ -73,9 +72,7 @@ class AIService:
                 return cached_result
 
             if settings.ENVIRONMENT == "development":
-                logger.info(
-                    "🚀 CACHE MISS: Starting multi-option generation..."
-                )
+                logger.info("🚀 CACHE MISS: Starting multi-option generation...")
 
             # Generate 3 different recommendation options
             options = await self._generate_multiple_options(
@@ -98,11 +95,7 @@ class AIService:
                     "length": length,
                     "multiple_options": True,
                 },
-                "generation_prompt": (
-                    initial_prompt[:500] + "..."
-                    if len(initial_prompt) > 500
-                    else initial_prompt
-                ),
+                "generation_prompt": (initial_prompt[:500] + "..." if len(initial_prompt) > 500 else initial_prompt),
             }
 
             # Cache for 24 hours
@@ -139,9 +132,7 @@ class AIService:
         ]
 
         if target_role:
-            prompt_parts.append(
-                f"Highlight why they'd be great for a {target_role} position."
-            )
+            prompt_parts.append(f"Highlight why they'd be great for a {target_role} position.")
 
         # Add GitHub context based on analysis type
         if github_data.get("repository_info"):
@@ -172,143 +163,87 @@ class AIService:
             repo_skills = github_data.get("skills", {})
 
             if repo_languages:
-                top_languages = [
-                    lang["language"] for lang in repo_languages[:5]
-                ]
-                prompt_parts.append(
-                    f"- Programming languages they work with: {', '.join(top_languages)}"
-                )
+                top_languages = [lang["language"] for lang in repo_languages[:5]]
+                prompt_parts.append(f"- Programming languages they work with: {', '.join(top_languages)}")
 
             if repo_skills.get("technical_skills"):
-                prompt_parts.append(
-                    f"- Technical skills: {', '.join(repo_skills['technical_skills'][:10])}"
-                )
+                prompt_parts.append(f"- Technical skills: {', '.join(repo_skills['technical_skills'][:10])}")
 
             if repo_skills.get("frameworks"):
-                prompt_parts.append(
-                    f"- Frameworks and tools: {', '.join(repo_skills['frameworks'])}"
-                )
+                prompt_parts.append(f"- Frameworks and tools: {', '.join(repo_skills['frameworks'])}")
 
             if repo_skills.get("domains"):
-                prompt_parts.append(
-                    f"- Areas they specialize in: {', '.join(repo_skills['domains'])}"
-                )
+                prompt_parts.append(f"- Areas they specialize in: {', '.join(repo_skills['domains'])}")
         else:
             # Profile-based skills
             if languages:
                 top_languages = [lang["language"] for lang in languages[:5]]
-                prompt_parts.append(
-                    f"- Programming languages they work with: {', '.join(top_languages)}"
-                )
+                prompt_parts.append(f"- Programming languages they work with: {', '.join(top_languages)}")
 
             if skills["technical_skills"]:
-                prompt_parts.append(
-                    f"- Technical skills: {', '.join(skills['technical_skills'][:10])}"
-                )
+                prompt_parts.append(f"- Technical skills: {', '.join(skills['technical_skills'][:10])}")
 
             if skills["frameworks"]:
-                prompt_parts.append(
-                    f"- Frameworks and tools: {', '.join(skills['frameworks'])}"
-                )
+                prompt_parts.append(f"- Frameworks and tools: {', '.join(skills['frameworks'])}")
 
             if skills["domains"]:
-                prompt_parts.append(
-                    f"- Areas they specialize in: {', '.join(skills['domains'])}"
-                )
+                prompt_parts.append(f"- Areas they specialize in: {', '.join(skills['domains'])}")
 
         # Add commit analysis insights based on analysis type
-        if (
-            commit_analysis
-            and commit_analysis.get("total_commits_analyzed", 0) > 0
-        ):
+        if commit_analysis and commit_analysis.get("total_commits_analyzed", 0) > 0:
             if github_data.get("repository_info"):
                 # Repository-specific insights
                 prompt_parts.append("\nWhat their coding work shows:")
 
                 if commit_analysis.get("repository_focused"):
-                    excellence_areas = commit_analysis.get(
-                        "excellence_areas", {}
-                    )
+                    excellence_areas = commit_analysis.get("excellence_areas", {})
                     if excellence_areas.get("primary_strength"):
                         primary_strength = excellence_areas["primary_strength"]
-                        prompt_parts.append(
-                            f"- What they're really good at: {primary_strength}"
-                        )
+                        prompt_parts.append(f"- What they're really good at: {primary_strength}")
 
                     patterns = excellence_areas.get("patterns", {})
                     if patterns:
                         top_patterns = list(patterns.keys())[:2]
-                        pattern_str = ", ".join(
-                            [p.replace("_", " ").title() for p in top_patterns]
-                        )
-                        prompt_parts.append(
-                            f"- How they approach development: {pattern_str}"
-                        )
+                        pattern_str = ", ".join([p.replace("_", " ").title() for p in top_patterns])
+                        prompt_parts.append(f"- How they approach development: {pattern_str}")
 
-                    tech_contributions = commit_analysis.get(
-                        "technical_contributions", {}
-                    )
+                    tech_contributions = commit_analysis.get("technical_contributions", {})
                     if tech_contributions:
                         top_contributions = list(tech_contributions.keys())[:2]
                         contrib_str = ", ".join(top_contributions)
-                        prompt_parts.append(
-                            f"- Technical areas they focus on: {contrib_str}"
-                        )
+                        prompt_parts.append(f"- Technical areas they focus on: {contrib_str}")
             else:
                 # Profile-based insights
                 prompt_parts.append("\nWhat their overall coding work shows:")
 
                 excellence_areas = commit_analysis.get("excellence_areas", {})
                 if excellence_areas.get("primary_strength"):
-                    primary_strength = (
-                        excellence_areas["primary_strength"]
-                        .replace("_", " ")
-                        .title()
-                    )
-                    prompt_parts.append(
-                        f"- What they're really good at: {primary_strength}"
-                    )
+                    primary_strength = excellence_areas["primary_strength"].replace("_", " ").title()
+                    prompt_parts.append(f"- What they're really good at: {primary_strength}")
 
                 patterns = excellence_areas.get("patterns", {})
                 if patterns:
                     top_patterns = list(patterns.keys())[:3]
-                    pattern_str = ", ".join(
-                        [p.replace("_", " ").title() for p in top_patterns]
-                    )
-                    prompt_parts.append(
-                        f"- How they approach development: {pattern_str}"
-                    )
+                    pattern_str = ", ".join([p.replace("_", " ").title() for p in top_patterns])
+                    prompt_parts.append(f"- How they approach development: {pattern_str}")
 
-                tech_contributions = commit_analysis.get(
-                    "technical_contributions", {}
-                )
+                tech_contributions = commit_analysis.get("technical_contributions", {})
                 if tech_contributions:
                     top_contributions = sorted(
                         tech_contributions.items(),
                         key=lambda x: x[1],
                         reverse=True,
                     )[:2]
-                    contrib_str = ", ".join(
-                        [
-                            contrib[0].replace("_", " ").title()
-                            for contrib in top_contributions
-                        ]
-                    )
-                    prompt_parts.append(
-                        f"- Technical areas they focus on: {contrib_str}"
-                    )
+                    contrib_str = ", ".join([contrib[0].replace("_", " ").title() for contrib in top_contributions])
+                    prompt_parts.append(f"- Technical areas they focus on: {contrib_str}")
 
         # Add specific skills if requested
         if specific_skills:
-            prompt_parts.append(
-                f"\nMake sure to highlight these skills: {', '.join(specific_skills)}"
-            )
+            prompt_parts.append(f"\nMake sure to highlight these skills: {', '.join(specific_skills)}")
 
         # Add custom prompt if provided
         if custom_prompt:
-            prompt_parts.append(
-                f"\nAdditional information to include: {custom_prompt}"
-            )
+            prompt_parts.append(f"\nAdditional information to include: {custom_prompt}")
 
         # Add guidelines based on length
         base_guidelines = [
@@ -386,9 +321,7 @@ class AIService:
 
         return f"Professional Recommendation for {username}"
 
-    def _calculate_confidence_score(
-        self, github_data: Dict[str, Any], generated_content: str
-    ) -> int:
+    def _calculate_confidence_score(self, github_data: Dict[str, Any], generated_content: str) -> int:
         """Calculate dynamic confidence score based on data quality and content."""
         score: float = 0.0
         max_score = 100
@@ -404,9 +337,7 @@ class AIService:
         # Commit analysis availability (20 points max)
         commit_analysis = github_data.get("commit_analysis", {})
         if commit_analysis.get("total_commits_analyzed", 0) > 0:
-            commit_score = min(
-                commit_analysis["total_commits_analyzed"] / 150 * 100, 100
-            )
+            commit_score = min(commit_analysis["total_commits_analyzed"] / 150 * 100, 100)
             score += commit_score * 0.2
 
         # Multi-stage refinement bonus (10 points max)
@@ -468,15 +399,9 @@ class AIService:
 
             # Generate the option
             temp_modifier = config.get("temperature_modifier", 0.7)
-            temp_modifier = (
-                float(temp_modifier)
-                if isinstance(temp_modifier, (int, float, str))
-                else 0.7
-            )
+            temp_modifier = float(temp_modifier) if isinstance(temp_modifier, (int, float, str)) else 0.7
 
-            option_content = await self._generate_single_option(
-                option_prompt, temp_modifier
-            )
+            option_content = await self._generate_single_option(option_prompt, temp_modifier)
 
             option_end = time.time()
 
@@ -488,19 +413,13 @@ class AIService:
                 "title": self._extract_title(option_content, base_username),
                 "word_count": len(option_content.split()),
                 "focus": config["focus"],
-                "confidence_score": self._calculate_confidence_score(
-                    github_data, option_content
-                ),
+                "confidence_score": self._calculate_confidence_score(github_data, option_content),
             }
 
             options.append(option)
 
-            logger.info(
-                f"⏱️  {config['name']} completed in {option_end - option_start:.2f} seconds"
-            )
-            logger.info(
-                f"✅ Generated {option['word_count']} words, confidence: {option['confidence_score']}"
-            )
+            logger.info(f"⏱️  {config['name']} completed in {option_end - option_start:.2f} seconds")
+            logger.info(f"✅ Generated {option['word_count']} words, confidence: {option['confidence_score']}")
             logger.info(f"   • Preview: {option_content[:100]}...")
 
         pipeline_end = time.time()
@@ -514,9 +433,7 @@ class AIService:
 
         return options
 
-    def _build_option_prompt(
-        self, base_prompt: str, custom_instruction: str, focus: str
-    ) -> str:
+    def _build_option_prompt(self, base_prompt: str, custom_instruction: str, focus: str) -> str:
         """Build a customized prompt for a specific option."""
         return """{base_prompt}
 
@@ -526,22 +443,16 @@ FOR THIS VERSION, FOCUS ON:
 Create a recommendation that really highlights their {focus.replace('_', ' ')} skills while keeping it natural and conversational.
 """
 
-    async def _generate_single_option(
-        self, prompt: str, temperature_modifier: float
-    ) -> str:
+    async def _generate_single_option(self, prompt: str, temperature_modifier: float) -> str:
         """Generate a single recommendation option."""
         # Adjust temperature for variety
         config = genai.types.GenerationConfig(
-            temperature=min(
-                settings.GEMINI_TEMPERATURE + temperature_modifier, 2.0
-            ),
+            temperature=min(settings.GEMINI_TEMPERATURE + temperature_modifier, 2.0),
             max_output_tokens=settings.GEMINI_MAX_TOKENS,
             top_p=0.9,
             top_k=40,
         )
-        response = self.model.generate_content(
-            prompt, generation_config=config
-        )
+        response = self.model.generate_content(prompt, generation_config=config)
         return response.text
 
     async def regenerate_recommendation(
@@ -573,9 +484,7 @@ Create a recommendation that really highlights their {focus.replace('_', ' ')} s
             )
 
             # Generate refined recommendation
-            refined_content = await self._generate_refined_regeneration(
-                refinement_prompt
-            )
+            refined_content = await self._generate_refined_regeneration(refinement_prompt)
 
             # Return refined result
             result = {
@@ -585,9 +494,7 @@ Create a recommendation that really highlights their {focus.replace('_', ' ')} s
                     github_data["user_data"]["github_username"],
                 ),
                 "word_count": len(refined_content.split()),
-                "confidence_score": self._calculate_confidence_score(
-                    github_data, refined_content
-                ),
+                "confidence_score": self._calculate_confidence_score(github_data, refined_content),
                 "generation_parameters": {
                     "model": settings.GEMINI_MODEL,
                     "temperature": settings.GEMINI_TEMPERATURE,
@@ -621,7 +528,7 @@ Create a recommendation that really highlights their {focus.replace('_', ' ')} s
         username = github_data["user_data"]["github_username"]
         target_length = self._get_length_guideline(length)
 
-        return """
+        return f"""
 I have this LinkedIn recommendation that needs some changes:
 
 ORIGINAL RECOMMENDATION:
@@ -648,15 +555,12 @@ Just give me the updated recommendation text, nothing else.
     async def _generate_refined_regeneration(self, prompt: str) -> str:
         """Generate refined recommendation for regeneration."""
         config = genai.types.GenerationConfig(
-            temperature=settings.GEMINI_TEMPERATURE
-            + 0.1,  # Slightly higher for refinement
+            temperature=settings.GEMINI_TEMPERATURE + 0.1,  # Slightly higher for refinement
             max_output_tokens=settings.GEMINI_MAX_TOKENS,
             top_p=0.9,
             top_k=40,
         )
-        response = self.model.generate_content(
-            prompt, generation_config=config
-        )
+        response = self.model.generate_content(prompt, generation_config=config)
         return response.text
 
     def _score_data_completeness(self, github_data: Dict[str, Any]) -> int:
@@ -673,7 +577,7 @@ Just give me the updated recommendation text, nothing else.
             score += 10
 
         # Repository data
-        # repositories = ...  # Removed unused variable
+        repositories = github_data.get("repositories", [])
         if repositories:
             score += 20
         if len(repositories) >= 5:
@@ -729,9 +633,7 @@ Just give me the updated recommendation text, nothing else.
             "code",
             "programming",
         ]
-        if any(
-            indicator in content.lower() for indicator in specific_indicators
-        ):
+        if any(indicator in content.lower() for indicator in specific_indicators):
             score += 25
 
         return min(score, 100)

@@ -65,8 +65,7 @@ async def lifespan(app: FastAPI):
 # Create FastAPI application
 app = FastAPI(
     title="LinkedIn Recommendation Writer",
-    description="Generate professional LinkedIn recommendations using GitHub "
-    "data and AI",
+    description="Generate professional LinkedIn recommendations using GitHub " "data and AI",
     version="1.0.0",
     docs_url="/docs" if settings.ENVIRONMENT != "production" else None,
     redoc_url="/redoc" if settings.ENVIRONMENT != "production" else None,
@@ -161,15 +160,12 @@ async def health_check():
 
 # Custom exception handlers
 @app.exception_handler(BaseApplicationError)
-async def application_exception_handler(
-    request: Request, exc: BaseApplicationError
-):
+async def application_exception_handler(request: Request, exc: BaseApplicationError):
     """Handle custom application exceptions."""
     request_id = getattr(request.state, "request_id", "unknown")
 
     logger.warning(
-        f"Application error in request {request_id}: {exc.error_code} - "
-        f"{exc.message}",
+        f"Application error in request {request_id}: {exc.error_code} - " f"{exc.message}",
         extra={"error_code": exc.error_code, "details": exc.details},
     )
 
@@ -200,9 +196,7 @@ async def application_exception_handler(
 async def global_exception_handler(request: Request, exc: Exception):
     """Global exception handler for unhandled exceptions."""
     request_id = getattr(request.state, "request_id", "unknown")
-    logger.error(
-        f"Unhandled exception in request {request_id}: {exc}", exc_info=True
-    )
+    logger.error(f"Unhandled exception in request {request_id}: {exc}", exc_info=True)
 
     if settings.API_DEBUG:
         return JSONResponse(
@@ -232,8 +226,6 @@ if __name__ == "__main__":
         host=settings.API_HOST,
         port=settings.API_PORT,
         reload=settings.API_RELOAD and settings.ENVIRONMENT != "production",
-        workers=(
-            settings.API_WORKERS if settings.ENVIRONMENT == "production" else 1
-        ),
+        workers=(settings.API_WORKERS if settings.ENVIRONMENT == "production" else 1),
         log_level=settings.LOG_LEVEL.lower(),
     )

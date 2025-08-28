@@ -63,15 +63,21 @@ if [ -n "$HAS_BACKEND" ]; then
   fi
 
   # Run backend formatting check
-  if ! run_cmd "cd backend && python -m black --check --diff app/" "Python formatting check"; then
+  if ! (cd backend && python -m black --check --diff app/); then
+    echo -e "${RED}❌ Python formatting check failed${NC}"
     echo -e "${YELLOW}💡 Run 'cd backend && python -m black app/' to fix formatting${NC}"
     failed=1
+  else
+    echo -e "${GREEN}✅ Python formatting check completed successfully${NC}"
   fi
 
   # Run backend linting check
-  if ! run_cmd "cd backend && python -m flake8 app/" "Python linting check"; then
+  if ! python -m flake8 --max-line-length=150 --extend-ignore=E203,W503 backend/app/; then
+    echo -e "${RED}❌ Python linting check failed${NC}"
     echo -e "${YELLOW}💡 Fix the linting issues above${NC}"
     failed=1
+  else
+    echo -e "${GREEN}✅ Python linting check completed successfully${NC}"
   fi
 fi
 

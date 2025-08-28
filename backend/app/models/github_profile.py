@@ -50,17 +50,11 @@ class GitHubProfile(Base):
     # Metadata
     last_analyzed = Column(DateTime, default=datetime.utcnow)
     created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
-    )
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
     user = relationship("User", back_populates="github_profiles")
-    recommendations = relationship(
-        "Recommendation", back_populates="github_profile"
-    )
+    recommendations = relationship("Recommendation", back_populates="github_profile")
 
     def __repr__(self):
-        return (
-            f"<GitHubProfile(id={self.id}, username={self.github_username})>"
-        )
+        return f"<GitHubProfile(id={self.id}, username={self.github_username})>"

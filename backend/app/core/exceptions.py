@@ -56,9 +56,7 @@ class ExternalServiceError(BaseApplicationError):
         status_code: Optional[int] = None,
         details: Optional[Dict[str, Any]] = None,
     ):
-        super().__init__(
-            f"{service} error: {message}", "EXTERNAL_SERVICE_ERROR", details
-        )
+        super().__init__(f"{service} error: {message}", "EXTERNAL_SERVICE_ERROR", details)
         self.service = service
         self.status_code = status_code
 

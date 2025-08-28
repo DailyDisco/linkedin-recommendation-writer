@@ -3,6 +3,7 @@
 import logging
 from typing import Optional
 
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -116,7 +117,7 @@ async def analyze_github_profile(
             )
 
         user_data = analysis["user_data"]
-        # repositories = ...  # Removed unused variable
+        repositories = analysis["repositories"]
         languages = analysis["languages"]
         skills = analysis["skills"]
 
@@ -190,16 +191,12 @@ async def get_github_profile(
     request = GitHubAnalysisRequest(
         github_username=username,
         force_refresh=force_refresh,
-        analyze_# repositories = ...  # Removed unused variable
-        max_# repositories = ...  # Removed unused variable
     )
 
     return await analyze_github_profile(request, db, github_service)
 
 
-@router.post(
-    "/repository/contributors", response_model=RepositoryContributorsResponse
-)
+@router.post("/repository/contributors", response_model=RepositoryContributorsResponse)
 async def get_repository_contributors(
     request: RepositoryContributorsRequest,
     db: AsyncSession = Depends(get_database_session),
