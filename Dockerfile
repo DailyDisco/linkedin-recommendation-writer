@@ -35,15 +35,17 @@ RUN find app/components/ui -name "*.tsx" -o -name "*.ts" | xargs sed -i 's|@/lib
     find app/components -name "*.tsx" -o -name "*.ts" | xargs sed -i 's|@/lib/utils|../lib/utils|g' && \
     find app -maxdepth 1 -name "*.tsx" -o -name "*.ts" | xargs sed -i 's|@/lib/utils|./lib/utils|g'
 
-# Install dependencies and build for production (SPA mode)
-RUN npm ci --production=false && npx vite build --mode production
+# Install dependencies and build
+RUN npm ci --production=false && npm run build
 
 # Copy built frontend to backend static directory
 RUN mkdir -p /app/frontend_static && \
-    if [ -d "dist" ]; then \
-        cp -r dist/* /app/frontend_static/; \
+    if [ -d "build/client" ]; then \
+        cp -r build/client/* /app/frontend_static/; \
     elif [ -d "build" ]; then \
         cp -r build/* /app/frontend_static/; \
+    elif [ -d "dist" ]; then \
+        cp -r dist/* /app/frontend_static/; \
     else \
         echo "No build output directory found" && exit 1; \
     fi
