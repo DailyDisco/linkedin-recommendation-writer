@@ -11,7 +11,7 @@ line_length = 150
 line-length = 150
 target-version = ['py311']
 include = '\.pyi?$'
-extend-exclude = '''
+exclude = '''
 /(
   # directories
   \.eggs

@@ -98,11 +98,11 @@ export default function RecommendationModal({
     timeWorkedTogether: string;
     notableAchievements: string;
     recommendation_type:
-    | 'professional'
-    | 'technical'
-    | 'leadership'
-    | 'academic'
-    | 'personal';
+      | 'professional'
+      | 'technical'
+      | 'leadership'
+      | 'academic'
+      | 'personal';
     tone: 'professional' | 'friendly' | 'formal' | 'casual';
     length: 'short' | 'medium' | 'long';
     github_input: string;
@@ -390,7 +390,7 @@ Key Achievements: ${formData.notableAchievements}
       const error = err as HttpError; // Type assertion for axios error structure
       setError(
         error.response?.data?.detail ||
-        'Failed to create recommendation from selected option'
+          'Failed to create recommendation from selected option'
       );
     } finally {
       setIsCreatingFromOption(false);
@@ -464,7 +464,7 @@ Key Achievements: ${formData.notableAchievements}
 
       setError(
         error.response?.data?.detail ||
-        'Failed to regenerate recommendation. Please try again.'
+          'Failed to regenerate recommendation. Please try again.'
       );
       setIsRegenerating(false);
     }
@@ -553,10 +553,11 @@ Key Achievements: ${formData.notableAchievements}
                     id='github-input'
                     type='text'
                     required
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${validationErrors.github_input
-                      ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
-                      : 'border-gray-300'
-                      }`}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${
+                      validationErrors.github_input
+                        ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
+                        : 'border-gray-300'
+                    }`}
                     placeholder='e.g., johnsmith or https://github.com/johnsmith/myproject'
                     value={formData.github_input}
                     onChange={e => {
@@ -710,10 +711,11 @@ Key Achievements: ${formData.notableAchievements}
                     id='working-relationship'
                     ref={firstInputRef}
                     required
-                    className={`w-full h-20 px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${validationErrors.workingRelationship
-                      ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
-                      : 'border-gray-300'
-                      }`}
+                    className={`w-full h-20 px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${
+                      validationErrors.workingRelationship
+                        ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
+                        : 'border-gray-300'
+                    }`}
                     placeholder='e.g., We collaborated on the frontend development team for 8 months...'
                     value={formData.workingRelationship}
                     onChange={e => {
@@ -867,7 +869,11 @@ Key Achievements: ${formData.notableAchievements}
                         onChange={e =>
                           setFormData(prev => ({
                             ...prev,
-                            tone: e.target.value as 'professional' | 'friendly' | 'formal' | 'casual',
+                            tone: e.target.value as
+                              | 'professional'
+                              | 'friendly'
+                              | 'formal'
+                              | 'casual',
                           }))
                         }
                       >
@@ -895,7 +901,10 @@ Key Achievements: ${formData.notableAchievements}
                         onChange={e =>
                           setFormData(prev => ({
                             ...prev,
-                            length: e.target.value as 'short' | 'medium' | 'long',
+                            length: e.target.value as
+                              | 'short'
+                              | 'medium'
+                              | 'long',
                           }))
                         }
                       >

@@ -18,7 +18,8 @@ run_cmd() {
   echo -e "${BLUE}🔄 Running: ${NC}$desc"
   echo -e "${CYAN}Command: ${NC}$cmd"
 
-  if eval "$cmd"; then
+  # Use a subshell to ensure directory changes don't affect the main script
+  if (eval "$cmd"); then
     echo -e "${GREEN}✅ $desc completed successfully${NC}"
     return 0
   else
@@ -92,15 +93,19 @@ if [ -n "$HAS_FRONTEND" ]; then
   fi
 
   # Run frontend formatting fix
-  if ! run_cmd "cd frontend && npm run prettier:fix" "Frontend formatting fix"; then
+  if ! (cd frontend && npm run prettier:fix); then
     echo -e "${YELLOW}💡 Frontend formatting fix failed${NC}"
     failed=1
+  else
+    echo -e "${GREEN}✅ Frontend formatting fix completed successfully${NC}"
   fi
 
   # Run frontend linting
-  if ! run_cmd "cd frontend && npm run lint" "Frontend linting"; then
+  if ! (cd frontend && npm run lint); then
     echo -e "${YELLOW}💡 Fix the linting issues above${NC}"
     failed=1
+  else
+    echo -e "${GREEN}✅ Frontend linting completed successfully${NC}"
   fi
 fi
 
