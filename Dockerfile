@@ -53,8 +53,24 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 
 # Create a startup script to handle PORT properly
 RUN echo '#!/bin/sh\n\
-PORT=${PORT:-8000}\n\
+echo "=== Railway Docker Startup Script ===\n\
+echo "Environment variables:"\n\
+env | grep -E "(PORT|DATABASE|REDIS|GITHUB|GEMINI)" | sort\n\
+echo ""\n\
+\n\
+# Handle PORT environment variable\n\
+if [ -z "$PORT" ]; then\n\
+    echo "PORT environment variable not set, using default 8000"\n\
+    PORT=8000\n\
+else\n\
+    echo "PORT environment variable set to: $PORT"\n\
+fi\n\
+\n\
 echo "Starting application on port $PORT"\n\
+echo "Command: python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 4"\n\
+echo ""\n\
+\n\
+# Start the application\n\
 exec python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 4' > /app/start.sh && \
 chmod +x /app/start.sh
 
