@@ -12,7 +12,8 @@
     "vet:backend": "cd backend && flake8 .",
     "audit": "npm audit --audit-level=moderate",
     "lint:frontend": "cd frontend && npm run lint",
-    "build:frontend": "cd frontend && npm run build"
+    "build:frontend": "cd frontend && npm run build",
+    "typecheck:frontend": "cd frontend && npm run typecheck"
   },
   "keywords": [],
   "author": "",
