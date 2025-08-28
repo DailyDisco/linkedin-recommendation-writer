@@ -39,7 +39,7 @@ RUN find app/components/ui -name "*.tsx" -o -name "*.ts" | xargs sed -i 's|@/lib
 RUN npm ci --production=false && npm run build
 
 # Copy built frontend to backend static directory
-RUN mkdir -p /app/frontend_static && cp -r build/client/* /app/frontend_static/
+RUN mkdir -p /app/frontend_static && cp -r build/client/* /app/frontend_static/ && cp index.html /app/frontend_static/
 
 # Set working directory back to app root
 WORKDIR /app
