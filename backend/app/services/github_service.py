@@ -186,9 +186,7 @@ class GitHubService:
 
             cache_end = time.time()
             logger.info(f"⏱️  Results cached in {cache_end - cache_start:.2f} seconds")
-            logger.info(
-                f"✅ Cache TTL: {self.COMMIT_ANALYSIS_CACHE_TTL/3600:.1f} hours"
-            )
+            logger.info(f"✅ Cache TTL: {self.COMMIT_ANALYSIS_CACHE_TTL/3600:.1f} hours")
 
             analysis_end = time.time()
             total_time = analysis_end - analysis_start

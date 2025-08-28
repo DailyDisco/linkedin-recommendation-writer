@@ -708,9 +708,9 @@ class RecommendationService:
                 # Use repository-specific commit analysis if available
                 merged_data["commit_analysis"] = repository_data["commit_analysis"]
                 merged_data["commit_analysis"]["contributor_focused"] = True
-                merged_data["commit_analysis"]["repository_context"] = (
-                    repository_data.get("repository_info", {}).get("full_name", "")
-                )
+                merged_data["commit_analysis"][
+                    "repository_context"
+                ] = repository_data.get("repository_info", {}).get("full_name", "")
 
         # Add metadata about the analysis type
         merged_data["analysis_type"] = "repository_contributor"
