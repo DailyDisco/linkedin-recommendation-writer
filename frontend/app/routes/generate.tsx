@@ -12,7 +12,14 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { githubApi } from '../services/api';
-import type { ContributorInfo } from '../types';
+import type { ContributorInfo, RepositoryInfo } from '../types';
+
+// Extend window interface for debug utilities
+declare global {
+  interface Window {
+    testRepositoryUrlParsing?: typeof testRepositoryUrlParsing;
+  }
+}
 import RecommendationModal from '../components/RecommendationModal';
 import { ContributorSkeleton } from '../components/ui/loading-skeleton';
 import ErrorBoundary from '../components/ui/error-boundary';
@@ -23,7 +30,7 @@ export default function GeneratorPage() {
   const [mode, setMode] = useState<'user' | 'repository'>('repository');
   const [isLoading, setIsLoading] = useState(false);
   const [contributors, setContributors] = useState<ContributorInfo[]>([]);
-  const [repositoryInfo, setRepositoryInfo] = useState<any>(null);
+  const [repositoryInfo, setRepositoryInfo] = useState<RepositoryInfo | null>(null);
   const [error, setError] = useState<string>('');
   const [selectedContributor, setSelectedContributor] =
     useState<ContributorInfo | null>(null);
@@ -48,7 +55,7 @@ export default function GeneratorPage() {
   // Load debug utility in development
   useEffect(() => {
     if (import.meta.env.DEV && typeof window !== 'undefined') {
-      (window as any).testRepositoryUrlParsing = testRepositoryUrlParsing;
+      window.testRepositoryUrlParsing = testRepositoryUrlParsing;
       console.log(
         '🔧 Debug utility loaded! Run testRepositoryUrlParsing() in console to test URL parsing.'
       );
@@ -185,12 +192,13 @@ export default function GeneratorPage() {
           },
         ]);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const error = err as HttpError;
       console.error('💥 FRONTEND: API request failed:', {
-        status: err.response?.status,
-        statusText: err.response?.statusText,
-        data: err.response?.data,
-        message: err.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message,
         mode: mode,
         input: formData.input_value,
       });
@@ -221,7 +229,7 @@ export default function GeneratorPage() {
         // Add diagnostic suggestion if it looks like a configuration issue
         const enhancedMessage =
           errorMessage.includes('GitHub token') ||
-          errorMessage.includes('not configured')
+            errorMessage.includes('not configured')
             ? `${errorMessage} Please check the Service Diagnostics section below for configuration issues.`
             : errorMessage;
 
@@ -242,10 +250,11 @@ export default function GeneratorPage() {
       const result = await githubApi.checkHealth();
       setDiagnostics(result);
       setShowDiagnostics(true);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const error = err as HttpError;
       setDiagnostics({
         status: 'error',
-        message: `Failed to check GitHub service: ${err.response?.data?.detail || err.message}`,
+        message: `Failed to check GitHub service: ${error.response?.data?.detail || error.message}`,
         github_token_configured: false,
       });
       setShowDiagnostics(true);
@@ -300,11 +309,10 @@ export default function GeneratorPage() {
                   <button
                     type='button'
                     onClick={() => setMode('repository')}
-                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                      mode === 'repository'
-                        ? 'bg-blue-600 text-white'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
+                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${mode === 'repository'
+                      ? 'bg-blue-600 text-white'
+                      : 'text-gray-600 hover:text-gray-900'
+                      }`}
                   >
                     <Users className='w-4 h-4' />
                     <span>Repository Mode</span>
@@ -312,11 +320,10 @@ export default function GeneratorPage() {
                   <button
                     type='button'
                     onClick={() => setMode('user')}
-                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                      mode === 'user'
-                        ? 'bg-blue-600 text-white'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
+                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${mode === 'user'
+                      ? 'bg-blue-600 text-white'
+                      : 'text-gray-600 hover:text-gray-900'
+                      }`}
                   >
                     <User className='w-4 h-4' />
                     <span>Single User</span>
@@ -441,16 +448,15 @@ export default function GeneratorPage() {
                       )}
                       {(diagnostics.status === 'unhealthy' ||
                         diagnostics.status === 'error') && (
-                        <XCircle className='w-5 h-5 text-red-600' />
-                      )}
+                          <XCircle className='w-5 h-5 text-red-600' />
+                        )}
                       <span
-                        className={`font-medium ${
-                          diagnostics.status === 'healthy'
-                            ? 'text-green-600'
-                            : diagnostics.status === 'degraded'
-                              ? 'text-yellow-600'
-                              : 'text-red-600'
-                        }`}
+                        className={`font-medium ${diagnostics.status === 'healthy'
+                          ? 'text-green-600'
+                          : diagnostics.status === 'degraded'
+                            ? 'text-yellow-600'
+                            : 'text-red-600'
+                          }`}
                       >
                         {diagnostics.status.toUpperCase()}
                       </span>
@@ -464,11 +470,10 @@ export default function GeneratorPage() {
                           GitHub Token:
                         </span>
                         <span
-                          className={`ml-2 ${
-                            diagnostics.github_token_configured
-                              ? 'text-green-600'
-                              : 'text-red-600'
-                          }`}
+                          className={`ml-2 ${diagnostics.github_token_configured
+                            ? 'text-green-600'
+                            : 'text-red-600'
+                            }`}
                         >
                           {diagnostics.github_token_configured
                             ? '✓ Configured'
@@ -482,13 +487,12 @@ export default function GeneratorPage() {
                             API Quota Remaining:
                           </span>
                           <span
-                            className={`ml-2 ${
-                              diagnostics.rate_limit_remaining > 100
-                                ? 'text-green-600'
-                                : diagnostics.rate_limit_remaining > 0
-                                  ? 'text-yellow-600'
-                                  : 'text-red-600'
-                            }`}
+                            className={`ml-2 ${diagnostics.rate_limit_remaining > 100
+                              ? 'text-green-600'
+                              : diagnostics.rate_limit_remaining > 0
+                                ? 'text-yellow-600'
+                                : 'text-red-600'
+                              }`}
                           >
                             {diagnostics.rate_limit_remaining.toLocaleString()}{' '}
                             requests

@@ -7,7 +7,7 @@ import {
   ScrollRestoration,
   useRouteError,
 } from 'react-router';
-import type { Route } from './+types/root';
+// import type { Route } from './+types/root';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AppLayout } from './layout';
 import UIErrorBoundary from './components/ui/error-boundary';

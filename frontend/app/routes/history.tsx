@@ -3,13 +3,12 @@ import {
   FileText,
   Calendar,
   User,
-  Loader2,
   Copy,
   Eye,
   EyeOff,
 } from 'lucide-react';
 import { recommendationApi } from '../services/api';
-import type { Recommendation } from '../types';
+import type { HttpError, Recommendation } from '../types';
 import { RecommendationSkeleton } from '../components/ui/loading-skeleton';
 import ErrorBoundary from '../components/ui/error-boundary';
 
@@ -30,8 +29,9 @@ export default function HistoryPage() {
       setError('');
       const data = await recommendationApi.getAll();
       setRecommendations(data);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to load recommendations');
+    } catch (err: unknown) {
+      const error = err as HttpError;
+      setError(error.response?.data?.detail || 'Failed to load recommendations');
     } finally {
       setIsLoading(false);
     }

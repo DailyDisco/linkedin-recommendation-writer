@@ -12,9 +12,11 @@ import {
 import { recommendationApi } from '../services/api';
 import type {
   ContributorInfo,
+  HttpError,
   Recommendation,
   RecommendationOption,
   RegenerateRequest,
+  RecommendationRequest,
 } from '../types';
 import ErrorBoundary from './ui/error-boundary';
 import { parseGitHubInput, validateGitHubInput } from '../lib/utils';
@@ -96,11 +98,11 @@ export default function RecommendationModal({
     timeWorkedTogether: string;
     notableAchievements: string;
     recommendation_type:
-      | 'professional'
-      | 'technical'
-      | 'leadership'
-      | 'academic'
-      | 'personal';
+    | 'professional'
+    | 'technical'
+    | 'leadership'
+    | 'academic'
+    | 'personal';
     tone: 'professional' | 'friendly' | 'formal' | 'casual';
     length: 'short' | 'medium' | 'long';
     github_input: string;
@@ -231,7 +233,7 @@ Time Period: ${formData.timeWorkedTogether}
 Key Achievements: ${formData.notableAchievements}
             `.trim();
 
-      const request: any = {
+      const request: RecommendationRequest = {
         github_username: contributor.username, // Use selected contributor's username
         recommendation_type: formData.recommendation_type,
         tone: formData.tone,
@@ -284,42 +286,44 @@ Key Achievements: ${formData.notableAchievements}
       setStep('options');
 
       console.log('🎉 FRONTEND: UI updated with recommendation results');
-    } catch (err: any) {
+    } catch (err: unknown) {
       const endTime = Date.now();
       const duration = (endTime - startTime) / 1000;
 
       console.error('💥 FRONTEND: Recommendation generation failed');
       console.error('⏱️  Failed after:', `${duration.toFixed(2)} seconds`);
+      const errorDetails = err as HttpError; // Type assertion for logging
       console.error('❌ Error details:', {
-        status: err.response?.status,
-        statusText: err.response?.statusText,
-        detail: err.response?.data?.detail,
-        message: err.message,
-        code: err.code,
+        status: errorDetails.response?.status,
+        statusText: errorDetails.response?.statusText,
+        detail: errorDetails.response?.data?.detail,
+        message: errorDetails.message,
+        code: errorDetails.code,
         fullError: err,
-        stack: err.stack,
+        stack: errorDetails.stack,
       });
 
       // Provide more specific error messages based on error type
       let errorMessage = 'Failed to generate recommendation. Please try again.';
 
-      if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+      const error = err as HttpError; // Type assertion for axios error structure
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
         errorMessage =
           'Request timed out. The recommendation generation is taking longer than expected. Please try again.';
-      } else if (err.response?.status === 429) {
+      } else if (error.response?.status === 429) {
         errorMessage =
           'Too many requests. Please wait a moment before trying again.';
-      } else if (err.response?.status === 500) {
+      } else if (error.response?.status === 500) {
         errorMessage = 'Server error. Please try again in a few moments.';
-      } else if (err.response?.status === 400) {
+      } else if (error.response?.status === 400) {
         errorMessage =
-          err.response?.data?.detail ||
+          error.response?.data?.detail ||
           'Invalid request. Please check your input.';
-      } else if (!err.response) {
+      } else if (!error.response) {
         errorMessage =
           'Network error. Please check your connection and try again.';
-      } else if (err.response?.data?.detail) {
-        errorMessage = err.response.data.detail;
+      } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
       }
 
       setError(errorMessage);
@@ -378,14 +382,15 @@ Key Achievements: ${formData.notableAchievements}
       setGeneratedRecommendation(recommendation);
       setSelectedOption(option);
       setStep('result');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(
         '💥 FRONTEND: Failed to create recommendation from option:',
         err
       );
+      const error = err as HttpError; // Type assertion for axios error structure
       setError(
-        err.response?.data?.detail ||
-          'Failed to create recommendation from selected option'
+        error.response?.data?.detail ||
+        'Failed to create recommendation from selected option'
       );
     } finally {
       setIsCreatingFromOption(false);
@@ -445,20 +450,21 @@ Key Achievements: ${formData.notableAchievements}
       setGeneratedRecommendation(regeneratedRecommendation);
       setRegenerateInstructions('');
       setIsRegenerating(false);
-    } catch (err: any) {
+    } catch (err: unknown) {
       const endTime = Date.now();
       const duration = (endTime - startTime) / 1000;
 
       console.error('💥 FRONTEND: Regeneration failed');
       console.error('⏱️  Failed after:', `${duration.toFixed(2)} seconds`);
+      const error = err as HttpError; // Type assertion for axios error structure
       console.error(
         '❌ Error details:',
-        err.response?.data?.detail || err.message
+        error.response?.data?.detail || error.message
       );
 
       setError(
-        err.response?.data?.detail ||
-          'Failed to regenerate recommendation. Please try again.'
+        error.response?.data?.detail ||
+        'Failed to regenerate recommendation. Please try again.'
       );
       setIsRegenerating(false);
     }
@@ -547,11 +553,10 @@ Key Achievements: ${formData.notableAchievements}
                     id='github-input'
                     type='text'
                     required
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${
-                      validationErrors.github_input
-                        ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
-                        : 'border-gray-300'
-                    }`}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${validationErrors.github_input
+                      ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
+                      : 'border-gray-300'
+                      }`}
                     placeholder='e.g., johnsmith or https://github.com/johnsmith/myproject'
                     value={formData.github_input}
                     onChange={e => {
@@ -705,11 +710,10 @@ Key Achievements: ${formData.notableAchievements}
                     id='working-relationship'
                     ref={firstInputRef}
                     required
-                    className={`w-full h-20 px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${
-                      validationErrors.workingRelationship
-                        ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
-                        : 'border-gray-300'
-                    }`}
+                    className={`w-full h-20 px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${validationErrors.workingRelationship
+                      ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
+                      : 'border-gray-300'
+                      }`}
                     placeholder='e.g., We collaborated on the frontend development team for 8 months...'
                     value={formData.workingRelationship}
                     onChange={e => {
@@ -829,7 +833,12 @@ Key Achievements: ${formData.notableAchievements}
                         onChange={e =>
                           setFormData(prev => ({
                             ...prev,
-                            recommendation_type: e.target.value as any,
+                            recommendation_type: e.target.value as
+                              | 'professional'
+                              | 'technical'
+                              | 'leadership'
+                              | 'academic'
+                              | 'personal',
                           }))
                         }
                       >
@@ -858,7 +867,7 @@ Key Achievements: ${formData.notableAchievements}
                         onChange={e =>
                           setFormData(prev => ({
                             ...prev,
-                            tone: e.target.value as any,
+                            tone: e.target.value as 'professional' | 'friendly' | 'formal' | 'casual',
                           }))
                         }
                       >
@@ -886,7 +895,7 @@ Key Achievements: ${formData.notableAchievements}
                         onChange={e =>
                           setFormData(prev => ({
                             ...prev,
-                            length: e.target.value as any,
+                            length: e.target.value as 'short' | 'medium' | 'long',
                           }))
                         }
                       >

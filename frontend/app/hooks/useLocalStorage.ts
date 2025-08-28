@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 /**
  * Custom hook for managing localStorage with type safety
@@ -45,7 +45,7 @@ export function useLocalStorage<T>(
 /**
  * Custom hook for managing form state with localStorage persistence
  */
-export function usePersistedForm<T extends Record<string, any>>(
+export function usePersistedForm<T extends Record<string, unknown>>(
   key: string,
   initialState: T
 ): [T, (updates: Partial<T>) => void, () => void] {

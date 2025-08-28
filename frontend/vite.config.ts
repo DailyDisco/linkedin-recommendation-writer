@@ -32,7 +32,7 @@ export default defineConfig(({ mode }) => {
       // Ensure path aliases work in test environment
       server: {
         deps: {
-          inline: ['vite-tsconfig-paths'],
+          inline: ['react-router-node'],
         },
       },
     },

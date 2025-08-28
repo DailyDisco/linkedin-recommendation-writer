@@ -3,6 +3,13 @@
  * Run this in browser console to test various URL formats
  */
 
+// Extend window interface for debug utilities
+declare global {
+  interface Window {
+    testRepositoryUrlParsing?: typeof testRepositoryUrlParsing;
+  }
+}
+
 export const testRepositoryUrlParsing = () => {
   const parseRepositoryInput = (input: string): string => {
     const trimmed = input.trim().toLowerCase();
@@ -119,7 +126,7 @@ export const testRepositoryUrlParsing = () => {
 
 // Run tests if in browser environment
 if (typeof window !== 'undefined') {
-  (window as any).testRepositoryUrlParsing = testRepositoryUrlParsing;
+  window.testRepositoryUrlParsing = testRepositoryUrlParsing;
   console.log(
     '🔧 Debug utility loaded! Run testRepositoryUrlParsing() in console to test URL parsing.'
   );

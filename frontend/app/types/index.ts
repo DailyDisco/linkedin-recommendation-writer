@@ -73,13 +73,54 @@ export interface Recommendation {
   confidence_score: number;
   word_count: number;
   ai_model: string;
-  generation_parameters?: Record<string, any>;
+  generation_parameters?: Record<string, unknown>;
   selected_option_id?: number;
   selected_option_name?: string;
   selected_option_focus?: string;
   created_at: string;
   updated_at: string;
   github_username?: string;
+}
+
+// HTTP Error types for axios/fetch error handling
+export interface HttpError {
+  response?: {
+    status: number;
+    statusText: string;
+    data?: {
+      detail?: string;
+      message?: string;
+    };
+  };
+  code?: string;
+  message?: string;
+}
+
+// Repository information types
+export interface RepositoryInfo {
+  name: string;
+  full_name: string;
+  description: string | null;
+  html_url: string;
+  language: string | null;
+  stargazers_count: number;
+  forks_count: number;
+  open_issues_count: number;
+  created_at: string;
+  updated_at: string;
+  topics: string[];
+  owner: {
+    login: string;
+    avatar_url: string;
+    html_url: string;
+  };
+}
+
+// Debug URL parsing types
+export interface UrlParseResult {
+  type: 'user' | 'repository';
+  value: string;
+  valid: boolean;
 }
 
 export interface RecommendationOption {
@@ -94,7 +135,7 @@ export interface RecommendationOption {
 
 export interface RecommendationOptionsResponse {
   options: RecommendationOption[];
-  generation_parameters?: Record<string, any>;
+  generation_parameters?: Record<string, unknown>;
   generation_prompt?: string;
 }
 
