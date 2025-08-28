@@ -1,8 +1,11 @@
 """Service for managing recommendations."""
 
 import logging
-from typing import Any, Dict, List, Optional
 from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+from sqlalchemy import desc, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.github_profile import GitHubProfile
 from app.models.recommendation import Recommendation
@@ -13,8 +16,6 @@ from app.schemas.recommendation import (
 )
 from app.services.ai_service import AIService
 from app.services.github_service import GitHubService
-from sqlalchemy import desc, select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 

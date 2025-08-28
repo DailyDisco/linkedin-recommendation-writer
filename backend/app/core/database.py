@@ -3,10 +3,11 @@
 import logging
 from typing import AsyncGenerator
 
-from app.core.config import settings
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
+
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -64,9 +65,10 @@ async def init_database():
 async def run_migrations():
     """Run database migrations using Alembic."""
     try:
+        import os
+
         from alembic import command
         from alembic.config import Config
-        import os
 
         # Get the directory containing this file
         current_dir = os.path.dirname(os.path.abspath(__file__))

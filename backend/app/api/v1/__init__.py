@@ -1,7 +1,8 @@
 """API v1 package."""
 
-from app.api.v1 import github, recommendations
 from fastapi import APIRouter
+
+from app.api.v1 import github, recommendations
 
 api_router = APIRouter()
 api_router.include_router(github.router, prefix="/github", tags=["github"])

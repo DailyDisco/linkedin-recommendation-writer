@@ -3,23 +3,24 @@
 import logging
 from typing import List, Optional
 
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.dependencies import (
-    get_database_session,
-    get_recommendation_service,
-    get_pagination_params,
     PaginationParams,
+    get_database_session,
+    get_pagination_params,
+    get_recommendation_service,
 )
 from app.schemas.recommendation import (
+    RecommendationCreate,
+    RecommendationFromOptionRequest,
     RecommendationListResponse,
     RecommendationOptionsResponse,
     RecommendationRequest,
     RecommendationResponse,
-    RecommendationCreate,
-    RecommendationFromOptionRequest,
 )
 from app.services.recommendation_service import RecommendationService
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 

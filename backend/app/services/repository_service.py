@@ -3,10 +3,11 @@
 import logging
 from typing import Any, Dict, List, Optional
 
-from app.core.config import settings
-from app.core.redis_client import get_cache, set_cache
 from github import Github
 from github.GithubException import GithubException
+
+from app.core.config import settings
+from app.core.redis_client import get_cache, set_cache
 
 logger = logging.getLogger(__name__)
 

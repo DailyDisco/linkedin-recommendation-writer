@@ -3,6 +3,10 @@
 import logging
 from typing import Optional
 
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.dependencies import (
     get_database_session,
     get_github_service,
@@ -22,9 +26,6 @@ from app.schemas.repository import (
 )
 from app.services.github_service import GitHubService
 from app.services.repository_service import RepositoryService
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
-from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 

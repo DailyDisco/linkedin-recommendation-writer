@@ -8,11 +8,12 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 import httpx
+from github import Github
+from github.GithubException import GithubException
+
 from app.core.config import settings
 from app.core.redis_client import get_cache, set_cache
 from app.schemas.github import LanguageStats, RepositoryInfo, SkillAnalysis
-from github import Github
-from github.GithubException import GithubException
 
 logger = logging.getLogger(__name__)
 

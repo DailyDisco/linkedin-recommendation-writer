@@ -4,9 +4,10 @@ import json
 import logging
 from typing import Any, Optional
 
-from app.core.config import settings
 from redis.asyncio import Redis
 from redis.exceptions import ConnectionError, TimeoutError
+
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
