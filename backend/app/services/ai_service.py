@@ -254,6 +254,7 @@ class AIService:
             "- Focus on both technical competence and collaborative abilities, providing specific examples and positive anecdotes from their work.",
             "- DO NOT mention any company names, employers, or employment history",
             "- Focus on technical skills and collaborative abilities only",
+            "- Separate the recommendation into clear, distinct paragraphs to improve readability.",
             f"- Target length: {self._get_length_guideline(length)} words",
             "- Do not include any placeholders or template text",
             "- Make it sound natural and personal, like a real recommendation",

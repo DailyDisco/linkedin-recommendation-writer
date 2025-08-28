@@ -89,7 +89,7 @@ export default function HistoryPage() {
           </div>
         ) : recommendations.length === 0 ? (
           <div className='rounded-lg border border-gray-200 bg-white shadow-sm'>
-            <div className='p-6 pt-0 text-center py-12'>
+            <div className='p-6 text-center py-12'>
               <FileText className='w-12 h-12 text-gray-400 mx-auto mb-4' />
               <h3 className='text-lg font-medium text-gray-900 mb-2'>
                 No recommendations yet

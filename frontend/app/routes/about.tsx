@@ -15,7 +15,7 @@ export default function AboutPage() {
 
       <div className='prose prose-lg max-w-none'>
         <div className='rounded-lg border border-gray-200 bg-white shadow-sm'>
-          <div className='p-6 pt-0 space-y-6'>
+          <div className='p-6 space-y-6'>
             <h2 className='text-2xl font-bold text-gray-900'>
               What is this tool?
             </h2>
