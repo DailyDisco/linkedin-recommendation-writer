@@ -12,7 +12,7 @@ try:
 
     genai_available = True
 except ImportError:
-    genai = None  # type: ignore[assignment]
+    genai = None  # type: ignore
     genai_available = False
 
 logger = logging.getLogger(__name__)

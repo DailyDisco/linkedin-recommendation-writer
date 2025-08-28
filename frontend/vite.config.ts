@@ -32,7 +32,7 @@ export default defineConfig(({ mode }) => {
       // Ensure path aliases work in test environment
       server: {
         deps: {
-          inline: ['react-router-node'],
+          inline: ['@react-router-node'],
         },
       },
       // Explicitly configure path aliases for Vitest
