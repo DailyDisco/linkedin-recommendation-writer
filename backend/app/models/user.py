@@ -25,6 +25,7 @@ class User(Base):
     # Recommendation limits
     recommendation_count = Column(Integer, default=0)  # Number of recommendations created today
     last_recommendation_date = Column(DateTime, nullable=True)  # Last date a recommendation was created
+    daily_limit = Column(Integer, default=10)  # Daily recommendation limit
 
     # Relationships
     github_profiles = relationship("GitHubProfile", back_populates="user")
