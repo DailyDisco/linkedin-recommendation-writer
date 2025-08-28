@@ -10,12 +10,11 @@ class GitHubAnalysisRequest(BaseModel):
     """Request schema for GitHub profile analysis."""
 
     github_username: str = Field(..., description="GitHub username to analyze")
-    force_refresh: bool = Field(
-        False, description="Force refresh of cached data")
-    analyze_repositories: bool = Field(
-        True, description="Include repository analysis")
+    force_refresh: bool = Field(False, description="Force refresh of cached data")
+    analyze_repositories: bool = Field(True, description="Include repository analysis")
     max_repositories: int = Field(
-        10, ge=1, le=50, description="Maximum repositories to analyze")
+        10, ge=1, le=50, description="Maximum repositories to analyze"
+    )
 
 
 class RepositoryInfo(BaseModel):

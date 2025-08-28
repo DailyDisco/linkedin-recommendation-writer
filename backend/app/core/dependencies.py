@@ -54,33 +54,33 @@ def get_request_id(request: Request) -> str:
 # Service Dependencies
 class ServiceContainer:
     """Service container for dependency injection."""
-    
+
     _github_service: Optional[GitHubService] = None
     _ai_service: Optional[AIService] = None
     _recommendation_service: Optional[RecommendationService] = None
     _repository_service: Optional[RepositoryService] = None
-    
+
     @classmethod
     def get_github_service(cls) -> GitHubService:
         """Get or create GitHub service instance."""
         if cls._github_service is None:
             cls._github_service = GitHubService()
         return cls._github_service
-    
+
     @classmethod
     def get_ai_service(cls) -> AIService:
         """Get or create AI service instance."""
         if cls._ai_service is None:
             cls._ai_service = AIService()
         return cls._ai_service
-    
+
     @classmethod
     def get_recommendation_service(cls) -> RecommendationService:
         """Get or create recommendation service instance."""
         if cls._recommendation_service is None:
             cls._recommendation_service = RecommendationService()
         return cls._recommendation_service
-    
+
     @classmethod
     def get_repository_service(cls) -> RepositoryService:
         """Get or create repository service instance."""
@@ -116,30 +116,30 @@ async def validate_github_username(username: str) -> str:
     if not username or len(username) < 1 or len(username) > 39:
         raise HTTPException(
             status_code=400,
-            detail="GitHub username must be between 1 and 39 characters"
+            detail="GitHub username must be between 1 and 39 characters",
         )
-    
+
     # Basic validation for allowed characters
     import re
-    if not re.match(r'^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$', username):
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid GitHub username format"
-        )
-    
+
+    if not re.match(r"^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$", username):
+        raise HTTPException(status_code=400, detail="Invalid GitHub username format")
+
     return username
 
 
 # Pagination Dependencies
 class PaginationParams:
     """Pagination parameters."""
-    
+
     def __init__(self, page: int = 1, page_size: int = 10):
         if page < 1:
             raise HTTPException(status_code=400, detail="Page must be >= 1")
         if page_size < 1 or page_size > 100:
-            raise HTTPException(status_code=400, detail="Page size must be between 1 and 100")
-        
+            raise HTTPException(
+                status_code=400, detail="Page size must be between 1 and 100"
+            )
+
         self.page = page
         self.page_size = page_size
         self.offset = (page - 1) * page_size

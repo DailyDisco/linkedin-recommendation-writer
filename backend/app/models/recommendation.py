@@ -3,8 +3,7 @@
 from datetime import datetime
 
 from app.core.database import Base
-from sqlalchemy import (JSON, Column, DateTime, ForeignKey, Integer, String,
-                        Text)
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 
 
@@ -15,8 +14,9 @@ class Recommendation(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    github_profile_id = Column(Integer, ForeignKey(
-        "github_profiles.id"), nullable=False)
+    github_profile_id = Column(
+        Integer, ForeignKey("github_profiles.id"), nullable=False
+    )
 
     # Recommendation content
     title = Column(String, nullable=False)
@@ -42,17 +42,17 @@ class Recommendation(Base):
     selected_option_id = Column(Integer, nullable=True)
     selected_option_name = Column(String, nullable=True)
     selected_option_focus = Column(String, nullable=True)
-    generated_options = Column(JSON, nullable=True)  # Store all generated options for reference
+    generated_options = Column(
+        JSON, nullable=True
+    )  # Store all generated options for reference
 
     # Metadata
     created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow,
-                        onupdate=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
     user = relationship("User", back_populates="recommendations")
-    github_profile = relationship(
-        "GitHubProfile", back_populates="recommendations")
+    github_profile = relationship("GitHubProfile", back_populates="recommendations")
 
     def __repr__(self):
         return f"<Recommendation(id={self.id}, title={self.title[:50]}...)>"

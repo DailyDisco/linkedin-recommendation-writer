@@ -20,7 +20,7 @@ def setup_logging():
         format=settings.LOG_FORMAT,
         handlers=[
             logging.StreamHandler(sys.stdout),
-        ]
+        ],
     )
 
     # Set specific loggers based on environment
@@ -35,7 +35,7 @@ def setup_logging():
         logging.getLogger("uvicorn").setLevel(logging.INFO)
         logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
         logging.getLogger("httpx").setLevel(logging.WARNING)
-    
+
     # Suppress overly verbose third-party loggers
     logging.getLogger("urllib3").setLevel(logging.WARNING)
     logging.getLogger("requests").setLevel(logging.WARNING)

@@ -13,29 +13,26 @@ class RecommendationRequest(BaseModel):
     recommendation_type: str = Field(
         "professional",
         description="Type of recommendation",
-        pattern="^(professional|technical|leadership|academic|personal)$"
+        pattern="^(professional|technical|leadership|academic|personal)$",
     )
     tone: str = Field(
         "professional",
         description="Tone of the recommendation",
-        pattern="^(professional|friendly|formal|casual)$"
+        pattern="^(professional|friendly|formal|casual)$",
     )
     length: str = Field(
         "medium",
         description="Length of the recommendation",
-        pattern="^(short|medium|long)$"
+        pattern="^(short|medium|long)$",
     )
     custom_prompt: Optional[str] = Field(
-        None,
-        description="Custom prompt additions for personalization"
+        None, description="Custom prompt additions for personalization"
     )
     include_specific_skills: Optional[list] = Field(
-        None,
-        description="Specific skills to highlight"
+        None, description="Specific skills to highlight"
     )
     target_role: Optional[str] = Field(
-        None,
-        description="Target role or industry for the recommendation"
+        None, description="Target role or industry for the recommendation"
     )
 
 
@@ -77,10 +74,18 @@ class RecommendationFromOptionRequest(BaseModel):
     """Schema for creating a recommendation from a selected option."""
 
     github_username: str = Field(..., description="GitHub username")
-    selected_option: RecommendationOption = Field(..., description="The selected recommendation option")
-    all_options: List[RecommendationOption] = Field(..., description="All generated options for reference")
-    analysis_type: Optional[str] = Field("profile", description="Type of analysis performed")
-    repository_url: Optional[str] = Field(None, description="Repository URL if repo-specific analysis")
+    selected_option: RecommendationOption = Field(
+        ..., description="The selected recommendation option"
+    )
+    all_options: List[RecommendationOption] = Field(
+        ..., description="All generated options for reference"
+    )
+    analysis_type: Optional[str] = Field(
+        "profile", description="Type of analysis performed"
+    )
+    repository_url: Optional[str] = Field(
+        None, description="Repository URL if repo-specific analysis"
+    )
 
 
 class RecommendationResponse(BaseModel):

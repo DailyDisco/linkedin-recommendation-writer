@@ -56,6 +56,7 @@ async def lifespan(app: FastAPI):
     # Shutdown
     logger.info("Shutting down application...")
 
+
 # Create FastAPI application
 app = FastAPI(
     title="LinkedIn Recommendation Writer",
@@ -77,7 +78,7 @@ app.add_middleware(RequestIDMiddleware)
 if settings.ENABLE_RATE_LIMITING:
     app.add_middleware(
         RateLimitingMiddleware,
-        requests_per_minute=settings.RATE_LIMIT_REQUESTS_PER_MINUTE
+        requests_per_minute=settings.RATE_LIMIT_REQUESTS_PER_MINUTE,
     )
 
 # CORS middleware
@@ -100,21 +101,18 @@ async def root():
         "message": "LinkedIn Recommendation Writer API",
         "version": "1.0.0",
         "docs": "/docs",
-        "status": "running"
+        "status": "running",
     }
 
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint for Docker and load balancers."""
-    checks = {
-        "api": "ok",
-        "environment": settings.ENVIRONMENT
-    }
-    
+    checks = {"api": "ok", "environment": settings.ENVIRONMENT}
+
     overall_status = "healthy"
     status_code = 200
-    
+
     try:
         # Check database connectivity
         db_status = await check_database_health()
@@ -127,7 +125,7 @@ async def health_check():
         checks["database"] = "error"
         overall_status = "unhealthy"
         status_code = 503
-    
+
     try:
         # Check Redis connectivity
         redis_status = await check_redis_health()
@@ -140,18 +138,18 @@ async def health_check():
         checks["redis"] = "error"
         if overall_status == "healthy":
             overall_status = "degraded"
-    
+
     response_data = {
         "status": overall_status,
         "service": "linkedin-recommendation-writer",
         "version": "1.0.0",
         "environment": settings.ENVIRONMENT,
-        "checks": checks
+        "checks": checks,
     }
-    
+
     if status_code != 200:
         return JSONResponse(status_code=status_code, content=response_data)
-    
+
     return response_data
 
 
@@ -160,12 +158,12 @@ async def health_check():
 async def application_exception_handler(request: Request, exc: BaseApplicationError):
     """Handle custom application exceptions."""
     request_id = getattr(request.state, "request_id", "unknown")
-    
+
     logger.warning(
         f"Application error in request {request_id}: {exc.error_code} - {exc.message}",
-        extra={"error_code": exc.error_code, "details": exc.details}
+        extra={"error_code": exc.error_code, "details": exc.details},
     )
-    
+
     status_map = {
         "VALIDATION_ERROR": 400,
         "NOT_FOUND": 404,
@@ -175,17 +173,17 @@ async def application_exception_handler(request: Request, exc: BaseApplicationEr
         "CACHE_ERROR": 500,
         "CONFIGURATION_ERROR": 500,
     }
-    
+
     status_code = status_map.get(exc.error_code, 500)
-    
+
     return JSONResponse(
         status_code=status_code,
         content={
             "error": exc.error_code,
             "message": exc.message,
             "details": exc.details,
-            "request_id": request_id
-        }
+            "request_id": request_id,
+        },
     )
 
 
@@ -194,15 +192,15 @@ async def global_exception_handler(request: Request, exc: Exception):
     """Global exception handler for unhandled exceptions."""
     request_id = getattr(request.state, "request_id", "unknown")
     logger.error(f"Unhandled exception in request {request_id}: {exc}", exc_info=True)
-    
+
     if settings.API_DEBUG:
         return JSONResponse(
             status_code=500,
             content={
                 "error": "INTERNAL_ERROR",
                 "message": str(exc),
-                "request_id": request_id
-            }
+                "request_id": request_id,
+            },
         )
     else:
         return JSONResponse(
@@ -210,12 +208,14 @@ async def global_exception_handler(request: Request, exc: Exception):
             content={
                 "error": "INTERNAL_ERROR",
                 "message": "Internal server error",
-                "request_id": request_id
-            }
+                "request_id": request_id,
+            },
         )
+
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(
         "app.main:app",
         host=settings.API_HOST,

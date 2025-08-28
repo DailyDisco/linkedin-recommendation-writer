@@ -5,17 +5,13 @@ from typing import AsyncGenerator
 
 from app.core.config import settings
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import (AsyncSession, async_sessionmaker,
-                                    create_async_engine)
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
 logger = logging.getLogger(__name__)
 
 # Create async engine with configuration from settings
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    **settings.get_database_config()
-)
+engine = create_async_engine(settings.DATABASE_URL, **settings.get_database_config())
 
 # Create async session maker
 AsyncSessionLocal = async_sessionmaker(
@@ -27,6 +23,7 @@ AsyncSessionLocal = async_sessionmaker(
 
 class Base(DeclarativeBase):
     """Base class for SQLAlchemy models."""
+
     pass
 
 
@@ -53,7 +50,7 @@ async def init_database():
         from app.models.github_profile import GitHubProfile
         from app.models.recommendation import Recommendation
         from app.models.user import User
-        
+
         async with engine.begin() as conn:
             # Create all tables
             await conn.run_sync(Base.metadata.create_all)
@@ -70,19 +67,19 @@ async def run_migrations():
         from alembic import command
         from alembic.config import Config
         import os
-        
+
         # Get the directory containing this file
         current_dir = os.path.dirname(os.path.abspath(__file__))
         backend_dir = os.path.dirname(os.path.dirname(current_dir))
         alembic_cfg_path = os.path.join(backend_dir, "alembic.ini")
-        
+
         if os.path.exists(alembic_cfg_path):
             alembic_cfg = Config(alembic_cfg_path)
             command.upgrade(alembic_cfg, "head")
             logger.info("Database migrations completed successfully")
         else:
             logger.warning("Alembic configuration not found, skipping migrations")
-            
+
     except ImportError:
         logger.warning("Alembic not available, skipping migrations")
     except Exception as e:
@@ -96,10 +93,10 @@ async def get_database_info():
         async with AsyncSessionLocal() as session:
             result = await session.execute(text("SELECT version()"))
             version = result.scalar()
-            
+
             result = await session.execute(text("SELECT current_database()"))
             database = result.scalar()
-            
+
             return {
                 "version": version,
                 "database": database,

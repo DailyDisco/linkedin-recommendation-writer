@@ -3,13 +3,20 @@
 import logging
 from typing import List, Optional
 
-from app.core.dependencies import get_database_session, get_recommendation_service, get_pagination_params, PaginationParams
-from app.schemas.recommendation import (RecommendationListResponse,
-                                        RecommendationOptionsResponse,
-                                        RecommendationRequest,
-                                        RecommendationResponse,
-                                        RecommendationCreate,
-                                        RecommendationFromOptionRequest)
+from app.core.dependencies import (
+    get_database_session,
+    get_recommendation_service,
+    get_pagination_params,
+    PaginationParams,
+)
+from app.schemas.recommendation import (
+    RecommendationListResponse,
+    RecommendationOptionsResponse,
+    RecommendationRequest,
+    RecommendationResponse,
+    RecommendationCreate,
+    RecommendationFromOptionRequest,
+)
 from app.services.recommendation_service import RecommendationService
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,7 +30,7 @@ router = APIRouter()
 async def generate_recommendation(
     request: RecommendationRequest,
     db: AsyncSession = Depends(get_database_session),
-    recommendation_service: RecommendationService = Depends(get_recommendation_service)
+    recommendation_service: RecommendationService = Depends(get_recommendation_service),
 ):
     """Generate a new LinkedIn recommendation."""
 
@@ -36,7 +43,9 @@ async def generate_recommendation(
     logger.info(f"   • Tone: {request.tone}")
     logger.info(f"   • Length: {request.length}")
     logger.info(f"   • Custom Prompt: {'Yes' if request.custom_prompt else 'No'}")
-    logger.info(f"   • Specific Skills: {len(request.include_specific_skills or [])} skills")
+    logger.info(
+        f"   • Specific Skills: {len(request.include_specific_skills or [])} skills"
+    )
 
     try:
         logger.info("🎯 Starting recommendation creation process...")
@@ -48,7 +57,7 @@ async def generate_recommendation(
             length=request.length,
             custom_prompt=request.custom_prompt,
             target_role=request.target_role,
-            specific_skills=request.include_specific_skills
+            specific_skills=request.include_specific_skills,
         )
 
         logger.info("✅ RECOMMENDATION GENERATION COMPLETED SUCCESSFULLY")
@@ -73,7 +82,7 @@ async def generate_recommendation(
 async def generate_recommendation_options(
     request: RecommendationRequest,
     db: AsyncSession = Depends(get_database_session),
-    recommendation_service: RecommendationService = Depends(get_recommendation_service)
+    recommendation_service: RecommendationService = Depends(get_recommendation_service),
 ):
     """Generate multiple recommendation options."""
 
@@ -98,8 +107,8 @@ async def generate_recommendation_options(
             custom_prompt=request.custom_prompt,
             target_role=request.target_role,
             specific_skills=request.include_specific_skills,
-            analysis_type=getattr(request, 'analysis_type', 'profile'),
-            repository_url=getattr(request, 'repository_url', None)
+            analysis_type=getattr(request, "analysis_type", "profile"),
+            repository_url=getattr(request, "repository_url", None),
         )
 
         logger.info("✅ MULTIPLE OPTIONS GENERATION COMPLETED SUCCESSFULLY")
@@ -122,7 +131,7 @@ async def generate_recommendation_options(
 async def create_recommendation_from_option(
     request: RecommendationFromOptionRequest,
     db: AsyncSession = Depends(get_database_session),
-    recommendation_service: RecommendationService = Depends(get_recommendation_service)
+    recommendation_service: RecommendationService = Depends(get_recommendation_service),
 ):
     """Create a recommendation from a selected option."""
 
@@ -143,7 +152,7 @@ async def create_recommendation_from_option(
             selected_option=request.selected_option.model_dump(),
             all_options=[option.model_dump() for option in request.all_options],
             analysis_type=request.analysis_type or "profile",
-            repository_url=request.repository_url
+            repository_url=request.repository_url,
         )
 
         logger.info("✅ RECOMMENDATION CREATION FROM OPTION COMPLETED SUCCESSFULLY")
@@ -168,7 +177,7 @@ async def create_recommendation_from_option(
 async def regenerate_recommendation(
     request: dict,  # Will contain original content and refinement instructions
     db: AsyncSession = Depends(get_database_session),
-    recommendation_service: RecommendationService = Depends(get_recommendation_service)
+    recommendation_service: RecommendationService = Depends(get_recommendation_service),
 ):
     """Regenerate a recommendation with refinement instructions."""
 
@@ -202,7 +211,7 @@ async def regenerate_recommendation(
             github_username=github_username,
             recommendation_type=recommendation_type,
             tone=tone,
-            length=length
+            length=length,
         )
 
         logger.info("✅ RECOMMENDATION REGENERATION COMPLETED SUCCESSFULLY")
@@ -225,12 +234,14 @@ async def regenerate_recommendation(
 @router.get("/", response_model=RecommendationListResponse)
 async def list_recommendations(
     github_username: Optional[str] = Query(
-        None, description="Filter by GitHub username"),
+        None, description="Filter by GitHub username"
+    ),
     recommendation_type: Optional[str] = Query(
-        None, description="Filter by recommendation type"),
+        None, description="Filter by recommendation type"
+    ),
     pagination: PaginationParams = Depends(get_pagination_params),
     db: AsyncSession = Depends(get_database_session),
-    recommendation_service: RecommendationService = Depends(get_recommendation_service)
+    recommendation_service: RecommendationService = Depends(get_recommendation_service),
 ):
     """List recommendations with optional filtering."""
 
@@ -240,7 +251,7 @@ async def list_recommendations(
             github_username=github_username,
             recommendation_type=recommendation_type,
             limit=pagination.limit,
-            offset=pagination.offset
+            offset=pagination.offset,
         )
 
         # TODO: Get total count for proper pagination
@@ -250,7 +261,7 @@ async def list_recommendations(
             recommendations=recommendations,
             total=total,
             page=pagination.page,
-            page_size=pagination.page_size
+            page_size=pagination.page_size,
         )
 
     except Exception as e:
@@ -262,20 +273,19 @@ async def list_recommendations(
 async def get_recommendation(
     recommendation_id: int,
     db: AsyncSession = Depends(get_database_session),
-    recommendation_service: RecommendationService = Depends(get_recommendation_service)
+    recommendation_service: RecommendationService = Depends(get_recommendation_service),
 ):
     """Get a specific recommendation by ID."""
 
     try:
         recommendation = await recommendation_service.get_recommendation_by_id(
-            db=db,
-            recommendation_id=recommendation_id
+            db=db, recommendation_id=recommendation_id
         )
 
         if not recommendation:
             raise HTTPException(
                 status_code=404,
-                detail=f"Recommendation with ID {recommendation_id} not found"
+                detail=f"Recommendation with ID {recommendation_id} not found",
             )
 
         return recommendation
@@ -291,7 +301,7 @@ async def get_recommendation(
 async def delete_recommendation(
     recommendation_id: int,
     db: AsyncSession = Depends(get_database_session),
-    recommendation_service: RecommendationService = Depends(get_recommendation_service)
+    recommendation_service: RecommendationService = Depends(get_recommendation_service),
 ):
     """Delete a recommendation."""
 

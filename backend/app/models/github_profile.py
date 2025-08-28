@@ -3,8 +3,7 @@
 from datetime import datetime
 
 from app.core.database import Base
-from sqlalchemy import (JSON, Column, DateTime, ForeignKey, Integer, String,
-                        Text)
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 
 
@@ -35,20 +34,18 @@ class GitHubProfile(Base):
 
     # Analyzed data (stored as JSON)
     repositories_data = Column(JSON, nullable=True)  # Repository analysis
-    languages_data = Column(JSON, nullable=True)    # Programming languages
+    languages_data = Column(JSON, nullable=True)  # Programming languages
     contribution_data = Column(JSON, nullable=True)  # Contribution patterns
-    skills_analysis = Column(JSON, nullable=True)    # Extracted skills
+    skills_analysis = Column(JSON, nullable=True)  # Extracted skills
 
     # Metadata
     last_analyzed = Column(DateTime, default=datetime.utcnow)
     created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow,
-                        onupdate=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
     user = relationship("User", back_populates="github_profiles")
-    recommendations = relationship(
-        "Recommendation", back_populates="github_profile")
+    recommendations = relationship("Recommendation", back_populates="github_profile")
 
     def __repr__(self):
         return f"<GitHubProfile(id={self.id}, username={self.github_username})>"

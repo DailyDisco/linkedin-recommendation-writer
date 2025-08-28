@@ -13,10 +13,7 @@ class Settings(BaseSettings):
     """Application settings with comprehensive validation and typing."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=True,
-        extra="ignore"
+        env_file=".env", env_file_encoding="utf-8", case_sensitive=True, extra="ignore"
     )
 
     # Environment
@@ -29,30 +26,52 @@ class Settings(BaseSettings):
     API_PORT: int = Field(default=8000, ge=1000, le=65535, description="API port")
     API_DEBUG: bool = Field(default=False, description="Enable debug mode")
     API_RELOAD: bool = Field(default=True, description="Enable auto-reload")
-    API_WORKERS: int = Field(default=1, ge=1, le=8, description="Number of worker processes")
+    API_WORKERS: int = Field(
+        default=1, ge=1, le=8, description="Number of worker processes"
+    )
 
     # Database Configuration
     DATABASE_URL: str = Field(
         default="postgresql+asyncpg://postgres:password@localhost:5432/github_recommender",
-        description="Database connection URL"
+        description="Database connection URL",
     )
-    DATABASE_POOL_SIZE: int = Field(default=10, ge=5, le=50, description="Database pool size")
-    DATABASE_MAX_OVERFLOW: int = Field(default=20, ge=10, le=100, description="Database pool max overflow")
-    DATABASE_POOL_TIMEOUT: int = Field(default=30, ge=5, le=120, description="Database pool timeout")
+    DATABASE_POOL_SIZE: int = Field(
+        default=10, ge=5, le=50, description="Database pool size"
+    )
+    DATABASE_MAX_OVERFLOW: int = Field(
+        default=20, ge=10, le=100, description="Database pool max overflow"
+    )
+    DATABASE_POOL_TIMEOUT: int = Field(
+        default=30, ge=5, le=120, description="Database pool timeout"
+    )
 
     # Redis Configuration
-    REDIS_URL: str = Field(default="redis://localhost:6379/0", description="Redis connection URL")
-    REDIS_TIMEOUT: int = Field(default=5, ge=1, le=30, description="Redis timeout in seconds")
-    REDIS_DEFAULT_TTL: int = Field(default=3600, ge=60, le=86400, description="Default cache TTL")
+    REDIS_URL: str = Field(
+        default="redis://localhost:6379/0", description="Redis connection URL"
+    )
+    REDIS_TIMEOUT: int = Field(
+        default=5, ge=1, le=30, description="Redis timeout in seconds"
+    )
+    REDIS_DEFAULT_TTL: int = Field(
+        default=3600, ge=60, le=86400, description="Default cache TTL"
+    )
 
     # External APIs
     GITHUB_TOKEN: str = Field(default="", description="GitHub API token")
-    GITHUB_RATE_LIMIT: int = Field(default=5000, ge=1000, le=15000, description="GitHub API rate limit")
-    
+    GITHUB_RATE_LIMIT: int = Field(
+        default=5000, ge=1000, le=15000, description="GitHub API rate limit"
+    )
+
     GEMINI_API_KEY: str = Field(default="", description="Google Gemini API key")
-    GEMINI_MODEL: str = Field(default="gemini-2.5-flash-lite", description="Gemini model name")
-    GEMINI_TEMPERATURE: float = Field(default=0.7, ge=0.0, le=2.0, description="Gemini temperature")
-    GEMINI_MAX_TOKENS: int = Field(default=2048, ge=100, le=8192, description="Gemini max tokens")
+    GEMINI_MODEL: str = Field(
+        default="gemini-2.5-flash-lite", description="Gemini model name"
+    )
+    GEMINI_TEMPERATURE: float = Field(
+        default=0.7, ge=0.0, le=2.0, description="Gemini temperature"
+    )
+    GEMINI_MAX_TOKENS: int = Field(
+        default=2048, ge=100, le=8192, description="Gemini max tokens"
+    )
 
     # Logging
     LOG_LEVEL: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(
@@ -60,23 +79,25 @@ class Settings(BaseSettings):
     )
     LOG_FORMAT: str = Field(
         default="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        description="Log format string"
+        description="Log format string",
     )
 
     # Initialization flags
     INIT_DB: bool = Field(default=True, description="Initialize database on startup")
-    RUN_MIGRATIONS: bool = Field(default=False, description="Run database migrations on startup")
+    RUN_MIGRATIONS: bool = Field(
+        default=False, description="Run database migrations on startup"
+    )
 
     # CORS Configuration
     ALLOWED_ORIGINS: str = Field(
         default="http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173",
-        description="Comma-separated list of allowed CORS origins"
+        description="Comma-separated list of allowed CORS origins",
     )
 
     # Security
     SECRET_KEY: str = Field(
         default_factory=lambda: secrets.token_urlsafe(32),
-        description="Secret key for security operations"
+        description="Secret key for security operations",
     )
 
     # Rate Limiting
@@ -88,7 +109,9 @@ class Settings(BaseSettings):
     )
 
     # Feature Flags
-    ENABLE_RATE_LIMITING: bool = Field(default=True, description="Enable API rate limiting")
+    ENABLE_RATE_LIMITING: bool = Field(
+        default=True, description="Enable API rate limiting"
+    )
     ENABLE_METRICS: bool = Field(default=False, description="Enable metrics collection")
     ENABLE_TRACING: bool = Field(default=False, description="Enable request tracing")
 
@@ -109,38 +132,38 @@ class Settings(BaseSettings):
         """Check if running in production mode."""
         return self.ENVIRONMENT == "production"
 
-    @field_validator('GITHUB_TOKEN')
+    @field_validator("GITHUB_TOKEN")
     @classmethod
     def validate_github_token(cls, v: str) -> str:
         """Validate GitHub token format."""
-        if v and not v.startswith(('ghp_', 'github_pat_')):
-            raise ValueError(
-                'GitHub token should start with "ghp_" or "github_pat_"'
-            )
+        if v and not v.startswith(("ghp_", "github_pat_")):
+            raise ValueError('GitHub token should start with "ghp_" or "github_pat_"')
         return v
 
-    @field_validator('GEMINI_API_KEY')
+    @field_validator("GEMINI_API_KEY")
     @classmethod
     def validate_gemini_key(cls, v: str) -> str:
         """Validate Gemini API key format."""
-        if v and not v.startswith('AIza'):
+        if v and not v.startswith("AIza"):
             raise ValueError('Gemini API key should start with "AIza"')
         return v
 
-    @field_validator('SECRET_KEY')
+    @field_validator("SECRET_KEY")
     @classmethod
     def validate_secret_key(cls, v: str) -> str:
         """Validate secret key length and format."""
         if len(v) < 32:
-            raise ValueError('Secret key must be at least 32 characters long')
+            raise ValueError("Secret key must be at least 32 characters long")
         return v
 
-    @field_validator('DATABASE_URL')
+    @field_validator("DATABASE_URL")
     @classmethod
     def validate_database_url(cls, v: str) -> str:
         """Validate database URL format."""
-        if not v.startswith(('postgresql://', 'postgresql+asyncpg://')):
-            raise ValueError('Database URL must use postgresql or postgresql+asyncpg scheme')
+        if not v.startswith(("postgresql://", "postgresql+asyncpg://")):
+            raise ValueError(
+                "Database URL must use postgresql or postgresql+asyncpg scheme"
+            )
         return v
 
     def get_database_config(self) -> dict:
@@ -150,7 +173,7 @@ class Settings(BaseSettings):
             "max_overflow": self.DATABASE_MAX_OVERFLOW,
             "pool_timeout": self.DATABASE_POOL_TIMEOUT,
             "pool_recycle": 3600,
-            "echo": self.API_DEBUG
+            "echo": self.API_DEBUG,
         }
 
 

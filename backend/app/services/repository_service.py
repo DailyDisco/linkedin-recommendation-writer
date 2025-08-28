@@ -21,10 +21,7 @@ class RepositoryService:
             self.github_client = Github(settings.GITHUB_TOKEN)
 
     async def get_repository_contributors(
-        self,
-        repo_name: str,
-        max_contributors: int = 50,
-        force_refresh: bool = False
+        self, repo_name: str, max_contributors: int = 50, force_refresh: bool = False
     ) -> Optional[Dict[str, Any]]:
         """Get contributors from a repository with their real names."""
 
@@ -35,7 +32,8 @@ class RepositoryService:
             cached_data = await get_cache(cache_key)
             if cached_data:
                 logger.info(
-                    f"Returning cached contributors for repository: {repo_name}")
+                    f"Returning cached contributors for repository: {repo_name}"
+                )
                 return cached_data
 
         try:
@@ -75,8 +73,12 @@ class RepositoryService:
                     contributor_info = {
                         "username": contributor.login,
                         "full_name": user.name if user.name else contributor.login,
-                        "first_name": self._extract_first_name(user.name) if user.name else "",
-                        "last_name": self._extract_last_name(user.name) if user.name else "",
+                        "first_name": (
+                            self._extract_first_name(user.name) if user.name else ""
+                        ),
+                        "last_name": (
+                            self._extract_last_name(user.name) if user.name else ""
+                        ),
                         "email": user.email,
                         "bio": user.bio,
                         "company": user.company,
@@ -93,30 +95,33 @@ class RepositoryService:
 
                 except Exception as e:
                     logger.warning(
-                        f"Could not get details for contributor {contributor.login}: {e}")
+                        f"Could not get details for contributor {contributor.login}: {e}"
+                    )
                     # Add basic info even if detailed lookup fails
-                    contributors_list.append({
-                        "username": contributor.login,
-                        "full_name": contributor.login,
-                        "first_name": "",
-                        "last_name": "",
-                        "email": None,
-                        "bio": None,
-                        "company": None,
-                        "location": None,
-                        "avatar_url": contributor.avatar_url,
-                        "contributions": contributor.contributions,
-                        "profile_url": f"https://github.com/{contributor.login}",
-                        "followers": 0,
-                        "public_repos": 0,
-                    })
+                    contributors_list.append(
+                        {
+                            "username": contributor.login,
+                            "full_name": contributor.login,
+                            "first_name": "",
+                            "last_name": "",
+                            "email": None,
+                            "bio": None,
+                            "company": None,
+                            "location": None,
+                            "avatar_url": contributor.avatar_url,
+                            "contributions": contributor.contributions,
+                            "profile_url": f"https://github.com/{contributor.login}",
+                            "followers": 0,
+                            "public_repos": 0,
+                        }
+                    )
                     count += 1
 
             result = {
                 "repository": repo_info,
                 "contributors": contributors_list,
                 "total_contributors": len(contributors_list),
-                "fetched_at": "now"
+                "fetched_at": "now",
             }
 
             # Cache for 1 hour
@@ -129,12 +134,10 @@ class RepositoryService:
                 logger.error(f"Repository not found: {repo_name}")
                 return None
             else:
-                logger.error(
-                    f"GitHub API error for repository {repo_name}: {e}")
+                logger.error(f"GitHub API error for repository {repo_name}: {e}")
                 return None
         except Exception as e:
-            logger.error(
-                f"Error fetching contributors for repository {repo_name}: {e}")
+            logger.error(f"Error fetching contributors for repository {repo_name}: {e}")
             return None
 
     def _extract_first_name(self, full_name: str) -> str:

@@ -9,12 +9,13 @@ from pydantic import BaseModel, Field
 class RepositoryContributorsRequest(BaseModel):
     """Request schema for getting repository contributors."""
 
-    repository_name: str = Field(...,
-                                 description="Repository name in format 'owner/repo'")
+    repository_name: str = Field(
+        ..., description="Repository name in format 'owner/repo'"
+    )
     max_contributors: int = Field(
-        50, ge=1, le=100, description="Maximum contributors to fetch")
-    force_refresh: bool = Field(
-        False, description="Force refresh of cached data")
+        50, ge=1, le=100, description="Maximum contributors to fetch"
+    )
+    force_refresh: bool = Field(False, description="Force refresh of cached data")
 
 
 class ContributorInfo(BaseModel):

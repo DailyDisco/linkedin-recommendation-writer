@@ -48,8 +48,7 @@ async def set_cache(key: str, value: Any, ttl: Optional[int] = None) -> bool:
     """Set a value in Redis cache."""
     try:
         client = await get_redis()
-        serialized_value = json.dumps(
-            value) if not isinstance(value, str) else value
+        serialized_value = json.dumps(value) if not isinstance(value, str) else value
         cache_ttl = ttl or settings.REDIS_DEFAULT_TTL
         await client.setex(key, cache_ttl, serialized_value)
         return True
