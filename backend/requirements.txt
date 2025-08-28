@@ -1,5 +1,6 @@
 # FastAPI and server
 fastapi==0.115.6
+starlette>=0.47.2  # Security fix for CVE-2025-54121
 uvicorn[standard]==0.32.1
 
 # Database

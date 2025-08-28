@@ -107,7 +107,7 @@ jobs:
       - name: Run safety (dependency vulnerability scan)
         run: |
           echo "🔍 Running safety vulnerability scan..."
-          safety check || echo "⚠️  Safety scan completed with warnings (non-blocking)"
+          safety scan || echo "⚠️  Safety scan completed with warnings (non-blocking)"
         shell: bash
         working-directory: ${{ env.WORKING_DIR }}
 
