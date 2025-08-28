@@ -35,6 +35,12 @@ export default defineConfig(({ mode }) => {
           inline: ['react-router-node'],
         },
       },
+      // Explicitly configure path aliases for Vitest
+      resolve: {
+        alias: {
+          '@': path.resolve(__dirname, './app'),
+        },
+      },
     },
   };
 });
