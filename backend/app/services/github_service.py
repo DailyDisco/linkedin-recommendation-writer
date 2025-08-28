@@ -157,6 +157,7 @@ class GitHubService:
                 "skills": skills,
                 "commit_analysis": commit_analysis,
                 "analyzed_at": datetime.utcnow().isoformat(),
+                "analysis_context_type": "profile",
             }
 
             # Cache for longer due to more expensive commit analysis
@@ -209,6 +210,19 @@ class GitHubService:
             logger.info(f"   • Name: {user.name or 'Not provided'}")
             logger.info(f"   • Public repos: {user.public_repos}")
 
+            # Fetch starred repositories (indicates interests and technologies they follow)
+            logger.info("⭐ Fetching starred repositories...")
+            starred_repositories = await self._get_starred_repositories(user)
+            logger.info(f"   • Found {len(starred_repositories)} starred repositories")
+
+            # Fetch organizations (shows community involvement and professional networks)
+            logger.info("🏢 Fetching organizations...")
+            organizations = await self._get_user_organizations(user)
+            logger.info(f"   • Found {len(organizations)} organizations")
+
+            # Analyze starred repositories for technology interests
+            starred_tech_analysis = await self._analyze_starred_technologies(starred_repositories)
+
             return {
                 "github_username": user.login,
                 "github_id": user.id,
@@ -225,6 +239,10 @@ class GitHubService:
                 "public_gists": user.public_gists,
                 "created_at": user.created_at.isoformat() if user.created_at else None,
                 "updated_at": user.updated_at.isoformat() if user.updated_at else None,
+                # Enhanced data
+                "starred_repositories": starred_repositories,
+                "organizations": organizations,
+                "starred_technologies": starred_tech_analysis,
             }
 
         except GithubException as e:
@@ -239,6 +257,135 @@ class GitHubService:
             logger.error(f"   • Error message: {str(e)}")
             logger.error(f"   • Stack trace: {e.__trace__ if hasattr(e, '__trace__') else 'No trace'}")
             return None
+
+    async def _get_starred_repositories(self, user) -> List[Dict[str, Any]]:
+        """Fetch user's starred repositories to understand their interests."""
+        try:
+            starred = []
+            max_starred = 20  # Limit to avoid rate limits and focus on most recent/most relevant
+
+            for repo in user.get_starred()[:max_starred]:
+                starred_repo = {
+                    "name": repo.name,
+                    "full_name": repo.full_name,
+                    "description": repo.description,
+                    "language": repo.language,
+                    "stars": repo.stargazers_count,
+                    "forks": repo.forks_count,
+                    "topics": list(repo.get_topics()) if hasattr(repo, "get_topics") else [],
+                    "url": repo.html_url,
+                    "owner": repo.owner.login,
+                    "is_fork": repo.fork,
+                    "archived": getattr(repo, "archived", False),
+                    "updated_at": repo.updated_at.isoformat() if repo.updated_at else None,
+                }
+                starred.append(starred_repo)
+
+            return starred
+
+        except Exception as e:
+            logger.debug(f"Error fetching starred repositories: {e}")
+            return []
+
+    async def _get_user_organizations(self, user) -> List[Dict[str, Any]]:
+        """Fetch user's organizations to understand their professional networks."""
+        try:
+            organizations = []
+
+            for org in user.get_orgs():
+                org_data = {
+                    "login": org.login,
+                    "name": getattr(org, "name", None),
+                    "description": getattr(org, "description", None),
+                    "url": org.html_url,
+                    "avatar_url": org.avatar_url,
+                    "public_repos": getattr(org, "public_repos", 0),
+                    "members_count": getattr(org, "members_count", 0),
+                    "location": getattr(org, "location", None),
+                    "blog": getattr(org, "blog", None),
+                    "email": getattr(org, "email", None),
+                }
+                organizations.append(org_data)
+
+            return organizations
+
+        except Exception as e:
+            logger.debug(f"Error fetching user organizations: {e}")
+            return []
+
+    async def _analyze_starred_technologies(self, starred_repositories: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Analyze starred repositories to understand technology interests and preferences."""
+        if not starred_repositories:
+            return {
+                "languages": {},
+                "topics": {},
+                "technology_focus": {},
+                "interest_score": 0,
+            }
+
+        # Count languages
+        language_counts = {}
+        topic_counts = {}
+        technology_focus = {}
+
+        for repo in starred_repositories:
+            # Count languages
+            language = repo.get("language")
+            if language:
+                language_counts[language] = language_counts.get(language, 0) + 1
+
+            # Count topics
+            topics = repo.get("topics", [])
+            for topic in topics:
+                topic_counts[topic] = topic_counts.get(topic, 0) + 1
+
+        # Determine technology focus based on starred repos
+        # This helps understand what technologies they find interesting vs what they use
+        technology_patterns = {
+            "Web Development": ["javascript", "typescript", "react", "vue", "angular", "html", "css", "web"],
+            "Backend": ["python", "java", "go", "rust", "c#", "php", "ruby", "backend", "api"],
+            "Data Science": ["python", "r", "jupyter", "pandas", "tensorflow", "pytorch", "machine-learning"],
+            "DevOps": ["docker", "kubernetes", "terraform", "ansible", "ci/cd", "jenkins"],
+            "Mobile": ["swift", "kotlin", "react-native", "flutter", "ios", "android"],
+            "Systems": ["c", "c++", "rust", "go", "systems", "embedded"],
+            "Frontend": ["javascript", "typescript", "react", "vue", "angular", "frontend"],
+            "Database": ["postgresql", "mysql", "mongodb", "redis", "database"],
+            "Cloud": ["aws", "gcp", "azure", "cloud", "serverless"],
+            "Security": ["security", "cryptography", "authentication", "authorization"],
+        }
+
+        for focus_area, patterns in technology_patterns.items():
+            score = 0
+            for pattern in patterns:
+                # Check languages
+                for lang, count in language_counts.items():
+                    if pattern.lower() in lang.lower():
+                        score += count * 2  # Languages are more significant
+
+                # Check topics
+                for topic, count in topic_counts.items():
+                    if pattern.lower() in topic.lower():
+                        score += count
+
+            if score > 0:
+                technology_focus[focus_area] = score
+
+        # Calculate interest diversity score
+        total_starred = len(starred_repositories)
+        language_diversity = len(language_counts)
+        topic_diversity = len(topic_counts)
+
+        interest_score = min(100, (language_diversity * 10) + (topic_diversity * 5) + (total_starred * 2))
+
+        return {
+            "languages": dict(sorted(language_counts.items(), key=lambda x: x[1], reverse=True)),
+            "topics": dict(sorted(topic_counts.items(), key=lambda x: x[1], reverse=True)[:15]),  # Top 15 topics
+            "technology_focus": dict(sorted(technology_focus.items(), key=lambda x: x[1], reverse=True)),
+            "interest_score": interest_score,
+            "total_starred": total_starred,
+            "language_diversity": language_diversity,
+            "topic_diversity": topic_diversity,
+        }
 
     async def _get_repositories(self, username: str, max_count: int) -> List[Dict[str, Any]]:
         """Get user's repositories with details."""
@@ -313,78 +460,407 @@ class GitHubService:
             reverse=True,
         )
 
+    async def _fetch_dependency_data(self, repo_data: Dict[str, Any]) -> List[str]:
+        """Fetch and analyze dependency files from a repository."""
+        if not self.github_client:
+            return []
+
+        try:
+            # Common dependency file patterns
+            dependency_files = {
+                # Python
+                "requirements.txt": "python",
+                "pyproject.toml": "python",
+                "setup.py": "python",
+                "Pipfile": "python",
+                "poetry.lock": "python",
+                # JavaScript/Node.js
+                "package.json": "javascript",
+                "yarn.lock": "javascript",
+                "package-lock.json": "javascript",
+                # Java
+                "pom.xml": "java",
+                "build.gradle": "java",
+                "build.gradle.kts": "java",
+                # .NET/C#
+                ".csproj": "dotnet",
+                "packages.config": "dotnet",
+                "project.json": "dotnet",
+                # Go
+                "go.mod": "go",
+                "go.sum": "go",
+                # Rust
+                "Cargo.toml": "rust",
+                "Cargo.lock": "rust",
+                # PHP
+                "composer.json": "php",
+                "composer.lock": "php",
+                # Ruby
+                "Gemfile": "ruby",
+                "Gemfile.lock": "ruby",
+                # Swift/iOS
+                "Package.swift": "swift",
+                "Podfile": "swift",
+                "Cartfile": "swift",
+                # Infrastructure/DevOps
+                "Dockerfile": "docker",
+                "docker-compose.yml": "docker",
+                "docker-compose.yaml": "docker",
+            }
+
+            repo_full_name = repo_data.get("full_name") or f"{repo_data.get('name', '')}"
+            if not repo_full_name:
+                return []
+
+            # Try to get repository object
+            try:
+                repo = self.github_client.get_repo(repo_full_name)
+            except Exception:
+                # If we can't access the repo, skip dependency analysis
+                return []
+
+            dependencies = []
+            max_files_to_check = 3  # Limit to avoid rate limits
+
+            for filename, language in dependency_files.items():
+                if len(dependencies) >= max_files_to_check:
+                    break
+
+                try:
+                    # Check if file exists and get its content
+                    file_content = repo.get_contents(filename)
+
+                    # Skip if it's a directory
+                    if hasattr(file_content, "type") and file_content.type == "dir":
+                        continue
+
+                    # Decode content
+                    if hasattr(file_content, "decoded_content"):
+                        content = file_content.decoded_content.decode("utf-8", errors="ignore")
+                    else:
+                        continue
+
+                    # Parse dependencies based on file type
+                    file_dependencies = self._parse_dependency_file(content, filename, language)
+                    dependencies.extend(file_dependencies)
+
+                except Exception:
+                    # File doesn't exist or can't be read, continue
+                    continue
+
+            # Remove duplicates and return
+            return list(set(dependencies))
+
+        except Exception as e:
+            logger.debug(f"Error fetching dependency data for {repo_data.get('name', 'unknown')}: {e}")
+            return []
+
+    def _parse_dependency_file(self, content: str, filename: str, language: str) -> List[str]:
+        """Parse dependency file content to extract package/library names."""
+        dependencies = []
+
+        try:
+            if filename == "requirements.txt" or filename.endswith("requirements-"):
+                # Python requirements.txt
+                for line in content.split("\n"):
+                    line = line.strip()
+                    if line and not line.startswith("#") and not line.startswith("-"):
+                        # Extract package name (everything before version specifiers)
+                        package_name = line.split(">=")[0].split("==")[0].split("<")[0].split(">")[0].split("~")[0].strip()
+                        if package_name and len(package_name) > 1:
+                            dependencies.append(package_name.lower())
+
+            elif filename == "package.json":
+                # Node.js package.json
+                import json
+
+                try:
+                    data = json.loads(content)
+                    # Get dependencies
+                    deps = data.get("dependencies", {})
+                    dev_deps = data.get("devDependencies", {})
+
+                    for dep_dict in [deps, dev_deps]:
+                        for package_name in dep_dict.keys():
+                            # Clean package name (remove @scope/ prefix)
+                            clean_name = package_name.split("/")[-1] if "/" in package_name else package_name
+                            dependencies.append(clean_name.lower())
+                except json.JSONDecodeError:
+                    pass
+
+            elif filename == "go.mod":
+                # Go modules
+                for line in content.split("\n"):
+                    line = line.strip()
+                    if line.startswith("require ") or line.startswith("\t"):
+                        parts = line.split()
+                        if len(parts) >= 2:
+                            module_path = parts[1]
+                            # Extract the main module name (e.g., github.com/gin-gonic/gin -> gin-gonic/gin)
+                            if "/" in module_path:
+                                module_name = "/".join(module_path.split("/")[-2:])
+                                dependencies.append(module_name.lower())
+
+            elif filename == "Cargo.toml":
+                # Rust Cargo.toml
+                in_dependencies = False
+                for line in content.split("\n"):
+                    line = line.strip()
+                    if line == "[dependencies]":
+                        in_dependencies = True
+                        continue
+                    elif line.startswith("[") and in_dependencies:
+                        in_dependencies = False
+                        continue
+
+                    if in_dependencies and "=" in line:
+                        package_name = line.split("=")[0].strip()
+                        if package_name and not package_name.startswith("#"):
+                            dependencies.append(package_name.lower())
+
+            elif filename == "composer.json":
+                # PHP Composer
+                import json
+
+                try:
+                    data = json.loads(content)
+                    deps = data.get("require", {})
+                    dev_deps = data.get("require-dev", {})
+
+                    for dep_dict in [deps, dev_deps]:
+                        for package_name in dep_dict.keys():
+                            # Remove vendor prefix for well-known packages
+                            if "/" in package_name:
+                                package_name = package_name.split("/")[1]
+                            dependencies.append(package_name.lower())
+                except json.JSONDecodeError:
+                    pass
+
+            elif filename == "Gemfile":
+                # Ruby Gemfile
+                for line in content.split("\n"):
+                    line = line.strip()
+                    if line.startswith("gem '") or line.startswith('gem "'):
+                        # Extract gem name
+                        start_quote = "'" if "'" in line else '"'
+                        parts = line.split(start_quote)
+                        if len(parts) >= 3:
+                            gem_name = parts[1]
+                            dependencies.append(gem_name.lower())
+
+        except Exception as e:
+            logger.debug(f"Error parsing dependency file {filename}: {e}")
+
+        return dependencies
+
     async def _extract_skills(self, user_data: Dict[str, Any], repositories: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Extract skills from user profile and repositories."""
+        """Extract skills from user profile and repositories with enhanced analysis."""
         technical_skills = set()
         frameworks = set()
         tools = set()
         domains = set()
+        dependencies_found = set()
+
+        # Enhanced framework and technology mappings
+        framework_patterns = {
+            # JavaScript Frameworks
+            "React": ["react", "reactjs", "react.js", "next.js", "nextjs", "create-react-app", "react-native"],
+            "Vue": ["vue", "vuejs", "vue.js", "nuxt", "nuxtjs", "nuxt.js"],
+            "Angular": ["angular", "angularjs", "angular.js", "@angular"],
+            "Svelte": ["svelte", "sveltekit"],
+            "Express": ["express", "expressjs", "express.js"],
+            "NestJS": ["nestjs", "nest.js", "@nestjs"],
+            # Python Frameworks
+            "Django": ["django", "django-rest-framework", "djangorestframework"],
+            "Flask": ["flask", "flask-restful", "flask-sqlalchemy"],
+            "FastAPI": ["fastapi", "fastapi-users", "fastapi-admin"],
+            "TensorFlow": ["tensorflow", "tf-", "keras"],
+            "PyTorch": ["torch", "pytorch", "torchvision"],
+            "Scikit-learn": ["scikit-learn", "sklearn"],
+            "Pandas": ["pandas", "pandas-profiling"],
+            "NumPy": ["numpy", "numpy-financial"],
+            "Matplotlib": ["matplotlib", "matplotlib.pyplot"],
+            # Java Frameworks
+            "Spring": ["spring", "spring-boot", "spring-framework", "spring-mvc", "spring-data", "spring-security"],
+            "Hibernate": ["hibernate", "hibernate-core"],
+            "Maven": ["maven", "maven-plugin"],
+            "Gradle": ["gradle", "gradle-wrapper"],
+            # .NET Frameworks
+            "ASP.NET": ["asp.net", "asp.net-core", "asp.net-mvc", "asp.net-web-api"],
+            "Entity Framework": ["entity-framework", "entityframework", "ef-core"],
+            # Go Frameworks
+            "Gin": ["gin", "gin-gonic/gin"],
+            "Echo": ["echo", "labstack/echo"],
+            "Fiber": ["fiber", "gofiber/fiber"],
+            # Ruby Frameworks
+            "Rails": ["rails", "ruby-on-rails", "ror"],
+            "Sinatra": ["sinatra"],
+            # PHP Frameworks
+            "Laravel": ["laravel", "laravel/framework"],
+            "Symfony": ["symfony", "symfony/framework"],
+            "CodeIgniter": ["codeigniter"],
+            # Rust Frameworks
+            "Actix": ["actix", "actix-web"],
+            "Rocket": ["rocket", "rocket_contrib"],
+            "Tokio": ["tokio", "tokio-util"],
+        }
+
+        tool_patterns = {
+            # Cloud Platforms
+            "AWS": ["aws", "amazon-web-services", "boto3", "aws-sdk", "aws-cli", "ec2", "s3", "lambda"],
+            "Google Cloud": ["gcp", "google-cloud", "google-cloud-platform", "gcloud", "firebase"],
+            "Azure": ["azure", "microsoft-azure", "azure-sdk"],
+            "Heroku": ["heroku", "heroku-cli"],
+            "Vercel": ["vercel", "vercel-cli"],
+            "Netlify": ["netlify", "netlify-cli"],
+            # Containers & Orchestration
+            "Docker": ["docker", "docker-compose", "dockerfile", "containerd"],
+            "Kubernetes": ["kubernetes", "k8s", "kubectl", "helm", "istio"],
+            "Podman": ["podman", "buildah"],
+            # Databases
+            "PostgreSQL": ["postgresql", "psycopg2", "postgres", "pg"],
+            "MySQL": ["mysql", "pymysql", "mysql-connector"],
+            "MongoDB": ["mongodb", "pymongo", "mongoose"],
+            "Redis": ["redis", "redis-py"],
+            "SQLite": ["sqlite", "sqlite3"],
+            "Elasticsearch": ["elasticsearch", "elasticsearch-py"],
+            # CI/CD & DevOps
+            "Jenkins": ["jenkins", "jenkins-pipeline"],
+            "GitLab CI": ["gitlab-ci", "gitlab-ci.yml"],
+            "GitHub Actions": ["github-actions", "actions"],
+            "CircleCI": ["circleci", "circle-ci"],
+            "Travis CI": ["travis-ci", ".travis.yml"],
+            # Version Control
+            "Git": ["git", "git-flow", "git-lfs"],
+            "GitHub": ["github", "github-api"],
+            # Testing
+            "Jest": ["jest", "@testing-library"],
+            "Mocha": ["mocha", "chai"],
+            "PyTest": ["pytest", "pytest-django"],
+            "JUnit": ["junit", "junit5"],
+            "Selenium": ["selenium", "selenium-webdriver"],
+            # Build Tools
+            "Webpack": ["webpack", "webpack-cli"],
+            "Vite": ["vite", "vitejs"],
+            "Babel": ["babel", "@babel"],
+            "TypeScript": ["typescript", "ts-node", "@types"],
+        }
 
         # Extract from languages
         languages = {repo.get("language") for repo in repositories if repo.get("language")}
         technical_skills.update(languages)
 
-        # Extract from repository topics and descriptions
+        # Process each repository
         for repo in repositories:
+            # Extract from repository topics
             topics = repo.get("topics", [])
             technical_skills.update(topics)
 
+            # Enhanced description analysis
             description = repo.get("description", "")
             if description:
-                # Simple keyword extraction (could be enhanced with NLP)
                 description_lower = description.lower()
 
-                # Common frameworks
-                framework_keywords = [
-                    "react",
-                    "vue",
-                    "angular",
-                    "django",
-                    "flask",
-                    "express",
-                    "spring",
-                    "rails",
-                ]
-                for keyword in framework_keywords:
-                    if keyword in description_lower:
-                        frameworks.add(keyword.title())
+                # Check for frameworks in description
+                for framework, patterns in framework_patterns.items():
+                    if any(pattern in description_lower for pattern in patterns):
+                        frameworks.add(framework)
 
-                # Common tools
-                tool_keywords = [
-                    "docker",
-                    "kubernetes",
-                    "aws",
-                    "gcp",
-                    "azure",
-                    "jenkins",
-                    "git",
-                    "mongodb",
-                    "postgresql",
-                ]
-                for keyword in tool_keywords:
-                    if keyword in description_lower:
-                        tools.add(keyword.upper() if keyword in ["aws", "gcp"] else keyword.title())
+                # Check for tools in description
+                for tool, patterns in tool_patterns.items():
+                    if any(pattern in description_lower for pattern in patterns):
+                        tools.add(tool)
 
-        # Extract from bio
+            # Analyze repository dependencies (new feature)
+            try:
+                repo_dependencies = await self._fetch_dependency_data(repo)
+                dependencies_found.update(repo_dependencies)
+
+                # Map dependencies to frameworks and tools
+                for dep in repo_dependencies:
+                    dep_lower = dep.lower()
+
+                    # Check if dependency matches known frameworks
+                    for framework, patterns in framework_patterns.items():
+                        if any(pattern in dep_lower or dep_lower in pattern for pattern in patterns):
+                            frameworks.add(framework)
+                            break
+
+                    # Check if dependency matches known tools
+                    for tool, patterns in tool_patterns.items():
+                        if any(pattern in dep_lower or dep_lower in pattern for pattern in patterns):
+                            tools.add(tool)
+                            break
+
+                    # Add dependency as technical skill if it's a well-known library
+                    if len(dep) > 2 and not any(char.isdigit() for char in dep):
+                        technical_skills.add(dep.title())
+
+            except Exception as e:
+                logger.debug(f"Error analyzing dependencies for {repo.get('name', 'unknown')}: {e}")
+
+        # Extract from repository names (additional signal)
+        for repo in repositories:
+            repo_name = repo.get("name", "").lower()
+            for framework, patterns in framework_patterns.items():
+                if any(pattern in repo_name for pattern in patterns):
+                    frameworks.add(framework)
+
+        # Extract from bio with enhanced pattern matching
         bio = user_data.get("bio", "")
         if bio:
             bio_lower = bio.lower()
-            if "machine learning" in bio_lower or "ml" in bio_lower:
-                domains.add("Machine Learning")
-            if "data science" in bio_lower:
-                domains.add("Data Science")
-            if "web development" in bio_lower or "web dev" in bio_lower:
-                domains.add("Web Development")
-            if "mobile" in bio_lower:
-                domains.add("Mobile Development")
-            if "devops" in bio_lower:
-                domains.add("DevOps")
+
+            # Domain detection
+            domain_patterns = {
+                "Machine Learning": ["machine learning", "ml", "deep learning", "neural network", "ai", "artificial intelligence"],
+                "Data Science": ["data science", "data analysis", "data visualization", "statistics", "analytics"],
+                "Web Development": ["web development", "web dev", "frontend", "backend", "fullstack", "web application"],
+                "Mobile Development": ["mobile", "ios", "android", "react native", "flutter", "swift", "kotlin"],
+                "DevOps": ["devops", "infrastructure", "deployment", "ci/cd", "automation", "cloud"],
+                "Cybersecurity": ["security", "cybersecurity", "encryption", "authentication", "penetration testing"],
+                "Game Development": ["game", "unity", "unreal", "godot", "game engine"],
+                "Blockchain": ["blockchain", "ethereum", "smart contract", "web3", "cryptocurrency"],
+                "IoT": ["iot", "internet of things", "embedded", "raspberry pi", "arduino"],
+                "API Development": ["api", "rest", "graphql", "microservices", "soap"],
+            }
+
+            for domain, patterns in domain_patterns.items():
+                if any(pattern in bio_lower for pattern in patterns):
+                    domains.add(domain)
+
+            # Extract additional frameworks and tools from bio
+            for framework, patterns in framework_patterns.items():
+                if any(pattern in bio_lower for pattern in patterns):
+                    frameworks.add(framework)
+
+            for tool, patterns in tool_patterns.items():
+                if any(pattern in bio_lower for pattern in patterns):
+                    tools.add(tool)
+
+        # Extract from user company/location (additional context)
+        company = user_data.get("company", "")
+        location = user_data.get("location", "")
+
+        for field in [company, location]:
+            if field:
+                field_lower = field.lower()
+                for tool, patterns in tool_patterns.items():
+                    if any(pattern in field_lower for pattern in patterns):
+                        tools.add(tool)
+
+        # Clean up and deduplicate
+        technical_skills = {skill for skill in technical_skills if skill and len(str(skill)) > 1}
+        frameworks = {framework for framework in frameworks if framework}
+        tools = {tool for tool in tools if tool}
+        domains = {domain for domain in domains if domain}
 
         return {
-            "technical_skills": list(technical_skills),
-            "frameworks": list(frameworks),
-            "tools": list(tools),
-            "domains": list(domains),
+            "technical_skills": sorted(list(technical_skills)),
+            "frameworks": sorted(list(frameworks)),
+            "tools": sorted(list(tools)),
+            "domains": sorted(list(domains)),
+            "dependencies_found": sorted(list(dependencies_found)),
             "soft_skills": [],  # Could be enhanced with more analysis
         }
 
@@ -700,6 +1176,450 @@ class GitHubService:
 
         return optimal
 
+    def _parse_conventional_commit(self, commit_message: str) -> Dict[str, Any]:
+        """Parse a commit message for conventional commit format and extract structured information."""
+        import re
+
+        # Conventional commit pattern: type(scope): description
+        conventional_pattern = r"^(?P<type>\w+)(?:\((?P<scope>[^\)]+)\))?: (?P<description>.+)$"
+
+        # Breaking change pattern
+        breaking_pattern = r"BREAKING CHANGE: (.+)$"
+
+        # Common conventional commit types and their meanings
+        commit_types = {
+            "feat": {"category": "feature_development", "description": "New feature"},
+            "fix": {"category": "bug_fixing", "description": "Bug fix"},
+            "docs": {"category": "documentation", "description": "Documentation"},
+            "style": {"category": "code_quality", "description": "Code style changes"},
+            "refactor": {"category": "refactoring", "description": "Code refactoring"},
+            "test": {"category": "testing", "description": "Testing"},
+            "chore": {"category": "maintenance", "description": "Maintenance"},
+            "perf": {"category": "optimization", "description": "Performance improvement"},
+            "ci": {"category": "ci_cd", "description": "CI/CD changes"},
+            "build": {"category": "build", "description": "Build system changes"},
+            "revert": {"category": "maintenance", "description": "Revert changes"},
+        }
+
+        result = {
+            "is_conventional": False,
+            "type": None,
+            "scope": None,
+            "description": commit_message.strip(),
+            "category": "other",
+            "is_breaking_change": False,
+            "breaking_description": None,
+            "impact_level": "minor",  # minor, moderate, major
+        }
+
+        # Check for conventional commit format
+        match = re.match(conventional_pattern, commit_message.strip(), re.IGNORECASE)
+        if match:
+            result["is_conventional"] = True
+            result["type"] = match.group("type").lower()
+            result["scope"] = match.group("scope").lower() if match.group("scope") else None
+            result["description"] = match.group("description").strip()
+
+            # Map to category
+            if result["type"] in commit_types:
+                result["category"] = commit_types[result["type"]]["category"]
+
+            # Determine impact level based on type
+            if result["type"] in ["feat", "perf"]:
+                result["impact_level"] = "moderate"
+            elif result["type"] in ["fix", "refactor"]:
+                result["impact_level"] = "minor"
+            elif result["type"] in ["revert"]:
+                result["impact_level"] = "major"
+
+        # Check for breaking changes
+        breaking_match = re.search(breaking_pattern, commit_message, re.IGNORECASE | re.MULTILINE)
+        if breaking_match:
+            result["is_breaking_change"] = True
+            result["breaking_description"] = breaking_match.group(1).strip()
+            result["impact_level"] = "major"
+
+        return result
+
+    def _analyze_commit_impact(self, commit_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Analyze the impact and significance of a single commit."""
+        message = commit_data.get("message", "")
+        files_changed = commit_data.get("files_changed", 0)
+
+        # Parse conventional commit
+        conventional_info = self._parse_conventional_commit(message)
+
+        # Calculate impact score based on multiple factors
+        impact_score = 0
+
+        # Conventional commit bonus
+        if conventional_info["is_conventional"]:
+            impact_score += 20
+
+        # Breaking change bonus
+        if conventional_info["is_breaking_change"]:
+            impact_score += 30
+
+        # Files changed impact
+        if files_changed > 0:
+            if files_changed <= 3:
+                impact_score += 10
+            elif files_changed <= 10:
+                impact_score += 20
+            elif files_changed <= 20:
+                impact_score += 30
+            else:
+                impact_score += 40
+
+        # Message length and detail
+        message_words = len(message.split())
+        if message_words > 50:
+            impact_score += 15
+        elif message_words > 20:
+            impact_score += 10
+        elif message_words > 10:
+            impact_score += 5
+
+        # Keywords that indicate significance
+        significant_keywords = [
+            "breaking",
+            "major",
+            "critical",
+            "security",
+            "performance",
+            "optimization",
+            "architecture",
+            "design",
+            "api",
+            "database",
+        ]
+        message_lower = message.lower()
+        keyword_count = sum(1 for keyword in significant_keywords if keyword in message_lower)
+        impact_score += keyword_count * 5
+
+        # Determine impact level
+        if impact_score >= 70:
+            impact_level = "high"
+        elif impact_score >= 40:
+            impact_level = "moderate"
+        elif impact_score >= 20:
+            impact_level = "low"
+        else:
+            impact_level = "minimal"
+
+        return {
+            "impact_score": impact_score,
+            "impact_level": impact_level,
+            "conventional_info": conventional_info,
+            "files_changed": files_changed,
+            "message_quality": "high" if message_words > 20 else "medium" if message_words > 10 else "low",
+        }
+
+    def _analyze_conventional_commits(self, commits: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Analyze conventional commit patterns across all commits."""
+        conventional_commits = []
+        conventional_stats = {
+            "total_commits": len(commits),
+            "conventional_commits": 0,
+            "breaking_changes": 0,
+            "types": {},
+            "scopes": {},
+            "categories": {},
+        }
+
+        for commit in commits:
+            message = commit.get("message", "")
+            conventional_info = self._parse_conventional_commit(message)
+
+            if conventional_info["is_conventional"]:
+                conventional_commits.append(
+                    {
+                        "commit": commit,
+                        "conventional_info": conventional_info,
+                    }
+                )
+
+                conventional_stats["conventional_commits"] += 1
+
+                # Track commit types
+                commit_type = conventional_info["type"]
+                conventional_stats["types"][commit_type] = conventional_stats["types"].get(commit_type, 0) + 1
+
+                # Track scopes
+                if conventional_info["scope"]:
+                    scope = conventional_info["scope"]
+                    conventional_stats["scopes"][scope] = conventional_stats["scopes"].get(scope, 0) + 1
+
+                # Track categories
+                category = conventional_info["category"]
+                conventional_stats["categories"][category] = conventional_stats["categories"].get(category, 0) + 1
+
+                # Track breaking changes
+                if conventional_info["is_breaking_change"]:
+                    conventional_stats["breaking_changes"] += 1
+
+        # Calculate percentages
+        conventional_stats["conventional_percentage"] = (
+            round((conventional_stats["conventional_commits"] / conventional_stats["total_commits"]) * 100, 1)
+            if conventional_stats["total_commits"] > 0
+            else 0
+        )
+
+        # Sort types and categories by frequency
+        conventional_stats["top_types"] = dict(sorted(conventional_stats["types"].items(), key=lambda x: x[1], reverse=True)[:5])
+        conventional_stats["top_categories"] = dict(sorted(conventional_stats["categories"].items(), key=lambda x: x[1], reverse=True)[:5])
+        conventional_stats["top_scopes"] = dict(sorted(conventional_stats["scopes"].items(), key=lambda x: x[1], reverse=True)[:5])
+
+        return {
+            "stats": conventional_stats,
+            "conventional_commits": conventional_commits,
+            "quality_score": self._calculate_conventional_quality_score(conventional_stats),
+        }
+
+    def _analyze_repository_content_for_readme(self, repo_data: Dict[str, Any], repository) -> Dict[str, Any]:
+        """Analyze repository content specifically for README generation."""
+        analysis = {
+            "existing_readme": False,
+            "readme_content": None,
+            "main_files": [],
+            "documentation_files": [],
+            "configuration_files": [],
+            "source_directories": [],
+            "license_info": None,
+            "has_tests": False,
+            "has_ci_cd": False,
+            "has_docker": False,
+            "api_endpoints": [],
+            "key_features": [],
+        }
+
+        try:
+            # Check for existing README files
+            readme_files = ["README.md", "README.rst", "README.txt", "readme.md", "Readme.md"]
+            for readme_file in readme_files:
+                try:
+                    readme_content = repository.get_contents(readme_file)
+                    if readme_content and hasattr(readme_content, "decoded_content"):
+                        analysis["existing_readme"] = True
+                        analysis["readme_content"] = readme_content.decoded_content.decode("utf-8", errors="ignore")
+                        break
+                except Exception:
+                    continue
+
+            # Get repository structure (limited to avoid rate limits)
+            try:
+                contents = repository.get_contents("")
+                max_items = 50  # Limit to avoid processing too many files
+
+                for item in contents[:max_items]:
+                    if item.type == "file":
+                        filename = item.name.lower()
+
+                        # Main application files
+                        if any(filename.endswith(ext) for ext in [".py", ".js", ".ts", ".java", ".cpp", ".c", ".go", ".rs", ".php", ".rb"]):
+                            analysis["main_files"].append(item.name)
+
+                        # Documentation files
+                        elif any(filename.endswith(ext) for ext in [".md", ".rst", ".txt"]) or "doc" in filename:
+                            analysis["documentation_files"].append(item.name)
+
+                        # Configuration files
+                        elif any(filename in ["package.json", "setup.py", "requirements.txt", "cargo.toml", "pom.xml", "build.gradle"]):
+                            analysis["configuration_files"].append(item.name)
+
+                        # CI/CD files
+                        elif any(term in filename for term in [".yml", ".yaml", "ci", "cd", "github", "actions"]):
+                            analysis["has_ci_cd"] = True
+
+                        # Docker files
+                        elif "docker" in filename:
+                            analysis["has_docker"] = True
+
+                        # Test files
+                        elif "test" in filename or "spec" in filename:
+                            analysis["has_tests"] = True
+
+                    elif item.type == "dir":
+                        dirname = item.name.lower()
+
+                        # Source directories
+                        if any(term in dirname for term in ["src", "source", "lib", "core", "main"]):
+                            analysis["source_directories"].append(item.name)
+
+            except Exception as e:
+                logger.debug(f"Error analyzing repository structure: {e}")
+
+            # Extract license information
+            try:
+                license_info = repository.get_license()
+                if license_info:
+                    analysis["license_info"] = {
+                        "name": license_info.license.name if license_info.license else "Unknown",
+                        "key": license_info.license.key if license_info.license else None,
+                    }
+            except Exception:
+                pass
+
+            # Extract key features from description and topics
+            description = repo_data.get("description", "")
+            topics = repo_data.get("topics", [])
+
+            if description:
+                # Simple feature extraction from description
+                sentences = [s.strip() for s in description.split(".") if s.strip()]
+                analysis["key_features"] = sentences[:3]  # First 3 sentences as features
+
+            # Add topics as features
+            for topic in topics[:5]:  # Top 5 topics
+                if len(analysis["key_features"]) < 5:
+                    analysis["key_features"].append(f"Built with {topic}")
+
+        except Exception as e:
+            logger.debug(f"Error analyzing repository content for README: {e}")
+
+        return analysis
+
+    def _extract_api_endpoints_from_code(self, repository, main_files: List[str]) -> List[str]:
+        """Extract API endpoints from source code files (basic implementation)."""
+        endpoints = []
+
+        try:
+            max_files_to_check = 5  # Limit to avoid rate limits
+
+            for filename in main_files[:max_files_to_check]:
+                try:
+                    file_content = repository.get_contents(filename)
+                    if hasattr(file_content, "decoded_content"):
+                        content = file_content.decoded_content.decode("utf-8", errors="ignore")
+
+                        # Simple regex patterns for common API endpoints
+                        import re
+
+                        # Flask/Django patterns
+                        flask_patterns = [
+                            r'@app\.route\([\'"]([^\'"]*)[\'"]',
+                            r'@api\.route\([\'"]([^\'"]*)[\'"]',
+                            r'path\([\'"]([^\'"]*)[\'"]',
+                        ]
+
+                        # Express.js patterns
+                        express_patterns = [
+                            r'app\.(get|post|put|delete|patch)\([\'"]([^\'"]*)[\'"]',
+                            r'router\.(get|post|put|delete|patch)\([\'"]([^\'"]*)[\'"]',
+                        ]
+
+                        # Spring patterns
+                        spring_patterns = [
+                            r'@RequestMapping\([\'"]([^\'"]*)[\'"]',
+                            r'@GetMapping\([\'"]([^\'"]*)[\'"]',
+                            r'@PostMapping\([\'"]([^\'"]*)[\'"]',
+                        ]
+
+                        all_patterns = flask_patterns + express_patterns + spring_patterns
+
+                        for pattern in all_patterns:
+                            matches = re.findall(pattern, content, re.IGNORECASE)
+                            if isinstance(matches[0], tuple) if matches else False:
+                                # Handle patterns with method prefix
+                                endpoints.extend([match[1] for match in matches if len(match) > 1])
+                            else:
+                                endpoints.extend(matches)
+
+                except Exception:
+                    continue
+
+            # Remove duplicates and clean endpoints
+            endpoints = list(set(endpoints))
+            endpoints = [ep for ep in endpoints if ep and not ep.startswith("http")][:10]  # Limit to 10 endpoints
+
+        except Exception as e:
+            logger.debug(f"Error extracting API endpoints: {e}")
+
+        return endpoints
+
+    def _analyze_commit_impacts(self, commits: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Analyze the impact distribution across all commits."""
+        impact_distribution = {
+            "high": 0,
+            "moderate": 0,
+            "low": 0,
+            "minimal": 0,
+        }
+
+        impact_scores = []
+        high_impact_commits = []
+        conventional_high_impact = []
+
+        for commit in commits:
+            impact_analysis = self._analyze_commit_impact(commit)
+            impact_level = impact_analysis["impact_level"]
+            impact_score = impact_analysis["impact_score"]
+
+            impact_distribution[impact_level] += 1
+            impact_scores.append(impact_score)
+
+            # Track high impact commits
+            if impact_level in ["high", "moderate"]:
+                high_impact_commits.append(
+                    {
+                        "commit": commit,
+                        "impact_analysis": impact_analysis,
+                    }
+                )
+
+                # Track conventional commits that are high impact
+                if impact_analysis["conventional_info"]["is_conventional"]:
+                    conventional_high_impact.append(
+                        {
+                            "commit": commit,
+                            "impact_analysis": impact_analysis,
+                        }
+                    )
+
+        # Calculate statistics
+        total_commits = len(commits)
+        avg_impact_score = sum(impact_scores) / len(impact_scores) if impact_scores else 0
+
+        return {
+            "distribution": impact_distribution,
+            "average_impact_score": round(avg_impact_score, 1),
+            "high_impact_commits": high_impact_commits[:10],  # Top 10
+            "conventional_high_impact": conventional_high_impact[:5],  # Top 5
+            "impact_score_range": {
+                "min": min(impact_scores) if impact_scores else 0,
+                "max": max(impact_scores) if impact_scores else 0,
+                "median": sorted(impact_scores)[len(impact_scores) // 2] if impact_scores else 0,
+            },
+            "quality_distribution": {
+                level: round((count / total_commits) * 100, 1) if total_commits > 0 else 0 for level, count in impact_distribution.items()
+            },
+        }
+
+    def _calculate_conventional_quality_score(self, conventional_stats: Dict[str, Any]) -> int:
+        """Calculate a quality score based on conventional commit usage."""
+        score = 0
+
+        # Conventional commit adoption (40 points max)
+        conventional_percentage = conventional_stats["conventional_percentage"]
+        score += min(conventional_percentage * 0.4, 40)
+
+        # Type diversity (30 points max)
+        unique_types = len(conventional_stats["types"])
+        type_diversity_score = min(unique_types * 10, 30)
+        score += type_diversity_score
+
+        # Scope usage (20 points max)
+        scope_usage = len(conventional_stats["scopes"])
+        scope_score = min(scope_usage * 5, 20)
+        score += scope_score
+
+        # Breaking changes (10 points max)
+        if conventional_stats["breaking_changes"] > 0:
+            breaking_score = min(conventional_stats["breaking_changes"] * 2, 10)
+            score += breaking_score
+
+        return int(score)
+
     def _perform_commit_analysis(self, commits: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Perform detailed analysis on commit messages and patterns."""
         if not commits:
@@ -707,25 +1627,31 @@ class GitHubService:
 
         commit_messages = [commit["message"].lower() for commit in commits]
 
-        # Analyze what the user excels at (action patterns)
-        excellence_patterns = self._analyze_excellence_patterns(commit_messages)
+        # Enhanced commit analysis with conventional commit parsing
+        conventional_analysis = self._analyze_conventional_commits(commits)
+        impact_analysis = self._analyze_commit_impacts(commits)
+
+        # Analyze what the user excels at (action patterns) - enhanced with conventional commit data
+        excellence_patterns = self._analyze_excellence_patterns(commit_messages, conventional_analysis)
 
         # Analyze tools and features added
         tools_and_features = self._analyze_tools_and_features(commit_messages)
 
-        # Analyze commit frequency and consistency
-        commit_patterns = self._analyze_commit_patterns(commits)
+        # Analyze commit frequency and consistency - enhanced with impact data
+        commit_patterns = self._analyze_commit_patterns(commits, impact_analysis)
 
-        # Extract technical contributions
-        technical_contributions = self._analyze_technical_contributions(commit_messages)
+        # Extract technical contributions - enhanced with conventional commit categories
+        technical_contributions = self._analyze_technical_contributions(commit_messages, conventional_analysis)
 
-        # Calculate contributor-specific metrics
-        contributor_metrics = self._calculate_contributor_metrics(commits)
+        # Calculate contributor-specific metrics - enhanced with impact analysis
+        contributor_metrics = self._calculate_contributor_metrics(commits, impact_analysis)
 
         return {
             "total_commits_analyzed": len(commits),
             "contributor_focused": True,
-            "analysis_method": "contributor_specific",
+            "analysis_method": "contributor_specific_enhanced",
+            "conventional_commit_analysis": conventional_analysis,
+            "impact_analysis": impact_analysis,
             "excellence_areas": excellence_patterns,
             "tools_and_features": tools_and_features,
             "commit_patterns": commit_patterns,
@@ -734,7 +1660,7 @@ class GitHubService:
             "contributor_metrics": contributor_metrics,
         }
 
-    def _analyze_excellence_patterns(self, commit_messages: List[str]) -> Dict[str, Any]:
+    def _analyze_excellence_patterns(self, commit_messages: List[str], conventional_analysis: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Identify what the user excels at based on commit message patterns."""
         excellence_keywords = {
             "bug_fixing": [
@@ -804,6 +1730,7 @@ class GitHubService:
         pattern_counts = {}
         total_commits = len(commit_messages)
 
+        # Base keyword analysis
         for category, keywords in excellence_keywords.items():
             count = sum(1 for message in commit_messages if any(keyword in message for keyword in keywords))
             if count > 0:
@@ -811,6 +1738,50 @@ class GitHubService:
                     "count": count,
                     "percentage": round((count / total_commits) * 100, 1),
                 }
+
+        # Enhance with conventional commit analysis if available
+        if conventional_analysis:
+            conventional_stats = conventional_analysis.get("stats", {})
+
+            # Map conventional commit categories to excellence areas
+            conventional_to_excellence = {
+                "feature_development": "feature_development",
+                "bug_fixing": "bug_fixing",
+                "refactoring": "refactoring",
+                "testing": "testing",
+                "documentation": "documentation",
+                "optimization": "optimization",
+                "code_quality": "refactoring",
+                "maintenance": "refactoring",
+                "ci_cd": "testing",
+                "build": "refactoring",
+            }
+
+            # Boost categories that have conventional commit evidence
+            for conv_category, excellence_category in conventional_to_excellence.items():
+                if conv_category in conventional_stats.get("categories", {}):
+                    conv_count = conventional_stats["categories"][conv_category]
+
+                    if excellence_category in pattern_counts:
+                        # Boost existing category
+                        pattern_counts[excellence_category]["count"] += conv_count * 0.5  # Partial boost
+                        pattern_counts[excellence_category]["percentage"] = round(
+                            (pattern_counts[excellence_category]["count"] / total_commits) * 100, 1
+                        )
+                    else:
+                        # Add new category based on conventional commits
+                        pattern_counts[excellence_category] = {
+                            "count": conv_count,
+                            "percentage": round((conv_count / total_commits) * 100, 1),
+                        }
+
+            # Add conventional commit quality score
+            conventional_quality = conventional_analysis.get("quality_score", 0)
+            if conventional_quality > 70:
+                # Boost code quality if they use conventional commits well
+                if "refactoring" in pattern_counts:
+                    pattern_counts["refactoring"]["count"] += conventional_quality * 0.1
+                    pattern_counts["refactoring"]["percentage"] = round((pattern_counts["refactoring"]["count"] / total_commits) * 100, 1)
 
         # Sort by frequency
         sorted_patterns = dict(
@@ -824,6 +1795,7 @@ class GitHubService:
         return {
             "patterns": sorted_patterns,
             "primary_strength": (list(sorted_patterns.keys())[0] if sorted_patterns else None),
+            "conventional_commit_enhanced": conventional_analysis is not None,
         }
 
     def _analyze_tools_and_features(self, commit_messages: List[str]) -> Dict[str, Any]:
@@ -908,7 +1880,7 @@ class GitHubService:
             "total_unique_tools": sum(len(tools) for tools in found_tools.values()),
         }
 
-    def _analyze_commit_patterns(self, commits: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def _analyze_commit_patterns(self, commits: List[Dict[str, Any]], impact_analysis: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Analyze commit frequency and timing patterns."""
         if not commits:
             return {}
@@ -927,14 +1899,33 @@ class GitHubService:
         files_changed = [commit["files_changed"] for commit in commits if commit["files_changed"]]
         avg_files_per_commit = sum(files_changed) / len(files_changed) if files_changed else 0
 
-        return {
+        result = {
             "commits_per_day": round(commits_per_day, 2),
             "avg_files_per_commit": round(avg_files_per_commit, 1),
             "total_days_active": total_days,
             "consistency_score": min(commits_per_day * 10, 100),  # Scale to 0-100
         }
 
-    def _analyze_technical_contributions(self, commit_messages: List[str]) -> Dict[str, Any]:
+        # Enhance with impact analysis if available
+        if impact_analysis:
+            result.update(
+                {
+                    "impact_distribution": impact_analysis.get("distribution", {}),
+                    "average_impact_score": impact_analysis.get("average_impact_score", 0),
+                    "high_impact_commits_count": len(impact_analysis.get("high_impact_commits", [])),
+                    "impact_quality_distribution": impact_analysis.get("quality_distribution", {}),
+                }
+            )
+
+            # Calculate impact-weighted consistency score
+            avg_impact = impact_analysis.get("average_impact_score", 0)
+            base_consistency = result["consistency_score"]
+            impact_weighted_score = min((base_consistency + avg_impact) / 2, 100)
+            result["impact_weighted_consistency"] = round(impact_weighted_score, 1)
+
+        return result
+
+    def _analyze_technical_contributions(self, commit_messages: List[str], conventional_analysis: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Analyze technical depth and contribution types."""
         technical_indicators = {
             "architecture": [
@@ -977,6 +1968,34 @@ class GitHubService:
             if count > 0:
                 contributions[category] = count
 
+        # Enhance with conventional commit analysis if available
+        if conventional_analysis:
+            conventional_stats = conventional_analysis.get("stats", {})
+
+            # Map conventional commit types to technical contributions
+            conventional_to_technical = {
+                "architecture": ["feat", "refactor"],
+                "performance": ["perf", "optimize"],
+                "scalability": ["feat", "refactor"],
+                "maintainability": ["refactor", "docs"],
+                "integration": ["feat", "ci"],
+            }
+
+            # Boost technical contributions based on conventional commit evidence
+            for tech_category, conv_types in conventional_to_technical.items():
+                conv_count = sum(conventional_stats.get("types", {}).get(conv_type, 0) for conv_type in conv_types)
+
+                if conv_count > 0:
+                    if tech_category in contributions:
+                        contributions[tech_category] += conv_count
+                    else:
+                        contributions[tech_category] = conv_count
+
+            # Add conventional commit quality metrics
+            conventional_quality = conventional_analysis.get("quality_score", 0)
+            if conventional_quality > 0:
+                contributions["conventional_commit_quality"] = conventional_quality
+
         return contributions
 
     def _get_top_commit_repositories(self, commits: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -995,7 +2014,7 @@ class GitHubService:
 
         return top_repos
 
-    def _calculate_contributor_metrics(self, commits: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def _calculate_contributor_metrics(self, commits: List[Dict[str, Any]], impact_analysis: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Calculate contributor-specific metrics from commits."""
         if not commits:
             return {
@@ -1039,7 +2058,7 @@ class GitHubService:
             "repository_diversity_score": (min(100, (repositories_with_commits / len(commits)) * 100) if commits else 0),
         }
 
-        return {
+        result = {
             "repositories_with_commits": repositories_with_commits,
             "avg_commits_per_repo": round(avg_commits_per_repo, 1),
             "most_active_repository": most_active_repo[0] if most_active_repo else None,
@@ -1047,13 +2066,63 @@ class GitHubService:
             "contribution_span_days": contribution_span_days,
         }
 
+        # Enhance with impact analysis if available
+        if impact_analysis:
+            result.update(
+                {
+                    "impact_metrics": {
+                        "average_impact_score": impact_analysis.get("average_impact_score", 0),
+                        "high_impact_commits": len(impact_analysis.get("high_impact_commits", [])),
+                        "impact_distribution": impact_analysis.get("distribution", {}),
+                        "conventional_high_impact": len(impact_analysis.get("conventional_high_impact", [])),
+                    },
+                    "quality_metrics": {
+                        "impact_quality_distribution": impact_analysis.get("quality_distribution", {}),
+                        "impact_score_range": impact_analysis.get("impact_score_range", {}),
+                    },
+                }
+            )
+
+            # Calculate impact-weighted productivity metrics
+            high_impact_count = len(impact_analysis.get("high_impact_commits", []))
+            total_commits = len(commits)
+            if total_commits > 0:
+                impact_productivity_ratio = high_impact_count / total_commits
+                result["impact_productivity_ratio"] = round(impact_productivity_ratio * 100, 1)
+
+        return result
+
     def _empty_commit_analysis(self) -> Dict[str, Any]:
         """Return empty commit analysis structure for contributor-focused analysis."""
         return {
             "total_commits_analyzed": 0,
             "contributor_focused": True,
-            "analysis_method": "contributor_specific",
-            "excellence_areas": {"patterns": {}, "primary_strength": None},
+            "analysis_method": "contributor_specific_enhanced",
+            "conventional_commit_analysis": {
+                "stats": {
+                    "total_commits": 0,
+                    "conventional_commits": 0,
+                    "breaking_changes": 0,
+                    "types": {},
+                    "scopes": {},
+                    "categories": {},
+                    "conventional_percentage": 0,
+                    "top_types": {},
+                    "top_categories": {},
+                    "top_scopes": {},
+                },
+                "conventional_commits": [],
+                "quality_score": 0,
+            },
+            "impact_analysis": {
+                "distribution": {"high": 0, "moderate": 0, "low": 0, "minimal": 0},
+                "average_impact_score": 0,
+                "high_impact_commits": [],
+                "conventional_high_impact": [],
+                "impact_score_range": {"min": 0, "max": 0, "median": 0},
+                "quality_distribution": {"high": 0, "moderate": 0, "low": 0, "minimal": 0},
+            },
+            "excellence_areas": {"patterns": {}, "primary_strength": None, "conventional_commit_enhanced": False},
             "tools_and_features": {
                 "tools_by_category": {},
                 "features_implemented": {},
@@ -1172,6 +2241,7 @@ class GitHubService:
                 "commit_analysis": commit_patterns,
                 "analyzed_at": datetime.utcnow().isoformat(),
                 "analysis_time_seconds": round(total_time, 2),
+                "analysis_context_type": "repository",
             }
 
             # Cache the result
