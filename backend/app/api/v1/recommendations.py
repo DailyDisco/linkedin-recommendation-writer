@@ -26,7 +26,7 @@ async def generate_recommendation(
     request: RecommendationRequest,
     db: AsyncSession = Depends(get_database_session),
     recommendation_service: RecommendationService = Depends(get_recommendation_service),
-):
+) -> RecommendationResponse:
     """Generate a new LinkedIn recommendation."""
 
     logger.info("=" * 80)
@@ -76,7 +76,7 @@ async def generate_recommendation_options(
     request: RecommendationRequest,
     db: AsyncSession = Depends(get_database_session),
     recommendation_service: RecommendationService = Depends(get_recommendation_service),
-):
+) -> RecommendationOptionsResponse:
     """Generate multiple recommendation options."""
 
     logger.info("=" * 80)
@@ -125,7 +125,7 @@ async def create_recommendation_from_option(
     request: RecommendationFromOptionRequest,
     db: AsyncSession = Depends(get_database_session),
     recommendation_service: RecommendationService = Depends(get_recommendation_service),
-):
+) -> RecommendationResponse:
     """Create a recommendation from a selected option."""
 
     logger.info("=" * 80)
@@ -171,7 +171,7 @@ async def regenerate_recommendation(
     request: dict,  # Will contain original content and refinement instructions
     db: AsyncSession = Depends(get_database_session),
     recommendation_service: RecommendationService = Depends(get_recommendation_service),
-):
+) -> RecommendationResponse:
     """Regenerate a recommendation with refinement instructions."""
 
     logger.info("=" * 80)
@@ -231,7 +231,7 @@ async def list_recommendations(
     pagination: PaginationParams = Depends(get_pagination_params),
     db: AsyncSession = Depends(get_database_session),
     recommendation_service: RecommendationService = Depends(get_recommendation_service),
-):
+) -> RecommendationListResponse:
     """List recommendations with optional filtering."""
 
     try:
@@ -263,7 +263,7 @@ async def get_recommendation(
     recommendation_id: int,
     db: AsyncSession = Depends(get_database_session),
     recommendation_service: RecommendationService = Depends(get_recommendation_service),
-):
+) -> RecommendationResponse:
     """Get a specific recommendation by ID."""
 
     try:
@@ -289,7 +289,7 @@ async def delete_recommendation(
     recommendation_id: int,
     db: AsyncSession = Depends(get_database_session),
     recommendation_service: RecommendationService = Depends(get_recommendation_service),
-):
+) -> dict:
     """Delete a recommendation."""
 
     try:

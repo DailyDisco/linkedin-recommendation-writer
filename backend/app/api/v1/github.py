@@ -97,7 +97,7 @@ class GitHubServiceHealthResponse(BaseModel):
 @router.get("/health", response_model=GitHubServiceHealthResponse)
 async def check_github_service_health(
     github_service: GitHubService = Depends(get_github_service),
-):
+) -> GitHubServiceHealthResponse:
     """Check GitHub service health and configuration."""
     try:
         github_token_configured = github_service.github_client is not None
@@ -112,9 +112,15 @@ async def check_github_service_health(
         # Try to get rate limit information
         # rate_limit_info = ...  # Removed unused variable
         try:
-            rate_limit = github_service.github_client.get_rate_limit()
-            rate_limit_remaining = rate_limit.core.remaining
-            rate_limit_reset = rate_limit.core.reset.timestamp()
+            if github_service.github_client:
+                rate_limit = github_service.github_client.get_rate_limit()
+                rate_limit_remaining = getattr(getattr(rate_limit, "core", None), "remaining", None)
+                rate_limit_reset = None
+                if hasattr(rate_limit, "core") and hasattr(rate_limit.core, "reset"):
+                    rate_limit_reset = getattr(rate_limit.core.reset, "timestamp", lambda: None)()
+            else:
+                rate_limit_remaining = None
+                rate_limit_reset = None
         except Exception:
             rate_limit_remaining = None
             rate_limit_reset = None
@@ -152,7 +158,7 @@ async def analyze_github_profile(
     request: GitHubAnalysisRequest,
     db: AsyncSession = Depends(get_database_session),
     github_service: GitHubService = Depends(get_github_service),
-):
+) -> GitHubProfileResponse:
     """Analyze a GitHub profile and return comprehensive data."""
 
     try:
@@ -188,7 +194,7 @@ async def get_github_profile(
     force_refresh: bool = False,
     db: AsyncSession = Depends(get_database_session),
     github_service: GitHubService = Depends(get_github_service),
-):
+) -> GitHubProfileResponse:
     """Get a GitHub profile analysis (convenience endpoint)."""
 
     request = GitHubAnalysisRequest(
@@ -206,7 +212,7 @@ async def get_repository_contributors(
     request: RepositoryContributorsRequest,
     db: AsyncSession = Depends(get_database_session),
     repository_service: RepositoryService = Depends(get_repository_service),
-):
+) -> RepositoryContributorsResponse:
     """Get contributors from a GitHub repository with their real names."""
 
     try:
@@ -239,7 +245,7 @@ async def get_repository_contributors_by_path(
     force_refresh: bool = False,
     db: AsyncSession = Depends(get_database_session),
     repository_service: RepositoryService = Depends(get_repository_service),
-):
+) -> RepositoryContributorsResponse:
     """Get contributors from a GitHub repository (convenience endpoint)."""
 
     request = RepositoryContributorsRequest(

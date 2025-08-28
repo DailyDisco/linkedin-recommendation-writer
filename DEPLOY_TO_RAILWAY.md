@@ -1,12 +1,16 @@
 # 🚀 Deploy to Railway - Simple Guide
 
-## The Issue
+## ✅ Single Project Deployment (Your Preference!)
 
-Monorepo deployment (both backend + frontend together) is causing Nixpacks conflicts with Python/Node.js dependencies.
+Perfect! We'll deploy both backend and frontend in **ONE Railway project**. The backend will serve the frontend static files - exactly what you want!
 
-## ✅ The Solution: Deploy as Separate Services
+**Benefits:**
 
-This is actually Railway's **recommended approach** for full-stack applications.
+- ✅ One project to manage
+- ✅ One URL for everything
+- ✅ Backend serves frontend automatically
+- ✅ SPA routing works perfectly
+- ✅ Simpler deployment process
 
 ---
 

@@ -8,10 +8,13 @@ LinkedIn recommendations.
 
 import logging
 from contextlib import asynccontextmanager
+from typing import AsyncGenerator, Any, Dict, Union
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
+import os
 
 from app.api.v1 import api_router
 from app.core.config import settings
@@ -27,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan manager."""
     # Startup
     logger.info("Starting LinkedIn Recommendation Writer Backend...")
@@ -79,7 +82,7 @@ if settings.ENABLE_RATE_LIMITING:
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,  # type: ignore
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
@@ -88,9 +91,33 @@ app.add_middleware(
 # Include API routes
 app.include_router(api_router, prefix="/api/v1")
 
+# Mount static files for frontend (only if frontend build exists)
+frontend_build_path = os.path.join(os.path.dirname(__file__), "..", "frontend_static")
+if os.path.exists(frontend_build_path):
+    app.mount("/", StaticFiles(directory=frontend_build_path, html=True), name="frontend")
+
+    @app.get("/{path:path}")
+    async def serve_frontend(path: str) -> Union[JSONResponse, FileResponse]:
+        """Serve frontend for SPA routing."""
+        # If the path is an API route, let it pass through
+        if path.startswith("api/") or path in ["docs", "redoc", "health"]:
+            return JSONResponse(status_code=404, content={"error": "Not found"})
+
+        # Try to serve the file if it exists
+        file_path = os.path.join(frontend_build_path, path)
+        if os.path.isfile(file_path):
+            return FileResponse(file_path)
+
+        # For SPA routing, serve index.html for all non-API routes
+        index_path = os.path.join(frontend_build_path, "index.html")
+        if os.path.exists(index_path):
+            return FileResponse(index_path)
+
+        return JSONResponse(status_code=404, content={"error": "Not found"})
+
 
 @app.get("/")
-async def root():
+async def root() -> Dict[str, Any]:
     """Root endpoint."""
     return {
         "message": "LinkedIn Recommendation Writer API",
@@ -101,7 +128,7 @@ async def root():
 
 
 @app.get("/health")
-async def health_check():
+async def health_check() -> Union[Dict[str, Any], JSONResponse]:
     """Health check endpoint for Docker and load balancers."""
     checks = {"api": "ok", "environment": settings.ENVIRONMENT}
 
@@ -150,7 +177,7 @@ async def health_check():
 
 # Custom exception handlers
 @app.exception_handler(BaseApplicationError)
-async def application_exception_handler(request: Request, exc: BaseApplicationError):
+async def application_exception_handler(request: Request, exc: BaseApplicationError) -> JSONResponse:
     """Handle custom application exceptions."""
     request_id = getattr(request.state, "request_id", "unknown")
 
@@ -183,7 +210,7 @@ async def application_exception_handler(request: Request, exc: BaseApplicationEr
 
 
 @app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
+async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Global exception handler for unhandled exceptions."""
     request_id = getattr(request.state, "request_id", "unknown")
     logger.error(f"Unhandled exception in request {request_id}: {exc}", exc_info=True)

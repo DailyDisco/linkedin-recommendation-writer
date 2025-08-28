@@ -44,7 +44,22 @@ cd backend
 
 # Initialize backend project
 echo "📦 Creating backend Railway project..."
-railway init linkedin-recommendation-backend --yes
+echo "Note: You'll need to create the project manually in Railway dashboard or CLI"
+echo "1. Go to https://railway.app/dashboard"
+echo "2. Click 'New Project'"
+echo "3. Choose 'Deploy from GitHub repo'"
+echo "4. Select your repository"
+echo "5. Name it 'linkedin-recommendation-backend'"
+echo ""
+read -p "Have you created the backend project? (y/n): " BACKEND_READY
+
+if [[ ! "$BACKEND_READY" =~ ^[Yy]$ ]]; then
+    echo "Please create the backend project first, then run this script again."
+    exit 1
+fi
+
+# Link to existing project
+railway link
 
 # Add required plugins
 echo "🗄️ Adding PostgreSQL database..."

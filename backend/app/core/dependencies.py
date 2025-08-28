@@ -1,7 +1,8 @@
 """Dependency injection container and providers."""
 
 import logging
-from typing import AsyncGenerator
+import re
+from typing import AsyncGenerator, Any, TypeVar, cast
 
 from fastapi import HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +14,8 @@ from app.services.ai_service import AIService
 from app.services.github_service import GitHubService
 from app.services.recommendation_service import RecommendationService
 from app.services.repository_service import RepositoryService
+
+T = TypeVar("T")
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +39,7 @@ async def get_database_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 # Redis Dependencies
-async def get_redis_client():
+async def get_redis_client() -> Any:
     """Dependency that provides Redis client."""
     try:
         return await get_redis()
@@ -58,12 +61,12 @@ class ServiceContainer:
     _instances: dict = {}
 
     @classmethod
-    def _get_service(cls, service_name: str, service_class):
+    def _get_service(cls, service_name: str, service_class: type[T]) -> T:
         """Generic service getter with singleton pattern."""
         if service_name not in cls._instances:
             logger.info(f"Initializing {service_name} service")
             cls._instances[service_name] = service_class()
-        return cls._instances[service_name]
+        return cast(T, cls._instances[service_name])
 
     @classmethod
     def get_github_service(cls) -> GitHubService:
@@ -86,7 +89,7 @@ class ServiceContainer:
         return cls._get_service("repository", RepositoryService)
 
     @classmethod
-    def clear_instances(cls):
+    def clear_instances(cls) -> None:
         """Clear all service instances (useful for testing)."""
         cls._instances.clear()
 
@@ -122,8 +125,6 @@ async def validate_github_username(username: str) -> str:
         )
 
     # Basic validation for allowed characters
-    import re
-
     if not re.match(r"^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$", username):
         raise HTTPException(status_code=400, detail="Invalid GitHub username format")
 

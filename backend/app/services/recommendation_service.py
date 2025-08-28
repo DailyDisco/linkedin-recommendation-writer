@@ -290,6 +290,7 @@ class RecommendationService:
         """Create multiple recommendation options."""
 
         import time
+        from typing import Optional
 
         start_time = time.time()
 
@@ -299,6 +300,7 @@ class RecommendationService:
             github_start = time.time()
 
             # Determine analysis type and get GitHub data
+            github_data: Optional[Dict[str, Any]] = None
             if analysis_type == "repo_only" and repository_url:
                 logger.info(f"📁 Analyzing repository: {repository_url}")
                 # Extract repository name from URL
@@ -316,7 +318,12 @@ class RecommendationService:
                 contributor_data = await self.github_service.analyze_github_profile(username=github_username, force_refresh=False)
 
                 # Merge repository and contributor data
-                github_data = self._merge_repository_and_contributor_data(repository_data, contributor_data, github_username)
+                if contributor_data and repository_data:
+                    github_data = self._merge_repository_and_contributor_data(repository_data, contributor_data, github_username)
+                elif contributor_data:
+                    github_data = contributor_data
+                else:
+                    github_data = repository_data
             else:
                 logger.info(f"👤 Analyzing profile: {github_username}")
                 github_data = await self.github_service.analyze_github_profile(username=github_username, force_refresh=False)
@@ -584,6 +591,7 @@ class RecommendationService:
         """Create a recommendation from a selected option."""
 
         import time
+        from typing import Optional
 
         start_time = time.time()
 
@@ -593,6 +601,7 @@ class RecommendationService:
             github_start = time.time()
 
             # Determine analysis type and get GitHub data
+            github_data: Optional[Dict[str, Any]] = None
             if analysis_type == "repo_only" and repository_url:
                 logger.info(f"📁 Analyzing repository: {repository_url}")
                 # Extract repository name from URL
@@ -610,7 +619,12 @@ class RecommendationService:
                 contributor_data = await self.github_service.analyze_github_profile(username=github_username, force_refresh=False)
 
                 # Merge repository and contributor data
-                github_data = self._merge_repository_and_contributor_data(repository_data, contributor_data, github_username)
+                if contributor_data and repository_data:
+                    github_data = self._merge_repository_and_contributor_data(repository_data, contributor_data, github_username)
+                elif contributor_data:
+                    github_data = contributor_data
+                else:
+                    github_data = repository_data
             else:
                 logger.info(f"👤 Analyzing profile: {github_username}")
                 github_data = await self.github_service.analyze_github_profile(username=github_username, force_refresh=False)

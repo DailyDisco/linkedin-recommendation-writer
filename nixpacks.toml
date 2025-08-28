@@ -1,9 +1,8 @@
-# This nixpacks.toml is for monorepo deployment
-# For Railway, we recommend deploying backend and frontend as separate services
-# See RAILWAY_DEPLOYMENT.md for the recommended approach
+# Railway Monorepo Deployment Configuration
+# Deploys both backend and frontend in a single Railway project
 
 [phases.setup]
-nixPkgs = ["python311", "nodejs", "postgresql", "redis"]
+nixPkgs = ["python311", "nodejs_20", "postgresql", "redis"]
 
 [phases.install]
 cmds = [
@@ -13,7 +12,9 @@ cmds = [
 
 [phases.build]
 cmds = [
-  "cd frontend && npm run build"
+  "cd frontend && npm run build",
+  "mkdir -p backend/frontend_static",
+  "cp -r frontend/build/* backend/frontend_static/"
 ]
 
 [start]
