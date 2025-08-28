@@ -91,6 +91,12 @@ if [ -n "$HAS_FRONTEND" ]; then
     exit 1
   fi
 
+  # Run frontend formatting fix
+  if ! run_cmd "cd frontend && npm run prettier:fix" "Frontend formatting fix"; then
+    echo -e "${YELLOW}💡 Frontend formatting fix failed${NC}"
+    failed=1
+  fi
+
   # Run frontend linting
   if ! run_cmd "cd frontend && npm run lint" "Frontend linting"; then
     echo -e "${YELLOW}💡 Fix the linting issues above${NC}"

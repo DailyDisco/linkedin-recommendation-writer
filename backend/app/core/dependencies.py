@@ -1,7 +1,7 @@
 """Dependency injection container and providers."""
 
 import logging
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator
 
 from fastapi import HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -53,40 +53,42 @@ def get_request_id(request: Request) -> str:
 
 # Service Dependencies
 class ServiceContainer:
-    """Service container for dependency injection."""
+    """Service container for dependency injection with proper lifecycle management."""
 
-    _github_service: Optional[GitHubService] = None
-    _ai_service: Optional[AIService] = None
-    _recommendation_service: Optional[RecommendationService] = None
-    _repository_service: Optional[RepositoryService] = None
+    _instances: dict = {}
+
+    @classmethod
+    def _get_service(cls, service_name: str, service_class):
+        """Generic service getter with singleton pattern."""
+        if service_name not in cls._instances:
+            logger.info(f"Initializing {service_name} service")
+            cls._instances[service_name] = service_class()
+        return cls._instances[service_name]
 
     @classmethod
     def get_github_service(cls) -> GitHubService:
         """Get or create GitHub service instance."""
-        if cls._github_service is None:
-            cls._github_service = GitHubService()
-        return cls._github_service
+        return cls._get_service("github", GitHubService)
 
     @classmethod
     def get_ai_service(cls) -> AIService:
         """Get or create AI service instance."""
-        if cls._ai_service is None:
-            cls._ai_service = AIService()
-        return cls._ai_service
+        return cls._get_service("ai", AIService)
 
     @classmethod
     def get_recommendation_service(cls) -> RecommendationService:
         """Get or create recommendation service instance."""
-        if cls._recommendation_service is None:
-            cls._recommendation_service = RecommendationService()
-        return cls._recommendation_service
+        return cls._get_service("recommendation", RecommendationService)
 
     @classmethod
     def get_repository_service(cls) -> RepositoryService:
         """Get or create repository service instance."""
-        if cls._repository_service is None:
-            cls._repository_service = RepositoryService()
-        return cls._repository_service
+        return cls._get_service("repository", RepositoryService)
+
+    @classmethod
+    def clear_instances(cls):
+        """Clear all service instances (useful for testing)."""
+        cls._instances.clear()
 
 
 # Service provider functions

@@ -1,6 +1,7 @@
 """GitHub API endpoints."""
 
 import logging
+from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -16,6 +17,71 @@ from app.services.repository_service import RepositoryService
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _handle_api_error(error: Exception, operation: str, status_code: int = 500) -> None:
+    """Handle API errors consistently with logging and HTTP exceptions."""
+    logger.error(f"Error in {operation}: {error}")
+    if isinstance(error, HTTPException):
+        raise error
+    raise HTTPException(status_code=status_code, detail="Internal server error")
+
+
+def _build_github_profile_response(
+    user_data: dict,
+    repositories: list,
+    languages: list,
+    skills: dict,
+    analyzed_at: datetime,
+) -> GitHubProfileResponse:
+    """Build GitHubProfileResponse from raw analysis data."""
+    return GitHubProfileResponse(
+        github_username=user_data["github_username"],
+        github_id=user_data["github_id"],
+        full_name=user_data.get("full_name"),
+        bio=user_data.get("bio"),
+        company=user_data.get("company"),
+        location=user_data.get("location"),
+        email=user_data.get("email"),
+        blog=user_data.get("blog"),
+        avatar_url=user_data.get("avatar_url"),
+        public_repos=user_data["public_repos"],
+        followers=user_data["followers"],
+        following=user_data["following"],
+        public_gists=user_data["public_gists"],
+        repositories=[
+            RepositoryInfo(
+                name=repo["name"],
+                description=repo.get("description"),
+                language=repo.get("language"),
+                stars=repo.get("stars", 0),
+                forks=repo.get("forks", 0),
+                size=repo.get("size", 0),
+                created_at=repo["created_at"],
+                updated_at=repo["updated_at"],
+                topics=repo.get("topics", []),
+                url=repo["url"],
+            )
+            for repo in repositories
+        ],
+        languages=[
+            LanguageStats(
+                language=lang["language"],
+                percentage=lang["percentage"],
+                lines_of_code=lang["lines_of_code"],
+                repository_count=lang["repository_count"],
+            )
+            for lang in languages
+        ],
+        skills=SkillAnalysis(
+            technical_skills=skills["technical_skills"],
+            frameworks=skills["frameworks"],
+            tools=skills["tools"],
+            domains=skills["domains"],
+            soft_skills=skills["soft_skills"],
+        ),
+        last_analyzed=analyzed_at,
+    )
 
 
 class GitHubServiceHealthResponse(BaseModel):
@@ -108,61 +174,12 @@ async def analyze_github_profile(
         skills = analysis["skills"]
 
         # Convert to response format
-        response = GitHubProfileResponse(
-            github_username=user_data["github_username"],
-            github_id=user_data["github_id"],
-            full_name=user_data.get("full_name"),
-            bio=user_data.get("bio"),
-            company=user_data.get("company"),
-            location=user_data.get("location"),
-            email=user_data.get("email"),
-            blog=user_data.get("blog"),
-            avatar_url=user_data.get("avatar_url"),
-            public_repos=user_data["public_repos"],
-            followers=user_data["followers"],
-            following=user_data["following"],
-            public_gists=user_data["public_gists"],
-            repositories=[
-                RepositoryInfo(
-                    name=repo["name"],
-                    description=repo.get("description"),
-                    language=repo.get("language"),
-                    stars=repo.get("stars", 0),
-                    forks=repo.get("forks", 0),
-                    size=repo.get("size", 0),
-                    created_at=repo["created_at"],
-                    updated_at=repo["updated_at"],
-                    topics=repo.get("topics", []),
-                    url=repo["url"],
-                )
-                for repo in repositories
-            ],
-            languages=[
-                LanguageStats(
-                    language=lang["language"],
-                    percentage=lang["percentage"],
-                    lines_of_code=lang["lines_of_code"],
-                    repository_count=lang["repository_count"],
-                )
-                for lang in languages
-            ],
-            skills=SkillAnalysis(
-                technical_skills=skills["technical_skills"],
-                frameworks=skills["frameworks"],
-                tools=skills["tools"],
-                domains=skills["domains"],
-                soft_skills=skills["soft_skills"],
-            ),
-            last_analyzed=analysis["analyzed_at"],
-        )
+        response = _build_github_profile_response(user_data, repositories, languages, skills, analysis["analyzed_at"])
 
         return response
 
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.error(f"Error analyzing GitHub profile: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        _handle_api_error(e, "GitHub profile analysis")
 
 
 @router.get("/user/{username}", response_model=GitHubProfileResponse)
@@ -177,6 +194,8 @@ async def get_github_profile(
     request = GitHubAnalysisRequest(
         github_username=username,
         force_refresh=force_refresh,
+        analyze_repositories=True,
+        max_repositories=10,
     )
 
     return await analyze_github_profile(request, db, github_service)
@@ -205,11 +224,8 @@ async def get_repository_contributors(
 
         return RepositoryContributorsResponse(**result)
 
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.error(f"Error getting repository contributors: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        _handle_api_error(e, "repository contributors analysis")
 
 
 @router.get(

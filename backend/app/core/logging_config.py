@@ -10,9 +10,9 @@ from app.core.config import settings
 def setup_logging():
     """Setup application logging configuration."""
 
-    # Create logs directory if it doesn't exist
-    log_dir = Path("/app/logs")
-    log_dir.mkdir(exist_ok=True)
+    # Create logs directory if it doesn't exist (use relative path for local dev)
+    log_dir = Path("logs") if not settings.is_production else Path("/app/logs")
+    log_dir.mkdir(exist_ok=True, parents=True)
 
     # Configure root logger
     logging.basicConfig(
