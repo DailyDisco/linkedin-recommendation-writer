@@ -12,6 +12,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AppLayout } from './layout';
 import UIErrorBoundary from './components/ui/error-boundary';
 import './styles/index.css';
+import { AuthProvider } from './hooks/useAuth'; // Import AuthProvider
 
 // Create a client
 const queryClient = new QueryClient({
@@ -81,12 +82,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function App() {
+export default function Root() {
   return (
     <UIErrorBoundary>
-      <AppLayout>
-        <Outlet />
-      </AppLayout>
+      <AuthProvider>
+        <AppLayout>
+          <Outlet />
+        </AppLayout>
+      </AuthProvider>
     </UIErrorBoundary>
   );
 }

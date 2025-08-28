@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, EmailStr
@@ -31,6 +32,9 @@ class UserResponse(UserBase):
 
     id: int
     is_active: bool
+    recommendation_count: int
+    last_recommendation_date: Optional[datetime] = None
+    daily_limit: int
 
     class Config:
         orm_mode = True
