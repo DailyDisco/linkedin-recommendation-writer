@@ -1,0 +1,105 @@
+#!/bin/bash
+set -euo pipefail
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+# Function to run command and return status
+run_cmd() {
+  local cmd="$1"
+  local desc="$2"
+
+  echo -e "${BLUE}🔄 Running: ${NC}$desc"
+  echo -e "${CYAN}Command: ${NC}$cmd"
+
+  if eval "$cmd"; then
+    echo -e "${GREEN}✅ $desc completed successfully${NC}"
+    return 0
+  else
+    local exit_code=$?
+    echo -e "${RED}❌ $desc failed${NC}"
+    return $exit_code
+  fi
+}
+
+# Check if we're in a git repository
+if ! git rev-parse --git-dir >/dev/null 2>&1; then
+  echo -e "${RED}❌ Not in a git repository${NC}"
+  exit 1
+fi
+
+# Check if there are any staged files
+if [ -z "$(git diff --cached --name-only 2>/dev/null)" ]; then
+  echo -e "${YELLOW}⚠️  No staged files found. Skipping pre-commit checks.${NC}"
+  exit 0
+fi
+
+# Detect what types of files changed
+HAS_FRONTEND=$(git diff --cached --name-only | grep -E "\.(ts|tsx|js|jsx)$" || echo "")
+HAS_BACKEND=$(git diff --cached --name-only | grep -E "\.py$" || echo "")
+HAS_CONFIG=$(git diff --cached --name-only | grep -E "\.(json|yml|yaml|toml|md)$" || echo "")
+
+echo -e "${PURPLE}📋 Changed file types detected:${NC}"
+[ -n "$HAS_FRONTEND" ] && echo -e "   ${CYAN}Frontend files:${NC} ✅" || echo -e "   ${CYAN}Frontend files:${NC} ❌"
+[ -n "$HAS_BACKEND" ] && echo -e "   ${CYAN}Backend files:${NC} ✅" || echo -e "   ${CYAN}Backend files:${NC} ❌"
+[ -n "$HAS_CONFIG" ] && echo -e "   ${CYAN}Config files:${NC} ✅" || echo -e "   ${CYAN}Config files:${NC} ❌"
+
+failed=0
+
+# Backend checks (if backend files changed)
+if [ -n "$HAS_BACKEND" ]; then
+  echo -e "\n${PURPLE}🔧 Running backend checks...${NC}"
+
+  # Check if backend directory exists
+  if [ ! -d "backend" ]; then
+    echo -e "${RED}❌ Backend directory not found${NC}"
+    exit 1
+  fi
+
+  # Run backend formatting check
+  if ! run_cmd "cd backend && python -m black --check --diff app/" "Python formatting check"; then
+    echo -e "${YELLOW}💡 Run 'cd backend && python -m black app/' to fix formatting${NC}"
+    failed=1
+  fi
+
+  # Run backend linting check
+  if ! run_cmd "cd backend && python -m flake8 app/" "Python linting check"; then
+    echo -e "${YELLOW}💡 Fix the linting issues above${NC}"
+    failed=1
+  fi
+fi
+
+# Frontend checks (if frontend files changed)
+if [ -n "$HAS_FRONTEND" ]; then
+  echo -e "\n${PURPLE}🎨 Running frontend checks...${NC}"
+
+  # Check if frontend directory and package.json exist
+  if [ ! -d "frontend" ] || [ ! -f "frontend/package.json" ]; then
+    echo -e "${RED}❌ Frontend directory or package.json not found${NC}"
+    exit 1
+  fi
+
+  # Run frontend linting
+  if ! run_cmd "cd frontend && npm run lint" "Frontend linting"; then
+    echo -e "${YELLOW}💡 Fix the linting issues above${NC}"
+    failed=1
+  fi
+fi
+
+# Final status report
+echo -e "\n${PURPLE}📊 Pre-commit Summary:${NC}"
+
+if [ $failed -eq 1 ]; then
+  echo -e "${RED}❌ Some checks failed!${NC}"
+  echo -e "${YELLOW}🔧 Please fix the issues above and try again.${NC}"
+  exit 1
+else
+  echo -e "${GREEN}✅ All checks passed successfully!${NC}"
+  echo -e "${CYAN}🎉 Your code is ready for commit.${NC}"
+fi
