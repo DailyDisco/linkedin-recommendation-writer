@@ -1,15 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect } from 'react';
 
 /**
  * Custom hook for managing localStorage with type safety
  */
 export function useLocalStorage<T>(
   key: string,
-  initialValue: T,
+  initialValue: T
 ): [T, (value: T | ((val: T) => T)) => void] {
   // State to store our value
   const [storedValue, setStoredValue] = useState<T>(() => {
-    if (typeof window === "undefined") {
+    if (typeof window === 'undefined') {
       return initialValue;
     }
 
@@ -31,7 +31,7 @@ export function useLocalStorage<T>(
       setStoredValue(valueToStore);
 
       // Save to localStorage
-      if (typeof window !== "undefined") {
+      if (typeof window !== 'undefined') {
         window.localStorage.setItem(key, JSON.stringify(valueToStore));
       }
     } catch (error) {
@@ -47,12 +47,12 @@ export function useLocalStorage<T>(
  */
 export function usePersistedForm<T extends Record<string, any>>(
   key: string,
-  initialState: T,
+  initialState: T
 ): [T, (updates: Partial<T>) => void, () => void] {
   const [formData, setFormData] = useLocalStorage(key, initialState);
 
   const updateForm = (updates: Partial<T>) => {
-    setFormData((prev) => ({ ...prev, ...updates }));
+    setFormData(prev => ({ ...prev, ...updates }));
   };
 
   const resetForm = () => {
