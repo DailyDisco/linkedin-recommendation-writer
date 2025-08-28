@@ -1,10 +1,14 @@
+# This nixpacks.toml is for monorepo deployment
+# For Railway, we recommend deploying backend and frontend as separate services
+# See RAILWAY_DEPLOYMENT.md for the recommended approach
+
 [phases.setup]
-nixPkgs = ["python311", "postgresql", "redis"]
+nixPkgs = ["python311", "nodejs-20_x", "postgresql", "redis"]
 
 [phases.install]
 cmds = [
-  "pip install -r backend/requirements.txt",
-  "cd frontend && npm ci"
+  "python3 -m pip install --user -r backend/requirements.txt",
+  "cd frontend && npm ci --production=false"
 ]
 
 [phases.build]
@@ -13,4 +17,4 @@ cmds = [
 ]
 
 [start]
-cmd = "cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 4"
+cmd = "cd backend && python3 -m uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 4"

@@ -25,29 +25,42 @@ Before deploying, ensure you have:
 
 ## ⚡ Quick Deployment (5 minutes)
 
-### Option 1: One-Click Deploy
+### 🎯 Recommended: Separate Services (Best Practice)
 
-[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=https://github.com/YOUR_USERNAME/YOUR_REPO&envs=GITHUB_TOKEN,GEMINI_API_KEY&plugins=postgresql,redis)
+Deploy backend and frontend as separate Railway services for better performance and easier management:
 
-### Option 2: Manual Setup
+#### Backend Deployment:
 
 ```bash
-# 1. Connect your repository
+# 1. Deploy backend service
+cd backend
 railway login
-railway link
-
-# 2. Add required plugins
+railway init linkedin-recommendation-backend
 railway add postgresql
 railway add redis
-
-# 3. Set environment variables
 railway variables set GITHUB_TOKEN=your_github_token
 railway variables set GEMINI_API_KEY=your_gemini_api_key
 railway variables set ENVIRONMENT=production
-
-# 4. Deploy
 railway up
 ```
+
+#### Frontend Deployment:
+
+```bash
+# 2. Deploy frontend service
+cd ../frontend
+railway init linkedin-recommendation-frontend
+railway variables set VITE_API_BASE_URL=https://your-backend-url.railway.app
+railway up
+```
+
+### Option 2: Monorepo Deployment (Alternative)
+
+If you prefer deploying everything together:
+
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=https://github.com/YOUR_USERNAME/YOUR_REPO&envs=GITHUB_TOKEN,GEMINI_API_KEY&plugins=postgresql,redis)
+
+**Note**: Monorepo deployment may have pip installation issues. Separate services are recommended.
 
 ## 📝 Step-by-Step Setup
 
@@ -217,7 +230,34 @@ print('Gemini Key:', bool(settings.GEMINI_API_KEY))
 "
 ```
 
-#### 4. CORS Issues
+#### 4. Pip Installation Issues (Monorepo Deployment)
+
+If you encounter `pip: command not found` errors during monorepo deployment:
+
+**Solutions:**
+
+1. **Switch to Separate Services** (Recommended):
+
+   ```bash
+   # Deploy backend and frontend as separate services
+   ./deploy-to-railway.sh
+   ```
+
+2. **Fix Nixpacks Configuration**:
+
+   - Ensure Python is properly installed: `python311` in nixPkgs
+   - Use `python3 -m pip` instead of `pip`
+   - Add `--user` flag: `python3 -m pip install --user -r requirements.txt`
+
+3. **Manual Fix**:
+   ```bash
+   # Delete the problematic nixpacks.toml and deploy as separate services
+   rm nixpacks.toml
+   cd backend && railway init backend-project
+   cd ../frontend && railway init frontend-project
+   ```
+
+#### 5. CORS Issues
 
 Update `ALLOWED_ORIGINS` with your frontend URL:
 
