@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Github, FileText, History, Info } from 'lucide-react';
+import { Github, FileText, History, Info, Settings } from 'lucide-react';
 import { Logo } from './Logo';
 import { DesktopNavigation, type NavigationItem } from './DesktopNavigation';
 import { MobileNavigation } from './MobileNavigation';
@@ -8,6 +8,7 @@ import { MobileMenuButton } from './MobileMenuButton';
 const navigation: NavigationItem[] = [
   { name: 'Home', href: '/', icon: Github },
   { name: 'Get Contributors', href: '/generate', icon: FileText },
+  { name: 'Advanced', href: '/advanced', icon: Settings },
   { name: 'History', href: '/history', icon: History },
   { name: 'About', href: '/about', icon: Info },
 ];

@@ -20,20 +20,30 @@ import type {
 } from '../types';
 import ErrorBoundary from './ui/error-boundary';
 import { parseGitHubInput, validateGitHubInput } from '@/lib/utils';
+import { useRecommendationCount } from '../hooks/useLocalStorage';
 
 interface RecommendationModalProps {
   contributor: ContributorInfo;
   isOpen: boolean;
   onClose: () => void;
+  isLoggedIn: boolean;
 }
 
 export default function RecommendationModal({
   contributor,
   isOpen,
   onClose,
+  isLoggedIn,
 }: RecommendationModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const firstInputRef = useRef<HTMLTextAreaElement>(null);
+
+  const { count: anonRecommendationCount, incrementCount: incrementAnonCount } =
+    useRecommendationCount();
+  const ANONYMOUS_LIMIT = 1;
+
+  const [showLimitExceededMessage, setShowLimitExceededMessage] =
+    useState(false);
 
   // Log modal open/close events
   useEffect(() => {
@@ -49,10 +59,17 @@ export default function RecommendationModal({
       setTimeout(() => {
         firstInputRef.current?.focus();
       }, 100);
+
+      // Check anonymous limit only if not logged in
+      if (!isLoggedIn && anonRecommendationCount >= ANONYMOUS_LIMIT) {
+        setShowLimitExceededMessage(true);
+      } else {
+        setShowLimitExceededMessage(false);
+      }
     } else {
       console.log('🚪 FRONTEND: Recommendation modal closed');
     }
-  }, [isOpen, contributor]);
+  }, [isOpen, contributor, isLoggedIn, anonRecommendationCount]);
 
   // Handle escape key
   useEffect(() => {
@@ -198,6 +215,11 @@ export default function RecommendationModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!isLoggedIn && anonRecommendationCount >= ANONYMOUS_LIMIT) {
+      setShowLimitExceededMessage(true);
+      return;
+    }
+
     console.log('🚀 FRONTEND: Recommendation generation started');
     console.log('='.repeat(80));
     console.log('📋 Form data submitted:', {
@@ -267,6 +289,11 @@ Key Achievements: ${formData.notableAchievements}
 
       const optionsResponse = await recommendationApi.generateOptions(request);
 
+      // Increment count only if not logged in and generation was successful
+      if (!isLoggedIn) {
+        incrementAnonCount();
+      }
+
       const endTime = Date.now();
       const duration = (endTime - startTime) / 1000;
 
@@ -300,7 +327,6 @@ Key Achievements: ${formData.notableAchievements}
         message: errorDetails.message,
         code: errorDetails.code,
         fullError: err,
-        stack: errorDetails.stack,
       });
 
       // Provide more specific error messages based on error type
@@ -354,6 +380,10 @@ Key Achievements: ${formData.notableAchievements}
   };
 
   const handleOptionSelect = async (option: RecommendationOption) => {
+    if (!isLoggedIn && anonRecommendationCount >= ANONYMOUS_LIMIT) {
+      setShowLimitExceededMessage(true);
+      return;
+    }
     console.log('🎯 FRONTEND: Option selected:', {
       name: option.name,
       focus: option.focus,
@@ -372,6 +402,11 @@ Key Achievements: ${formData.notableAchievements}
         formData.analysis_type,
         formData.repository_url
       );
+
+      // Increment count only if not logged in and creation was successful
+      if (!isLoggedIn) {
+        incrementAnonCount();
+      }
 
       console.log('✅ FRONTEND: Recommendation created from option:', {
         id: recommendation.id,
@@ -407,6 +442,11 @@ Key Achievements: ${formData.notableAchievements}
       return;
     }
 
+    if (!isLoggedIn && anonRecommendationCount >= ANONYMOUS_LIMIT) {
+      setShowLimitExceededMessage(true);
+      return;
+    }
+
     console.log('🔄 FRONTEND: Starting regeneration process...');
     setIsRegenerating(true);
 
@@ -435,6 +475,11 @@ Key Achievements: ${formData.notableAchievements}
 
       const regeneratedRecommendation =
         await recommendationApi.regenerate(request);
+
+      // Increment count only if not logged in and regeneration was successful
+      if (!isLoggedIn) {
+        incrementAnonCount();
+      }
 
       const endTime = Date.now();
       const duration = (endTime - startTime) / 1000;
@@ -539,7 +584,27 @@ Key Achievements: ${formData.notableAchievements}
 
           {/* Content */}
           <div className='p-6'>
-            {step === 'form' && (
+            {showLimitExceededMessage ? (
+              <div className='text-center py-12'>
+                <AlertCircle className='w-16 h-16 text-red-500 mx-auto mb-4' />
+                <h3 className='text-2xl font-bold text-gray-900 mb-2'>
+                  Recommendation Limit Reached
+                </h3>
+                <p className='text-lg text-gray-700 mb-6'>
+                  You have used your one free recommendation for today.
+                </p>
+                <p className='text-gray-600 mb-6'>
+                  Please create an account to generate up to 3 recommendations
+                  per day.
+                </p>
+                <button
+                  onClick={onClose}
+                  className='px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-lg font-semibold'
+                >
+                  Create Account
+                </button>
+              </div>
+            ) : (
               <form onSubmit={handleSubmit} className='space-y-6'>
                 {/* GitHub Input Section */}
                 <div>
@@ -655,7 +720,7 @@ Key Achievements: ${formData.notableAchievements}
                         />
                         <span className='text-sm text-gray-600'>
                           <strong>Repository Only</strong> - Focus on specific
-                          repository (you'll be asked to provide one)
+                          repository (you&apos;ll be asked to provide one)
                         </span>
                       </label>
                     </div>
@@ -949,8 +1014,8 @@ Key Achievements: ${formData.notableAchievements}
                   Generating Recommendation Options
                 </h3>
                 <p className='text-gray-600 mb-4'>
-                  Analyzing {contributor.username}'s GitHub profile and creating
-                  multiple options...
+                  Analyzing {contributor.username}&apos;s GitHub profile and
+                  creating multiple options...
                 </p>
                 <div className='bg-gray-200 rounded-full h-2 w-64 mx-auto mb-4'>
                   <div
@@ -983,8 +1048,8 @@ Key Achievements: ${formData.notableAchievements}
 
                 <p className='text-gray-600'>
                   Here are 3 different recommendation options based on{' '}
-                  {contributor.username}'s GitHub profile. Each option has a
-                  different focus area. Choose the one that best fits your
+                  {contributor.username}&apos;s GitHub profile. Each option has
+                  a different focus area. Choose the one that best fits your
                   needs.
                 </p>
 
@@ -1121,7 +1186,7 @@ Key Achievements: ${formData.notableAchievements}
                       Want to refine this recommendation?
                     </h4>
                     <p className='text-sm text-gray-600 mb-3'>
-                      Provide specific instructions for how you'd like the
+                      Provide specific instructions for how you&apos;d like the
                       recommendation modified.
                     </p>
                     <textarea

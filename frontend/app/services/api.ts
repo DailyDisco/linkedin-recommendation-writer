@@ -16,6 +16,20 @@ const api = axios.create({
   timeout: 60000, // Increased to 60 seconds for AI generation
 });
 
+// Add a request interceptor to include the auth token
+api.interceptors.request.use(
+  config => {
+    const token = localStorage.getItem('accessToken'); // Placeholder: Replace with actual token retrieval
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  error => {
+    return Promise.reject(error);
+  }
+);
+
 export const githubApi = {
   analyzeProfile: async (username: string): Promise<GitHubProfile> => {
     const response = await api.post('/github/analyze', {
@@ -48,6 +62,30 @@ export const githubApi = {
 };
 
 export const recommendationApi = {
+  login: async (
+    username: string,
+    password: string
+  ): Promise<{ access_token: string }> => {
+    const response = await api.post('/auth/login', {
+      username,
+      password,
+    });
+    return response.data;
+  },
+
+  register: async (
+    username: string,
+    email: string,
+    password: string
+  ): Promise<{ access_token: string }> => {
+    const response = await api.post('/auth/register', {
+      username,
+      email,
+      password,
+    });
+    return response.data;
+  },
+
   generate: async (request: RecommendationRequest): Promise<Recommendation> => {
     const response = await api.post('/recommendations/generate', request);
     return response.data;
@@ -92,6 +130,20 @@ export const recommendationApi = {
 
   getById: async (id: number): Promise<Recommendation> => {
     const response = await api.get(`/recommendations/${id}`);
+    return response.data;
+  },
+
+  getUserDetails: async (): Promise<{
+    id: number;
+    email: string;
+    username: string;
+    full_name: string;
+    is_active: boolean;
+    recommendation_count: number;
+    last_recommendation_date: string | null;
+    daily_limit: number;
+  }> => {
+    const response = await api.get('/users/me');
     return response.data;
   },
 };
