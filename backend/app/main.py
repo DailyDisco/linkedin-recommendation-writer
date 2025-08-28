@@ -7,14 +7,14 @@ LinkedIn recommendations.
 """
 
 import logging
+import os
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator, Any, Dict, Union
+from typing import Any, AsyncGenerator, Dict, Union
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-import os
 
 from app.api.v1 import api_router
 from app.core.config import settings

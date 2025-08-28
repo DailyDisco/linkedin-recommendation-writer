@@ -2,7 +2,7 @@
 
 import logging
 import re
-from typing import AsyncGenerator, Any, TypeVar, cast
+from typing import Any, AsyncGenerator, TypeVar, cast
 
 from fastapi import HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
