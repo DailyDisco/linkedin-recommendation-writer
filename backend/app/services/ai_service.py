@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, cast
 from app.core.config import settings
 from app.core.redis_client import get_cache, set_cache
 
+# Handle optional Google Generative AI import
 try:
     import google.generativeai as genai
 
