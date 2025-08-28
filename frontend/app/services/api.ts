@@ -9,11 +9,10 @@ import type {
   RegenerateRequest,
 } from '../types';
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 const api = axios.create({
-  baseURL: `${API_BASE_URL}/api/v1`,
+  baseURL: API_BASE_URL ? `${API_BASE_URL}/api/v1` : '/api/v1',
   timeout: 60000, // Increased to 60 seconds for AI generation
 });
 

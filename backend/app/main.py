@@ -133,9 +133,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include API routes
-app.include_router(api_router, prefix="/api/v1")
-
 
 # Health check endpoint (must be defined BEFORE frontend routes)
 @app.get("/health", response_model=None)
@@ -232,9 +229,17 @@ async def health_check() -> Union[Dict[str, Any], JSONResponse]:
     return response_data
 
 
+# Include API routes (AFTER health check, BEFORE static files)
+app.include_router(api_router, prefix="/api/v1")
+
+
 # Mount static files for frontend (only if frontend build exists)
+# Mount BEFORE API routes to avoid conflicts
 frontend_build_path = os.path.join(os.path.dirname(__file__), "..", "frontend_static")
 if os.path.exists(frontend_build_path):
+    # Mount static files for assets
+    app.mount("/assets", StaticFiles(directory=os.path.join(frontend_build_path, "assets")), name="assets")
+    # Mount root static files (including index.html) - without html=True to avoid API conflicts
     app.mount("/", StaticFiles(directory=frontend_build_path, html=True), name="frontend")
 
     @app.get("/{path:path}", response_model=None)
