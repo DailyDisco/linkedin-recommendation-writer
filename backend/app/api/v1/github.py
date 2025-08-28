@@ -4,7 +4,8 @@ import logging
 from typing import Optional
 
 from app.core.dependencies import get_database_session, get_github_service, get_repository_service, validate_github_username
-from app.schemas.github import GitHubAnalysisRequest, GitHubProfileResponse
+from app.schemas.github import (GitHubAnalysisRequest, GitHubProfileResponse,
+                                  LanguageStats, RepositoryInfo, SkillAnalysis)
 from app.schemas.repository import (RepositoryContributorsRequest,
                                     RepositoryContributorsResponse)
 from app.services.github_service import GitHubService
@@ -122,36 +123,36 @@ async def analyze_github_profile(
             following=user_data["following"],
             public_gists=user_data["public_gists"],
             repositories=[
-                {
-                    "name": repo["name"],
-                    "description": repo.get("description"),
-                    "language": repo.get("language"),
-                    "stars": repo.get("stars", 0),
-                    "forks": repo.get("forks", 0),
-                    "size": repo.get("size", 0),
-                    "created_at": repo["created_at"],
-                    "updated_at": repo["updated_at"],
-                    "topics": repo.get("topics", []),
-                    "url": repo["url"]
-                }
+                RepositoryInfo(
+                    name=repo["name"],
+                    description=repo.get("description"),
+                    language=repo.get("language"),
+                    stars=repo.get("stars", 0),
+                    forks=repo.get("forks", 0),
+                    size=repo.get("size", 0),
+                    created_at=repo["created_at"],
+                    updated_at=repo["updated_at"],
+                    topics=repo.get("topics", []),
+                    url=repo["url"]
+                )
                 for repo in repositories
             ],
             languages=[
-                {
-                    "language": lang["language"],
-                    "percentage": lang["percentage"],
-                    "lines_of_code": lang["lines_of_code"],
-                    "repository_count": lang["repository_count"]
-                }
+                LanguageStats(
+                    language=lang["language"],
+                    percentage=lang["percentage"],
+                    lines_of_code=lang["lines_of_code"],
+                    repository_count=lang["repository_count"]
+                )
                 for lang in languages
             ],
-            skills={
-                "technical_skills": skills["technical_skills"],
-                "frameworks": skills["frameworks"],
-                "tools": skills["tools"],
-                "domains": skills["domains"],
-                "soft_skills": skills["soft_skills"]
-            },
+            skills=SkillAnalysis(
+                technical_skills=skills["technical_skills"],
+                frameworks=skills["frameworks"],
+                tools=skills["tools"],
+                domains=skills["domains"],
+                soft_skills=skills["soft_skills"]
+            ),
             last_analyzed=analysis["analyzed_at"]
         )
 
@@ -175,7 +176,9 @@ async def get_github_profile(
 
     request = GitHubAnalysisRequest(
         github_username=username,
-        force_refresh=force_refresh
+        force_refresh=force_refresh,
+        analyze_repositories=True,
+        max_repositories=10
     )
 
     return await analyze_github_profile(request, db, github_service)

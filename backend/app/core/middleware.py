@@ -3,7 +3,7 @@
 import logging
 import time
 import uuid
-from typing import Callable
+from typing import Callable, Dict
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -74,7 +74,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         
-        if settings.is_production:
+        if settings.ENVIRONMENT == "production":
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         
         return response
@@ -86,7 +86,7 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
     def __init__(self, app, requests_per_minute: int = 60):
         super().__init__(app)
         self.requests_per_minute = requests_per_minute
-        self.requests = {}  # In production, use Redis
+        self.requests: Dict[str, int] = {}  # In production, use Redis
         
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         if not settings.ENABLE_RATE_LIMITING:
@@ -96,10 +96,10 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
         current_time = int(time.time() / 60)  # Current minute
         
         # Clean old entries
-        self.requests = {k: v for k, v in self.requests.items() if k[1] >= current_time - 1}
-        
+        self.requests = {k: v for k, v in self.requests.items() if int(k.split(":")[1]) >= current_time - 1}
+
         # Count requests for this client in current minute
-        key = (client_ip, current_time)
+        key = f"{client_ip}:{current_time}"
         count = self.requests.get(key, 0)
         
         if count >= self.requests_per_minute:

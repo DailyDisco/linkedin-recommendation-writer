@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 try:
     import google.generativeai as genai
 except ImportError:
-    genai = None
+    genai = None  # type: ignore
 
 from app.core.config import settings
 from app.core.redis_client import get_cache, set_cache
@@ -46,7 +46,7 @@ class AIService:
             raise ValueError("Gemini AI not configured")
 
         try:
-            if settings.is_development:
+            if settings.ENVIRONMENT == "development":
                 logger.info("🧠 AI SERVICE: Building initial prompt...")
 
             # Build the initial prompt
@@ -60,7 +60,7 @@ class AIService:
                 specific_skills=specific_skills
             )
 
-            if settings.is_development:
+            if settings.ENVIRONMENT == "development":
                 logger.info(f"✅ Prompt built with {len(initial_prompt)} characters")
 
             # Check cache for final result
@@ -71,7 +71,7 @@ class AIService:
                 logger.info("Cache hit for AI recommendation")
                 return cached_result
 
-            if settings.is_development:
+            if settings.ENVIRONMENT == "development":
                 logger.info("🚀 CACHE MISS: Starting multi-option generation...")
 
             # Generate 3 different recommendation options
@@ -317,7 +317,7 @@ class AIService:
 
     def _calculate_confidence_score(self, github_data: Dict[str, Any], generated_content: str) -> int:
         """Calculate dynamic confidence score based on data quality and content."""
-        score = 0
+        score: float = 0.0
         max_score = 100
         
         # Data completeness score (40 points max)
@@ -387,14 +387,17 @@ class AIService:
             # Create customized prompt for this option
             option_prompt = self._build_option_prompt(
                 initial_prompt,
-                config["custom_instruction"],
-                config["focus"]
+                str(config["custom_instruction"]),
+                str(config["focus"])
             )
 
             # Generate the option
+            temp_modifier = config.get("temperature_modifier", 0.7)
+            temp_modifier = float(temp_modifier) if isinstance(temp_modifier, (int, float, str)) else 0.7
+
             option_content = await self._generate_single_option(
                 option_prompt,
-                config["temperature_modifier"]
+                temp_modifier
             )
 
             option_end = time.time()

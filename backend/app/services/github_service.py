@@ -852,7 +852,7 @@ class GitHubService:
             }
         
         # Repository analysis
-        repo_counts = {}
+        repo_counts: Dict[str, int] = {}
         for commit in commits:
             repo_name = commit.get("repository", "unknown")
             repo_counts[repo_name] = repo_counts.get(repo_name, 0) + 1
@@ -1158,7 +1158,7 @@ class GitHubService:
 
             # Extract frameworks and tools from commit messages and file names
             frameworks = []
-            tools = []
+            tools: List[str] = []
             domains = []
 
             # Common framework patterns
@@ -1276,7 +1276,7 @@ class GitHubService:
             primary_strength = max(pattern_counts.items(), key=lambda x: x[1])[0] if pattern_counts else None
 
             # Analyze file types and technologies
-            file_extensions = {}
+            file_extensions: Dict[str, int] = {}
             for commit in commits:
                 for file_info in commit.get("files", []):
                     filename = file_info.get("filename", "")

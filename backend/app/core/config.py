@@ -93,7 +93,6 @@ class Settings(BaseSettings):
     ENABLE_TRACING: bool = Field(default=False, description="Enable request tracing")
 
     @computed_field
-    @property
     def cors_origins(self) -> List[str]:
         """Get CORS origins as a list."""
         if not self.ALLOWED_ORIGINS.strip():
@@ -101,13 +100,11 @@ class Settings(BaseSettings):
         return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",")]
 
     @computed_field
-    @property
     def is_development(self) -> bool:
         """Check if running in development mode."""
         return self.ENVIRONMENT == "development"
 
     @computed_field
-    @property
     def is_production(self) -> bool:
         """Check if running in production mode."""
         return self.ENVIRONMENT == "production"

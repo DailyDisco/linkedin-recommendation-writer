@@ -140,9 +140,9 @@ async def create_recommendation_from_option(
         recommendation = await recommendation_service.create_recommendation_from_option(
             db=db,
             github_username=request.github_username,
-            selected_option=request.selected_option,
-            all_options=request.all_options,
-            analysis_type=request.analysis_type,
+            selected_option=request.selected_option.model_dump(),
+            all_options=[option.model_dump() for option in request.all_options],
+            analysis_type=request.analysis_type or "profile",
             repository_url=request.repository_url
         )
 

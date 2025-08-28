@@ -110,7 +110,7 @@ class RecommendationService:
             save_start = time.time()
             
             recommendation_data = RecommendationCreate(
-                github_profile_id=github_profile.id,
+                github_profile_id=int(github_profile.id),
                 title=ai_result["title"],
                 content=ai_result["content"],
                 recommendation_type=recommendation_type,
@@ -504,7 +504,7 @@ class RecommendationService:
             save_start = time.time()
 
             recommendation_data = RecommendationCreate(
-                github_profile_id=github_profile.id,
+                github_profile_id=int(github_profile.id),
                 title=ai_result["title"],
                 content=ai_result["content"],
                 recommendation_type=recommendation_type,
@@ -712,7 +712,7 @@ class RecommendationService:
             }
 
             recommendation_data = RecommendationCreate(
-                github_profile_id=github_profile.id,
+                github_profile_id=int(github_profile.id),
                 title=selected_option.get("title", f"Professional Recommendation for {github_username}"),
                 content=selected_option["content"],
                 recommendation_type=generation_parameters.get("recommendation_type", "professional"),

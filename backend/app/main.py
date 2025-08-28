@@ -61,8 +61,8 @@ app = FastAPI(
     title="LinkedIn Recommendation Writer",
     description="Generate professional LinkedIn recommendations using GitHub data and AI",
     version="1.0.0",
-    docs_url="/docs" if not settings.is_production else None,
-    redoc_url="/redoc" if not settings.is_production else None,
+    docs_url="/docs" if settings.ENVIRONMENT != "production" else None,
+    redoc_url="/redoc" if settings.ENVIRONMENT != "production" else None,
     debug=settings.API_DEBUG,
     lifespan=lifespan,
 )
@@ -83,7 +83,7 @@ if settings.ENABLE_RATE_LIMITING:
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
+    allow_origins=settings.cors_origins,  # type: ignore
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
@@ -220,7 +220,7 @@ if __name__ == "__main__":
         "app.main:app",
         host=settings.API_HOST,
         port=settings.API_PORT,
-        reload=settings.API_RELOAD and not settings.is_production,
-        workers=settings.API_WORKERS if settings.is_production else 1,
+        reload=settings.API_RELOAD and settings.ENVIRONMENT != "production",
+        workers=settings.API_WORKERS if settings.ENVIRONMENT == "production" else 1,
         log_level=settings.LOG_LEVEL.lower(),
     )

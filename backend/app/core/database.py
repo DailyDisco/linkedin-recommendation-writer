@@ -1,6 +1,7 @@
 """Database configuration and utilities."""
 
 import logging
+from typing import AsyncGenerator
 
 from app.core.config import settings
 from sqlalchemy import text
@@ -29,7 +30,7 @@ class Base(DeclarativeBase):
     pass
 
 
-async def get_db() -> AsyncSession:
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """
     Dependency to get database session.
     DEPRECATED: Use get_database_session from dependencies module instead.
