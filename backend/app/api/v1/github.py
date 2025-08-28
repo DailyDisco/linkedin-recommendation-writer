@@ -7,23 +7,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import (
-    get_database_session,
-    get_github_service,
-    get_repository_service,
-    validate_github_username,
-)
-from app.schemas.github import (
-    GitHubAnalysisRequest,
-    GitHubProfileResponse,
-    LanguageStats,
-    RepositoryInfo,
-    SkillAnalysis,
-)
-from app.schemas.repository import (
-    RepositoryContributorsRequest,
-    RepositoryContributorsResponse,
-)
+from app.core.dependencies import get_database_session, get_github_service, get_repository_service, validate_github_username
+from app.schemas.github import GitHubAnalysisRequest, GitHubProfileResponse, LanguageStats, RepositoryInfo, SkillAnalysis
+from app.schemas.repository import RepositoryContributorsRequest, RepositoryContributorsResponse
 from app.services.github_service import GitHubService
 from app.services.repository_service import RepositoryService
 

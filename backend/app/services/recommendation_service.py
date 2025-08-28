@@ -9,11 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.github_profile import GitHubProfile
 from app.models.recommendation import Recommendation
-from app.schemas.recommendation import (
-    RecommendationCreate,
-    RecommendationOptionsResponse,
-    RecommendationResponse,
-)
+from app.schemas.recommendation import RecommendationCreate, RecommendationOptionsResponse, RecommendationResponse
 from app.services.ai_service import AIService
 from app.services.github_service import GitHubService
 

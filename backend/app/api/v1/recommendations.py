@@ -6,12 +6,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import (
-    PaginationParams,
-    get_database_session,
-    get_pagination_params,
-    get_recommendation_service,
-)
+from app.core.dependencies import PaginationParams, get_database_session, get_pagination_params, get_recommendation_service
 from app.schemas.recommendation import (
     RecommendationFromOptionRequest,
     RecommendationListResponse,
