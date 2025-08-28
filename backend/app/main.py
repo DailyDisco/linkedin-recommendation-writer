@@ -234,8 +234,23 @@ async def health_check() -> Union[Dict[str, Any], JSONResponse]:
 
 # Mount static files for frontend (only if frontend build exists)
 frontend_build_path = os.path.join(os.path.dirname(__file__), "..", "frontend_static")
+logger.info(f"🔍 Checking frontend build path: {frontend_build_path}")
 if os.path.exists(frontend_build_path):
+    logger.info(f"✅ Frontend build directory exists: {frontend_build_path}")
+    # List contents of frontend_static directory
+    try:
+        contents = os.listdir(frontend_build_path)
+        logger.info(f"📁 Frontend static files: {contents}")
+        if "index.html" in contents:
+            logger.info("✅ index.html found in frontend_static")
+        else:
+            logger.error("❌ index.html NOT found in frontend_static")
+    except Exception as e:
+        logger.error(f"❌ Error listing frontend_static contents: {e}")
     app.mount("/", StaticFiles(directory=frontend_build_path, html=True), name="frontend")
+    logger.info("✅ Frontend static files mounted successfully")
+else:
+    logger.error(f"❌ Frontend build directory does not exist: {frontend_build_path}")
 
     @app.get("/{path:path}", response_model=None)
     async def serve_frontend(path: str) -> Union[JSONResponse, FileResponse]:
