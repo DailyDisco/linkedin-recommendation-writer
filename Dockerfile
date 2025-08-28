@@ -31,6 +31,7 @@ WORKDIR /app/frontend
 
 # Fix path aliases for Docker build - handle different directory levels
 RUN find app/components/ui -name "*.tsx" -o -name "*.ts" | xargs sed -i 's|@/lib/utils|../../lib/utils|g' && \
+    find app/components/navigation -name "*.tsx" -o -name "*.ts" | xargs sed -i 's|@/lib/utils|../../lib/utils|g' && \
     find app/components -name "*.tsx" -o -name "*.ts" | xargs sed -i 's|@/lib/utils|../lib/utils|g' && \
     find app -maxdepth 1 -name "*.tsx" -o -name "*.ts" | xargs sed -i 's|@/lib/utils|./lib/utils|g'
 
