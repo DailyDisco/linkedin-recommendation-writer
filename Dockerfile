@@ -40,10 +40,12 @@ RUN npm ci --production=false && npm run build
 
 # Copy built frontend to backend static directory
 RUN mkdir -p /app/frontend_static && \
-    if [ -d "build" ]; then \
-        cp -r build/* /app/frontend_static/; \
+    if [ -d "build/client" ]; then \
+        cp -r build/client/* /app/frontend_static/ && \
+        cp index.html /app/frontend_static/ && \
+        echo "Frontend client assets and index.html copied successfully"; \
     else \
-        echo "Build directory not found" && ls -la && exit 1; \
+        echo "Client build directory not found" && ls -la build/ && exit 1; \
     fi
 
 # Set working directory back to app root
