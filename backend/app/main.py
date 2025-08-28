@@ -136,42 +136,8 @@ app.add_middleware(
 # Include API routes
 app.include_router(api_router, prefix="/api/v1")
 
-# Mount static files for frontend (only if frontend build exists)
-frontend_build_path = os.path.join(os.path.dirname(__file__), "..", "frontend_static")
-if os.path.exists(frontend_build_path):
-    app.mount("/", StaticFiles(directory=frontend_build_path, html=True), name="frontend")
 
-    @app.get("/{path:path}", response_model=None)
-    async def serve_frontend(path: str) -> Union[JSONResponse, FileResponse]:
-        """Serve frontend for SPA routing."""
-        # If the path is an API route, let it pass through
-        if path.startswith("api/") or path in ["docs", "redoc"]:
-            return JSONResponse(status_code=404, content={"error": "Not found"})
-
-        # Try to serve the file if it exists
-        file_path = os.path.join(frontend_build_path, path)
-        if os.path.isfile(file_path):
-            return FileResponse(file_path)
-
-        # For SPA routing, serve index.html for all non-API routes
-        index_path = os.path.join(frontend_build_path, "index.html")
-        if os.path.exists(index_path):
-            return FileResponse(index_path)
-
-        return JSONResponse(status_code=404, content={"error": "Not found"})
-
-
-@app.get("/")
-async def root() -> Dict[str, Any]:
-    """Root endpoint."""
-    return {
-        "message": "LinkedIn Recommendation Writer API",
-        "version": "1.0.0",
-        "docs": "/docs",
-        "status": "running",
-    }
-
-
+# Health check endpoint (must be defined BEFORE frontend routes)
 @app.get("/health", response_model=None)
 async def health_check() -> Union[Dict[str, Any], JSONResponse]:
     """Health check endpoint for Docker and load balancers."""
@@ -264,6 +230,42 @@ async def health_check() -> Union[Dict[str, Any], JSONResponse]:
         return JSONResponse(status_code=status_code, content=response_data)
 
     return response_data
+
+
+# Mount static files for frontend (only if frontend build exists)
+frontend_build_path = os.path.join(os.path.dirname(__file__), "..", "frontend_static")
+if os.path.exists(frontend_build_path):
+    app.mount("/", StaticFiles(directory=frontend_build_path, html=True), name="frontend")
+
+    @app.get("/{path:path}", response_model=None)
+    async def serve_frontend(path: str) -> Union[JSONResponse, FileResponse]:
+        """Serve frontend for SPA routing."""
+        # If the path is an API route, let it pass through
+        if path.startswith("api/") or path in ["docs", "redoc"]:
+            return JSONResponse(status_code=404, content={"error": "Not found"})
+
+        # Try to serve the file if it exists
+        file_path = os.path.join(frontend_build_path, path)
+        if os.path.isfile(file_path):
+            return FileResponse(file_path)
+
+        # For SPA routing, serve index.html for all non-API routes
+        index_path = os.path.join(frontend_build_path, "index.html")
+        if os.path.exists(index_path):
+            return FileResponse(index_path)
+
+        return JSONResponse(status_code=404, content={"error": "Not found"})
+
+
+@app.get("/")
+async def root() -> Dict[str, Any]:
+    """Root endpoint."""
+    return {
+        "message": "LinkedIn Recommendation Writer API",
+        "version": "1.0.0",
+        "docs": "/docs",
+        "status": "running",
+    }
 
 
 # Custom exception handlers
