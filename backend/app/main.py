@@ -141,7 +141,7 @@ frontend_build_path = os.path.join(os.path.dirname(__file__), "..", "frontend_st
 if os.path.exists(frontend_build_path):
     app.mount("/", StaticFiles(directory=frontend_build_path, html=True), name="frontend")
 
-    @app.get("/{path:path}")
+    @app.get("/{path:path}", response_model=None)
     async def serve_frontend(path: str) -> Union[JSONResponse, FileResponse]:
         """Serve frontend for SPA routing."""
         # If the path is an API route, let it pass through
