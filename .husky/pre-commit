@@ -61,6 +61,12 @@ failed=0
 # Frontend checks (if frontend files changed)
 if [ "$HAS_FRONTEND" = "true" ]; then
   echo "🎨 Running frontend checks..."
+
+  # Auto-format code with Prettier first
+  (run_cmd "cd frontend && npm run prettier:fix" "Prettier auto-formatting") &
+  pid_prettier=$!
+
+  # Then run tests
   (run_cmd "npm run test:frontend" "Frontend tests") &
   pid1=$!
 else
@@ -96,6 +102,7 @@ echo "⏳ Waiting for all checks to complete..."
 
 # Wait for frontend checks if they were started
 if [ "$HAS_FRONTEND" = "true" ]; then
+  if ! wait "$pid_prettier"; then failed=1; fi
   if ! wait "$pid1"; then failed=1; fi
 fi
 

@@ -15,18 +15,9 @@ This application analyzes GitHub profiles and generates personalized, profession
 - 🚀 **Fast Results**: Intelligent caching for quick responses
 - 🔒 **Privacy-Focused**: Only uses public GitHub data
 
-## 🚀 One Command Setup
+## 🚀 Quick Setup
 
-**Get everything running with a single command!**
-
-The one-command setup automatically:
-
-- ✅ Checks system requirements (Docker, Docker Compose)
-- ✅ Creates `.env` file from template if needed
-- ✅ Builds all Docker images with optimized caching
-- ✅ Starts all services (frontend, backend, database, Redis)
-- ✅ Shows service status and access URLs
-- ✅ Provides helpful next steps
+**Get everything running with simple commands!**
 
 ### Quick Start (Recommended)
 
@@ -35,89 +26,74 @@ git clone <repository-url>
 cd linkedin-recommendation-writer-app
 cp env.template .env
 # Edit .env with your API keys (GITHUB_TOKEN, GEMINI_API_KEY)
-./start.sh
+make setup
 ```
 
 **That's it!** Your application will be running at:
 
-- **Frontend**: http://localhost:5173
-- **Backend**: http://localhost:8000
-- **API Docs**: http://localhost:8000/docs
+- **Frontend**: <http://localhost:5173>
+- **Backend**: <http://localhost:8000>
+- **API Docs**: <http://localhost:8000/docs>
 
 ### What happens during setup?
 
-1. **System Check**: Verifies Docker and Docker Compose are installed
-2. **Environment Setup**: Creates `.env` file if missing
-3. **Dependency Installation**: Builds Docker images with all dependencies
-4. **Service Startup**: Starts frontend, backend, database, and Redis
-5. **Health Checks**: Waits for services to be ready
-6. **Status Display**: Shows all running services and their URLs
+1. **Environment Setup**: Creates `.env` file if missing (do this manually)
+2. **Build**: Builds all Docker images with optimized caching
+3. **Startup**: Starts frontend, backend, database, and Redis services
+4. **Status Display**: Shows service status and access URLs
 
 ### After Setup
 
 ```bash
 # View logs
-./setup.sh dev logs
+make logs
 
 # Stop services
-./setup.sh dev stop
+make down
 
 # Run tests
-./setup.sh test test
+make test
 
 # Clean up everything
-./setup.sh clean
+make clean
+
+# Get help with all available commands
+make help
 ```
 
-### Even Easier Commands (Optional)
-
-For the ultimate convenience, load the aliases:
+### Development Workflow
 
 ```bash
-source .aliases.sh
+# Start services
+make up
 
-# Now you can use ultra-short commands:
-q           # Quick start
-dev         # Full development setup
-prod        # Full production setup
-l           # Show logs
-test        # Run tests
-up          # Start services
-down        # Stop services
-clean       # Clean up
-```
+# Start with logs (don't detach)
+make up-logs
 
-### Advanced Setup Options
+# Restart services
+make restart
 
-#### Using the Full Setup Script
+# View status
+make status
 
-```bash
-# Development environment (default)
-./setup.sh dev setup
+# Access service shells
+make shell-frontend    # Frontend container
+make shell-backend     # Backend container
 
-# Production environment
-./setup.sh prod setup
-
-# Testing environment
-./setup.sh test setup
-
-# Other commands
-./setup.sh dev logs       # Show logs
-./setup.sh dev stop       # Stop services
-./setup.sh dev status     # Show status
-./setup.sh test test      # Run tests
-./setup.sh clean          # Clean up everything
+# Database operations
+make db-connect        # Connect to database
+make db-migrate        # Run migrations
 ```
 
 #### Manual Setup (Alternative)
 
-**Prerequisites**
+##### Prerequisites
 
 - Docker and Docker Compose
 - GitHub Personal Access Token
 - Google Gemini API Key
 
-**Setup Steps**
+##### Setup Steps
 
 1. **Clone and configure**:
 
@@ -137,17 +113,21 @@ clean       # Clean up
 3. **Start the application**:
 
    ```bash
-   # Development mode
-   docker-compose up -d
+   # Development mode (recommended)
+   make setup
+
+   # Or build and start separately
+   make build
+   make up
 
    # Production mode
-   docker-compose -f docker-compose.prod.yml up -d
+   make setup-prod
    ```
 
 4. **Access the application**:
-   - **Frontend**: http://localhost:5173
-   - **Backend**: http://localhost:8000
-   - **API Documentation**: http://localhost:8000/docs
+   - **Frontend**: <http://localhost:5173>
+   - **Backend**: <http://localhost:8000>
+   - **API Documentation**: <http://localhost:8000/docs>
 
 ## Environment Configuration
 
@@ -231,12 +211,19 @@ npm run dev
 ### Database Management
 
 ```bash
-# Initialize database
-docker-compose exec backend python -c "from app.core.database import init_database; import asyncio; asyncio.run(init_database())"
+# Initialize database (via container)
+make shell-backend
+# Then run: python -c "from app.core.database import init_database; import asyncio; asyncio.run(init_database())"
+
+# Or connect directly to database
+make db-connect
+
+# Run migrations
+make db-migrate
 
 # View logs
-docker-compose logs backend
-docker-compose logs frontend
+make logs-backend
+make logs-frontend
 ```
 
 ## Troubleshooting
@@ -254,7 +241,7 @@ Use the included troubleshooting script:
 1. **GitHub API Rate Limits**:
 
    - Ensure your GitHub token has correct permissions
-   - Check rate limit status at https://api.github.com/rate_limit
+   - Check rate limit status at <https://api.github.com/rate_limit>
 
 2. **Gemini API Errors**:
 
@@ -272,10 +259,17 @@ Use the included troubleshooting script:
 
 ## Production Deployment
 
-1. **Use production compose file**:
+1. **Use production setup**:
 
    ```bash
-   docker-compose -f docker-compose.prod.yml up -d
+   make setup-prod
+   ```
+
+   Or manually:
+
+   ```bash
+   make prod-build
+   make prod-up
    ```
 
 2. **Configure environment**:
@@ -286,10 +280,59 @@ Use the included troubleshooting script:
    - Configure SSL certificates if needed
 
 3. **Security considerations**:
+
    - Change default passwords
    - Use environment-specific secrets
    - Configure firewall rules
    - Set up monitoring and logging
+
+4. **Production commands**:
+
+   ```bash
+   make prod-logs      # View production logs
+   make prod-down      # Stop production services
+   make prod-up-logs   # Start with logs
+   ```
+
+## Makefile Commands
+
+The Makefile provides convenient commands for development and deployment:
+
+### Development Commands
+
+- `make setup` - Complete development setup (build + start)
+- `make build` - Build all services
+- `make up` - Start all services
+- `make down` - Stop all services
+- `make logs` - Show all service logs
+- `make status` - Show service status
+- `make restart` - Restart all services
+
+### Testing & Quality
+
+- `make test` - Run frontend tests
+- `make test-frontend` - Run frontend tests only
+- `make test-coverage` - Run tests with coverage
+- `make lint-frontend` - Lint frontend code
+- `make format-frontend` - Format frontend code
+
+### Production Commands
+
+- `make setup-prod` - Complete production setup
+- `make prod-build` - Build for production
+- `make prod-up` - Start production services
+- `make prod-down` - Stop production services
+- `make prod-logs` - Show production logs
+
+### Utility Commands
+
+- `make clean` - Remove all containers, volumes, and images
+- `make clean-volumes` - Remove all volumes
+- `make shell-frontend` - Open shell in frontend container
+- `make shell-backend` - Open shell in backend container
+- `make db-connect` - Connect to development database
+- `make info` - Show useful information and URLs
+- `make help` - Show all available commands
 
 ## License
 

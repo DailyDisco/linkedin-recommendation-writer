@@ -16,6 +16,10 @@ run_cmd() {
   fi
 }
 
+# Run code formatting checks first
+echo "💅 Checking code formatting..."
+run_cmd "cd frontend && npm run prettier:check" "Prettier formatting check" || exit 1
+
 # Run comprehensive tests in parallel before push
 echo "🧪 Running frontend and backend tests in parallel..."
 
