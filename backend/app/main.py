@@ -177,7 +177,7 @@ async def health_check() -> Union[Dict[str, Any], JSONResponse]:
     """Health check endpoint for Docker and load balancers."""
     logger.info("🏥 Health check requested")
 
-    checks = {"api": "ok", "environment": settings.ENVIRONMENT, "timestamp": "2024-01-01T00:00:00Z"}
+    checks: Dict[str, Any] = {"api": "ok", "environment": settings.ENVIRONMENT, "timestamp": "2024-01-01T00:00:00Z"}
 
     overall_status = "healthy"
     status_code = 200
