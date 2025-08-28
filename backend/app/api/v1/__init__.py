@@ -2,8 +2,13 @@
 
 from fastapi import APIRouter
 
-from app.api.v1 import github, recommendations
+from app.api.v1.auth import router as auth_router
+from app.api.v1.github import router as github_router
+from app.api.v1.recommendations import router as recommendations_router
+from app.api.v1.users import router as users_router
 
 api_router = APIRouter()
-api_router.include_router(github.router, prefix="/github", tags=["github"])
-api_router.include_router(recommendations.router, prefix="/recommendations", tags=["recommendations"])
+api_router.include_router(auth_router, prefix="/auth", tags=["Authentication"])
+api_router.include_router(github_router, prefix="/github", tags=["GitHub"])
+api_router.include_router(recommendations_router, prefix="/recommendations", tags=["Recommendations"])
+api_router.include_router(users_router, prefix="/users", tags=["Users"])

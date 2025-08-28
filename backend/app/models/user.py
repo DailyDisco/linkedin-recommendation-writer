@@ -17,9 +17,14 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=True)
     username = Column(String, unique=True, index=True, nullable=True)
     full_name = Column(String, nullable=True)
+    hashed_password = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Recommendation limits
+    recommendation_count = Column(Integer, default=0)  # Number of recommendations created today
+    last_recommendation_date = Column(DateTime, nullable=True)  # Last date a recommendation was created
 
     # Relationships
     github_profiles = relationship("GitHubProfile", back_populates="user")

@@ -14,6 +14,7 @@ from app.services.ai_service import AIService
 from app.services.github_service import GitHubService
 from app.services.recommendation_service import RecommendationService
 from app.services.repository_service import RepositoryService
+from app.services.user_service import UserService
 
 T = TypeVar("T")
 
@@ -89,6 +90,11 @@ class ServiceContainer:
         return cls._get_service("repository", RepositoryService)
 
     @classmethod
+    def get_user_service(cls) -> UserService:
+        """Get or create user service instance."""
+        return cls._get_service("user", UserService)
+
+    @classmethod
     def clear_instances(cls) -> None:
         """Clear all service instances (useful for testing)."""
         cls._instances.clear()
@@ -113,6 +119,11 @@ def get_recommendation_service() -> RecommendationService:
 def get_repository_service() -> RepositoryService:
     """Dependency provider for repository service."""
     return ServiceContainer.get_repository_service()
+
+
+def get_user_service() -> UserService:
+    """Dependency provider for user service."""
+    return ServiceContainer.get_user_service()
 
 
 # Validation Dependencies

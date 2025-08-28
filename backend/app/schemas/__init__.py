@@ -1,17 +1,41 @@
 """Pydantic schemas package."""
 
-from app.schemas.github import GitHubAnalysisRequest, GitHubProfileResponse
-from app.schemas.recommendation import RecommendationCreate, RecommendationRequest, RecommendationResponse
-from app.schemas.repository import ContributorInfo, RepositoryContributorsRequest, RepositoryContributorsResponse, RepositoryInfo
+from .github import GitHubAnalysisRequest, GitHubProfileResponse, LanguageStats, SkillAnalysis
+from .recommendation import (
+    KeywordRefinementRequest,
+    ReadmeGenerationRequest,
+    ReadmeGenerationResponse,
+    RecommendationCreate,
+    RecommendationFromOptionRequest,
+    RecommendationListResponse,
+    RecommendationOption,
+    RecommendationOptionsResponse,
+    RecommendationRequest,
+    RecommendationResponse,
+)
+from .repository import RepositoryInfo, RepositoryMetrics
+from .user import Token, TokenData, UserCreate, UserLogin, UserResponse
 
 __all__ = [
-    "GitHubProfileResponse",
     "GitHubAnalysisRequest",
+    "GitHubProfileResponse",
+    "LanguageStats",
+    "RepositoryInfo",
+    "SkillAnalysis",
+    "KeywordRefinementRequest",
+    "RecommendationCreate",
+    "RecommendationFromOptionRequest",
+    "RecommendationListResponse",
+    "RecommendationOption",
+    "RecommendationOptionsResponse",
     "RecommendationRequest",
     "RecommendationResponse",
-    "RecommendationCreate",
-    "RepositoryContributorsRequest",
-    "RepositoryContributorsResponse",
-    "ContributorInfo",
-    "RepositoryInfo",
+    "ReadmeGenerationRequest",
+    "ReadmeGenerationResponse",
+    "RepositoryMetrics",
+    "Token",
+    "TokenData",
+    "UserCreate",
+    "UserLogin",
+    "UserResponse",
 ]
