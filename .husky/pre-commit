@@ -1,0 +1,119 @@
+#!/bin/bash
+
+# Cache directory for expensive operations
+CACHE_DIR=".husky/cache"
+mkdir -p "$CACHE_DIR"
+
+# Function to check cache validity (within last 5 minutes)
+is_cache_valid() {
+  local cache_file="$1"
+  local max_age=300  # 5 minutes in seconds
+
+  if [ -f "$cache_file" ]; then
+    local cache_time=$(stat -c %Y "$cache_file" 2>/dev/null || stat -f %m "$cache_file" 2>/dev/null)
+    local current_time=$(date +%s)
+    local age=$((current_time - cache_time))
+
+    [ $age -lt $max_age ]
+  else
+    return 1
+  fi
+}
+
+# Function to mark cache as valid
+update_cache() {
+  local cache_file="$1"
+  touch "$cache_file"
+}
+
+# Function to check if files with specific patterns are staged
+has_staged_files() {
+  local patterns="$1"
+  git diff --cached --name-only | grep -E "$patterns" > /dev/null 2>&1
+}
+
+# Function to run command and return status
+run_cmd() {
+  local cmd="$1"
+  local desc="$2"
+  echo "🔄 Running: $desc"
+  if eval "$cmd"; then
+    echo "✅ $desc completed successfully"
+    return 0
+  else
+    echo "❌ $desc failed"
+    return 1
+  fi
+}
+
+# Detect what types of files changed
+HAS_FRONTEND=$(has_staged_files "\.(ts|tsx|js|jsx)$" && echo "true" || echo "false")
+HAS_BACKEND=$(has_staged_files "\.py$" && echo "true" || echo "false")
+HAS_CONFIG=$(has_staged_files "\.(json|yml|yaml|toml|md)$" && echo "true" || echo "false")
+
+echo "📋 Changed file types detected:"
+echo "   Frontend files: $HAS_FRONTEND"
+echo "   Backend files: $HAS_BACKEND"
+echo "   Config files: $HAS_CONFIG"
+
+failed=0
+
+# Frontend checks (if frontend files changed)
+if [ "$HAS_FRONTEND" = "true" ]; then
+  echo "🎨 Running frontend checks..."
+  (run_cmd "npm run test:frontend" "Frontend tests") &
+  pid1=$!
+else
+  echo "⏭️  Skipping frontend checks (no frontend files changed)"
+fi
+
+# Backend checks (if backend files changed OR if this is a comprehensive check)
+if [ "$HAS_BACKEND" = "true" ] || [ "$HAS_CONFIG" = "true" ]; then
+  echo "🔧 Running backend checks..."
+  (run_cmd "npm run test:backend" "Backend tests") &
+  pid2=$!
+
+  (run_cmd "npm run format:backend" "Python formatting check") &
+  pid3=$!
+
+  (run_cmd "npm run vet:backend" "Python linting check") &
+  pid4=$!
+else
+  echo "⏭️  Skipping backend checks (no backend or config files changed)"
+fi
+
+# Security audit with caching (only if cache is stale)
+if ! is_cache_valid "$CACHE_DIR/security_audit"; then
+  (run_cmd "npm run audit" "Security vulnerability check") &
+  pid5=$!
+  update_cache "$CACHE_DIR/security_audit"
+else
+  echo "⏭️  Skipping security audit (cached result still valid)"
+fi
+
+# Wait for all parallel processes to complete
+echo "⏳ Waiting for all checks to complete..."
+
+# Wait for frontend checks if they were started
+if [ "$HAS_FRONTEND" = "true" ]; then
+  if ! wait "$pid1"; then failed=1; fi
+fi
+
+# Wait for backend checks if they were started
+if [ "$HAS_BACKEND" = "true" ] || [ "$HAS_CONFIG" = "true" ]; then
+  if ! wait "$pid2"; then failed=1; fi
+  if ! wait "$pid3"; then failed=1; fi
+  if ! wait "$pid4"; then failed=1; fi
+fi
+
+# Wait for security audit if it was started
+if [ -n "$pid5" ]; then
+  if ! wait "$pid5"; then failed=1; fi
+fi
+
+if [ $failed -eq 1 ]; then
+  echo "❌ Some checks failed!"
+  exit 1
+else
+  echo "✅ All checks passed!"
+fi

@@ -1,0 +1,43 @@
+#!/bin/bash
+
+echo "🚀 Running pre-push safety checks..."
+
+# Function to run command and return status
+run_cmd() {
+  local cmd="$1"
+  local desc="$2"
+  echo "🔄 Running: $desc"
+  if eval "$cmd"; then
+    echo "✅ $desc completed successfully"
+    return 0
+  else
+    echo "❌ $desc failed"
+    return 1
+  fi
+}
+
+# Run comprehensive tests in parallel before push
+echo "🧪 Running frontend and backend tests in parallel..."
+
+failed=0
+
+# Run frontend tests in background
+(run_cmd "npm run test:frontend" "Frontend test suite") &
+pid1=$!
+
+# Run backend tests in background
+(run_cmd "npm run test:backend" "Backend test suite") &
+pid2=$!
+
+# Wait for both tests to complete
+echo "⏳ Waiting for test results..."
+
+if ! wait "$pid1"; then failed=1; fi
+if ! wait "$pid2"; then failed=1; fi
+
+if [ $failed -eq 1 ]; then
+  echo "❌ Pre-push checks failed! Push blocked."
+  exit 1
+else
+  echo "✅ All pre-push checks passed! Safe to push."
+fi

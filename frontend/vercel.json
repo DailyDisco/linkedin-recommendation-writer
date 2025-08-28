@@ -1,0 +1,11 @@
+{
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "buildCommand": "react-router build",
+  "outputDirectory": "build/client",
+  "installCommand": "npm install"
+}

@@ -1,0 +1,16 @@
+# Dependency directories
+backend/venv/
+frontend/node_modules/
+
+# Build/output directories
+frontend/dist/
+backend/__pycache__/
+
+# Log files
+logs/
+
+# Environment variables
+.env
+
+# Editor/IDE specific files
+.vscode/

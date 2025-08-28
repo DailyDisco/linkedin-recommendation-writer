@@ -1,0 +1,291 @@
+name: Complete CI
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+# Cancel in-progress runs for the same workflow and branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+  PYTHON_VERSION: '3.11'
+  FRONTEND_DIR: ./frontend
+  BACKEND_DIR: ./backend
+
+jobs:
+  # Frontend Security Check
+  frontend-security:
+    name: Frontend Security
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: ${{ env.FRONTEND_DIR }}/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ${{ env.FRONTEND_DIR }}
+
+      - name: Run security audit
+        run: npm audit --audit-level=moderate
+        working-directory: ${{ env.FRONTEND_DIR }}
+
+  # Frontend Quality Checks
+  frontend-quality:
+    name: Frontend Quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: ${{ env.FRONTEND_DIR }}/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ${{ env.FRONTEND_DIR }}
+
+      - name: Check formatting
+        run: npm run prettier:check
+        working-directory: ${{ env.FRONTEND_DIR }}
+
+      - name: Run type checking
+        run: npm run typecheck
+        working-directory: ${{ env.FRONTEND_DIR }}
+
+  # Frontend Testing
+  frontend-test:
+    name: Frontend Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: ${{ env.FRONTEND_DIR }}/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ${{ env.FRONTEND_DIR }}
+
+      - name: Run tests (fast mode)
+        run: npm run test:fast
+        working-directory: ${{ env.FRONTEND_DIR }}
+
+  # Backend Linting and Formatting
+  backend-lint:
+    name: Backend Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: ${{ env.BACKEND_DIR }}/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+        working-directory: ${{ env.BACKEND_DIR }}
+
+      - name: Run linting (flake8)
+        run: flake8 app/ --count --select=E9,F63,F7,F82 --show-source --statistics
+        working-directory: ${{ env.BACKEND_DIR }}
+
+      - name: Run type checking (mypy)
+        run: mypy app/ --ignore-missing-imports
+        working-directory: ${{ env.BACKEND_DIR }}
+
+      - name: Check code formatting (black)
+        run: black --check --diff app/
+        working-directory: ${{ env.BACKEND_DIR }}
+
+      - name: Check import sorting (isort)
+        run: isort --check-only --diff app/
+        working-directory: ${{ env.BACKEND_DIR }}
+
+  # Backend Security
+  backend-security:
+    name: Backend Security
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: ${{ env.BACKEND_DIR }}/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+        working-directory: ${{ env.BACKEND_DIR }}
+
+      - name: Install security tools
+        run: pip install safety bandit
+        working-directory: ${{ env.BACKEND_DIR }}
+
+      - name: Run safety (vulnerability scanning)
+        run: safety check
+        working-directory: ${{ env.BACKEND_DIR }}
+
+      - name: Run bandit (security linting)
+        run: bandit -r app/ -f json -o bandit-report.json || true
+        working-directory: ${{ env.BACKEND_DIR }}
+
+  # Backend Testing
+  backend-test:
+    name: Backend Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: ${{ env.BACKEND_DIR }}/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+        working-directory: ${{ env.BACKEND_DIR }}
+
+      - name: Run tests
+        run: |
+          echo "🧪 Running Python tests..."
+          # Skip tests if no test files exist (faster execution)
+          if find . -name "test_*.py" -o -name "*_test.py" | grep -q .; then
+            pytest -v --tb=short
+          else
+            echo "✅ No Python test files found - skipping tests"
+          fi
+        shell: bash
+        working-directory: ${{ env.BACKEND_DIR }}
+
+  # Frontend Build
+  frontend-build:
+    name: Frontend Build
+    runs-on: ubuntu-latest
+    needs: [frontend-security, frontend-quality, frontend-test]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: ${{ env.FRONTEND_DIR }}/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ${{ env.FRONTEND_DIR }}
+
+      - name: Build frontend
+        run: npm run build
+        working-directory: ${{ env.FRONTEND_DIR }}
+
+      - name: Upload frontend build
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: ${{ env.FRONTEND_DIR }}/build/
+          retention-days: 30
+
+  # Backend Build
+  backend-build:
+    name: Backend Build
+    runs-on: ubuntu-latest
+    needs: [backend-lint, backend-security, backend-test]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: ${{ env.BACKEND_DIR }}/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+        working-directory: ${{ env.BACKEND_DIR }}
+
+      - name: Validate Python app can start
+        run: |
+          echo "🔍 Validating Python app can start..."
+          python -c "import app.main; print('✅ App imports successfully')"
+        working-directory: ${{ env.BACKEND_DIR }}
+
+      - name: Create Python package (optional)
+        run: |
+          echo "📦 Creating Python package..."
+          pip install build
+          python -m build --wheel
+        working-directory: ${{ env.BACKEND_DIR }}
+        continue-on-error: true
+
+      - name: Upload Python build artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-build
+          path: |
+            ${{ env.BACKEND_DIR }}/dist/
+            ${{ env.BACKEND_DIR }}/build/
+          retention-days: 30
+
+  # Final summary
+  summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    needs: [frontend-build, backend-build]
+    if: always()
+    steps:
+      - name: Generate summary
+        run: |
+          echo "## 🚀 CI Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Component | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend Build | ${{ needs.frontend-build.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Backend Build | ${{ needs.backend-build.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [[ "${{ needs.frontend-build.result }}" == "success" && "${{ needs.backend-build.result }}" == "success" ]]; then
+            echo "🎉 **All CI checks passed!**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Some CI checks failed. Please review the failed jobs.**" >> $GITHUB_STEP_SUMMARY
+          fi
+        shell: bash

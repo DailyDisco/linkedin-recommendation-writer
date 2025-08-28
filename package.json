@@ -1,0 +1,23 @@
+{
+  "name": "github_repo_linkedin_recommendation_writer_app",
+  "version": "1.0.0",
+  "description": "Generate professional LinkedIn recommendations using GitHub data and AI.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prepare": "husky",
+    "test:frontend": "cd frontend && npm test",
+    "test:backend": "cd backend && python -m pytest",
+    "format:backend": "cd backend && black .",
+    "vet:backend": "cd backend && flake8 .",
+    "audit": "npm audit --audit-level=moderate",
+    "lint:frontend": "cd frontend && npm run lint",
+    "build:frontend": "cd frontend && npm run build"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "husky": "^9.1.7"
+  }
+}

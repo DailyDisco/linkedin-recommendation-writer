@@ -1,0 +1,210 @@
+# Full Stack Docker Compose for LinkedIn Recommendation Writer
+# This configuration runs both frontend and backend services together
+
+services:
+  # Frontend React Application
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development # Use 'production' for production builds
+    container_name: linkedin-recommender-frontend
+    ports:
+      - "5173:5173" # Vite dev server (development mode)
+    environment:
+      # API Configuration
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+      VITE_API_TIMEOUT: ${VITE_API_TIMEOUT:-30000}
+
+      # Environment
+      NODE_ENV: ${NODE_ENV:-development}
+
+    volumes:
+      # Mount source code for development (live reload enabled)
+      - ./frontend:/app
+      # Mount node_modules from container to avoid conflicts
+      - /app/node_modules
+
+    depends_on:
+      backend:
+        condition: service_healthy
+
+    networks:
+      - linkedin-recommender-network
+
+    restart: unless-stopped
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5173/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    # Development-specific configuration
+    stdin_open: true
+    tty: true
+
+  # Backend API Service
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development # Use 'production' for production builds
+    container_name: linkedin-recommender-backend
+    ports:
+      - "8000:8000"
+    environment:
+      # Database Configuration
+      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-github_recommender}
+
+      # Redis Configuration
+      REDIS_URL: redis://redis:6379/0
+
+      # API Configuration
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
+      API_DEBUG: ${API_DEBUG:-false}
+      API_RELOAD: ${API_RELOAD:-true}
+
+      # GitHub API (set in .env file)
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
+
+      # Gemini AI API (set in .env file)
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash-lite}
+
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
+      # Initialization flags
+      INIT_DB: ${INIT_DB:-true}
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-false}
+
+      # CORS Origins - Allow frontend access
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173}
+
+    volumes:
+      # Mount source code for development (comment out for production)
+      - ./backend:/app
+      # Mount config file
+      - ./backend/config.yaml:/app/config.yaml:ro
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+    networks:
+      - linkedin-recommender-network
+
+    restart: unless-stopped
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: linkedin-recommender-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-github_recommender}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+
+    volumes:
+      # Persistent database storage
+      - postgres_data:/var/lib/postgresql/data
+      # Optional: Custom initialization scripts
+      - ./backend/docker/postgres-init:/docker-entrypoint-initdb.d:ro
+
+    networks:
+      - linkedin-recommender-network
+
+    restart: unless-stopped
+
+    # Health check
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-github_recommender}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+    # Performance tuning for development
+    command: >
+      postgres
+      -c shared_preload_libraries=pg_stat_statements
+      -c pg_stat_statements.track=all
+      -c max_connections=200
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c maintenance_work_mem=64MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: linkedin-recommender-redis
+    command: >
+      redis-server 
+      --appendonly yes 
+      --appendfsync everysec
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --tcp-keepalive 60
+      --timeout 300
+
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+
+    volumes:
+      # Persistent Redis data
+      - redis_data:/data
+      # Optional: Custom Redis configuration
+      - ./backend/docker/redis.conf:/usr/local/etc/redis/redis.conf:ro
+
+    networks:
+      - linkedin-recommender-network
+
+    restart: unless-stopped
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+# Named volumes for data persistence
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+# Custom network
+networks:
+  linkedin-recommender-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

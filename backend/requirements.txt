@@ -1,0 +1,60 @@
+# FastAPI and server
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+
+# Database
+asyncpg==0.29.0
+sqlalchemy[asyncio]==2.0.23
+alembic==1.13.0
+
+# Redis
+redis==5.0.1
+
+# HTTP requests
+httpx==0.25.2
+aiohttp==3.9.1
+
+# AI/ML
+google-generativeai==0.3.2
+
+# Environment and configuration
+python-dotenv==1.0.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# Authentication and security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6
+
+# Date and time
+python-dateutil==2.8.2
+
+# Testing (development)
+pytest==7.4.3
+pytest-asyncio==0.21.1
+
+# Code formatting (development)
+black==23.11.0
+isort==5.12.0
+flake8==6.1.0
+mypy==1.7.1
+
+# GitHub API
+PyGithub==1.59.1
+
+# Data processing
+pandas==2.1.4
+numpy==1.25.2
+
+# Logging
+structlog==23.2.0
+
+# Background tasks
+celery==5.3.4
+
+# Monitoring and metrics (optional)
+prometheus-client==0.19.0
+
+# CORS (built into FastAPI, this package is not needed)
+# fastapi-cors==0.0.6
