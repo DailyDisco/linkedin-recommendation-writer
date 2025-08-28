@@ -3,7 +3,6 @@
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -58,7 +57,7 @@ async def check_github_service_health(
             )
 
         # Try to get rate limit information
-        rate_limit_info = None
+        # rate_limit_info = ...  # Removed unused variable
         try:
             rate_limit = github_service.github_client.get_rate_limit()
             rate_limit_remaining = rate_limit.core.remaining
@@ -117,7 +116,7 @@ async def analyze_github_profile(
             )
 
         user_data = analysis["user_data"]
-        repositories = analysis["repositories"]
+        # repositories = ...  # Removed unused variable
         languages = analysis["languages"]
         skills = analysis["skills"]
 
@@ -191,14 +190,16 @@ async def get_github_profile(
     request = GitHubAnalysisRequest(
         github_username=username,
         force_refresh=force_refresh,
-        analyze_repositories=True,
-        max_repositories=10,
+        analyze_# repositories = ...  # Removed unused variable
+        max_# repositories = ...  # Removed unused variable
     )
 
     return await analyze_github_profile(request, db, github_service)
 
 
-@router.post("/repository/contributors", response_model=RepositoryContributorsResponse)
+@router.post(
+    "/repository/contributors", response_model=RepositoryContributorsResponse
+)
 async def get_repository_contributors(
     request: RepositoryContributorsRequest,
     db: AsyncSession = Depends(get_database_session),

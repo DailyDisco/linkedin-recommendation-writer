@@ -35,7 +35,10 @@ class NotFoundError(BaseApplicationError):
     """Raised when a requested resource is not found."""
 
     def __init__(
-        self, resource: str, identifier: str, details: Optional[Dict[str, Any]] = None
+        self,
+        resource: str,
+        identifier: str,
+        details: Optional[Dict[str, Any]] = None,
     ):
         message = f"{resource} with identifier '{identifier}' not found"
         super().__init__(message, "NOT_FOUND", details)
@@ -88,10 +91,15 @@ class DatabaseError(BaseApplicationError):
     """Raised when database operations fail."""
 
     def __init__(
-        self, operation: str, message: str, details: Optional[Dict[str, Any]] = None
+        self,
+        operation: str,
+        message: str,
+        details: Optional[Dict[str, Any]] = None,
     ):
         super().__init__(
-            f"Database {operation} failed: {message}", "DATABASE_ERROR", details
+            f"Database {operation} failed: {message}",
+            "DATABASE_ERROR",
+            details,
         )
         self.operation = operation
 
@@ -119,10 +127,15 @@ class RateLimitError(BaseApplicationError):
     """Raised when rate limits are exceeded."""
 
     def __init__(
-        self, service: str, limit: str, details: Optional[Dict[str, Any]] = None
+        self,
+        service: str,
+        limit: str,
+        details: Optional[Dict[str, Any]] = None,
     ):
         super().__init__(
-            f"Rate limit exceeded for {service}: {limit}", "RATE_LIMIT_ERROR", details
+            f"Rate limit exceeded for {service}: {limit}",
+            "RATE_LIMIT_ERROR",
+            details,
         )
         self.service = service
         self.limit = limit
@@ -132,7 +145,10 @@ class ConfigurationError(BaseApplicationError):
     """Raised when there are configuration issues."""
 
     def __init__(
-        self, setting: str, message: str, details: Optional[Dict[str, Any]] = None
+        self,
+        setting: str,
+        message: str,
+        details: Optional[Dict[str, Any]] = None,
     ):
         super().__init__(
             f"Configuration error for '{setting}': {message}",

@@ -2,13 +2,10 @@
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
 
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.github_profile import GitHubProfile
-from app.models.recommendation import Recommendation
 from app.schemas.recommendation import (
     RecommendationCreate,
     RecommendationOptionsResponse,
@@ -74,11 +71,13 @@ class RecommendationService:
                     f"Could not analyze GitHub profile for {github_username}"
                 )
 
-            logger.info(f"✅ GitHub analysis successful:")
+            logger.info("✅ GitHub analysis successful:")
             logger.info(
                 f"   • Repositories: {len(github_data.get('repositories', []))}"
             )
-            logger.info(f"   • Languages: {len(github_data.get('languages', []))}")
+            logger.info(
+                f"   • Languages: {len(github_data.get('languages', []))}"
+            )
             logger.info(
                 f"   • Commits analyzed: {github_data.get('commit_analysis', {}).get('total_commits_analyzed', 0)}"
             )
@@ -88,7 +87,9 @@ class RecommendationService:
             logger.info("-" * 50)
             db_start = time.time()
 
-            github_profile = await self._get_or_create_github_profile(db, github_data)
+            github_profile = await self._get_or_create_github_profile(
+                db, github_data
+            )
 
             db_end = time.time()
             logger.info(
@@ -117,10 +118,14 @@ class RecommendationService:
             logger.info(
                 f"⏱️  AI generation completed in {ai_end - ai_start:.2f} seconds"
             )
-            logger.info(f"✅ AI recommendation generated:")
-            logger.info(f"   • Content length: {len(ai_result['content'])} characters")
+            logger.info("✅ AI recommendation generated:")
+            logger.info(
+                f"   • Content length: {len(ai_result['content'])} characters"
+            )
             logger.info(f"   • Word count: {ai_result['word_count']}")
-            logger.info(f"   • Confidence score: {ai_result['confidence_score']}")
+            logger.info(
+                f"   • Confidence score: {ai_result['confidence_score']}"
+            )
 
             # Create recommendation record
             logger.info("💾 STEP 4: SAVING RECOMMENDATION")
@@ -162,7 +167,7 @@ class RecommendationService:
             logger.info("🎉 RECOMMENDATION CREATION SUMMARY")
             logger.info("-" * 50)
             logger.info(f"⏱️  Total processing time: {total_time:.2f} seconds")
-            logger.info(f"📊 Breakdown:")
+            logger.info("📊 Breakdown:")
             logger.info(
                 f"   • GitHub Analysis: {github_end - github_start:.2f}s ({((github_end - github_start)/total_time)*100:.1f}%)"
             )
@@ -182,7 +187,9 @@ class RecommendationService:
             logger.error(
                 f"💥 ERROR in recommendation creation for {github_username}: {e}"
             )
-            logger.error(f"⏱️  Failed after {time.time() - start_time:.2f} seconds")
+            logger.error(
+                f"⏱️  Failed after {time.time() - start_time:.2f} seconds"
+            )
             await db.rollback()
             raise
 
@@ -199,7 +206,9 @@ class RecommendationService:
         query = select(Recommendation).join(GitHubProfile)
 
         if github_username:
-            query = query.where(GitHubProfile.github_username == github_username)
+            query = query.where(
+                GitHubProfile.github_username == github_username
+            )
 
         if recommendation_type:
             query = query.where(
@@ -207,7 +216,9 @@ class RecommendationService:
             )
 
         query = (
-            query.order_by(desc(Recommendation.created_at)).limit(limit).offset(offset)
+            query.order_by(desc(Recommendation.created_at))
+            .limit(limit)
+            .offset(offset)
         )
 
         result = await db.execute(query)
@@ -234,7 +245,9 @@ class RecommendationService:
     ) -> Optional[RecommendationResponse]:
         """Get a specific recommendation by ID."""
 
-        query = select(Recommendation).where(Recommendation.id == recommendation_id)
+        query = select(Recommendation).where(
+            Recommendation.id == recommendation_id
+        )
         result = await db.execute(query)
         recommendation = result.scalar_one_or_none()
 
@@ -270,7 +283,9 @@ class RecommendationService:
             username = user_data["github_username"]
 
         # Check if profile exists
-        query = select(GitHubProfile).where(GitHubProfile.github_username == username)
+        query = select(GitHubProfile).where(
+            GitHubProfile.github_username == username
+        )
         result = await db.execute(query)
         existing_profile = result.scalar_one_or_none()
 
@@ -278,20 +293,29 @@ class RecommendationService:
             # Update existing profile - exclude datetime fields for direct assignment
             datetime_fields = {"created_at", "updated_at", "last_analyzed"}
             for key, value in user_data.items():
-                if hasattr(existing_profile, key) and key not in datetime_fields:
+                if (
+                    hasattr(existing_profile, key)
+                    and key not in datetime_fields
+                ):
                     setattr(existing_profile, key, value)
 
             # Handle datetime fields separately
             if "created_at" in user_data:
-                existing_profile.created_at = parse_datetime(user_data["created_at"])
+                existing_profile.created_at = parse_datetime(
+                    user_data["created_at"]
+                )
             if "updated_at" in user_data:
-                existing_profile.updated_at = parse_datetime(user_data["updated_at"])
+                existing_profile.updated_at = parse_datetime(
+                    user_data["updated_at"]
+                )
 
             # Update analysis data
             existing_profile.repositories_data = github_data["repositories"]
             existing_profile.languages_data = github_data["languages"]
             existing_profile.skills_analysis = github_data["skills"]
-            existing_profile.last_analyzed = parse_datetime(github_data["analyzed_at"])
+            existing_profile.last_analyzed = parse_datetime(
+                github_data["analyzed_at"]
+            )
 
             await db.commit()
             await db.refresh(existing_profile)
@@ -374,9 +398,13 @@ class RecommendationService:
                 )
 
                 # Analyze the specific contributor's profile
-                logger.info(f"👤 Analyzing contributor profile: {github_username}")
-                contributor_data = await self.github_service.analyze_github_profile(
-                    username=github_username, force_refresh=False
+                logger.info(
+                    f"👤 Analyzing contributor profile: {github_username}"
+                )
+                contributor_data = (
+                    await self.github_service.analyze_github_profile(
+                        username=github_username, force_refresh=False
+                    )
                 )
 
                 # Merge repository and contributor data
@@ -411,7 +439,7 @@ class RecommendationService:
                     )
 
             if analysis_type == "repo_only":
-                logger.info(f"✅ Repository analysis successful:")
+                logger.info("✅ Repository analysis successful:")
                 logger.info(
                     f"   • Repository: {github_data.get('repository_info', {}).get('name', 'N/A')}"
                 )
@@ -422,11 +450,13 @@ class RecommendationService:
                     f"   • Commits analyzed: {len(github_data.get('commits', []))}"
                 )
             else:
-                logger.info(f"✅ Profile analysis successful:")
+                logger.info("✅ Profile analysis successful:")
                 logger.info(
                     f"   • Repositories: {len(github_data.get('repositories', []))}"
                 )
-                logger.info(f"   • Languages: {len(github_data.get('languages', []))}")
+                logger.info(
+                    f"   • Languages: {len(github_data.get('languages', []))}"
+                )
                 logger.info(
                     f"   • Commits analyzed: {github_data.get('commit_analysis', {}).get('total_commits_analyzed', 0)}"
                 )
@@ -436,7 +466,9 @@ class RecommendationService:
             logger.info("-" * 50)
             db_start = time.time()
 
-            github_profile = await self._get_or_create_github_profile(db, github_data)
+            github_profile = await self._get_or_create_github_profile(
+                db, github_data
+            )
 
             db_end = time.time()
             logger.info(
@@ -465,7 +497,7 @@ class RecommendationService:
             logger.info(
                 f"⏱️  AI generation completed in {ai_end - ai_start:.2f} seconds"
             )
-            logger.info(f"✅ AI recommendation options generated:")
+            logger.info("✅ AI recommendation options generated:")
             logger.info(f"   • Options: {len(ai_result['options'])}")
 
             end_time = time.time()
@@ -474,7 +506,7 @@ class RecommendationService:
             logger.info("🎉 RECOMMENDATION OPTIONS CREATION SUMMARY")
             logger.info("-" * 50)
             logger.info(f"⏱️  Total processing time: {total_time:.2f} seconds")
-            logger.info(f"📊 Breakdown:")
+            logger.info("📊 Breakdown:")
             logger.info(
                 f"   • GitHub Analysis: {github_end - github_start:.2f}s ({((github_end - github_start)/total_time)*100:.1f}%)"
             )
@@ -498,7 +530,9 @@ class RecommendationService:
             logger.error(
                 f"💥 ERROR in recommendation options creation for {github_username}: {e}"
             )
-            logger.error(f"⏱️  Failed after {time.time() - start_time:.2f} seconds")
+            logger.error(
+                f"⏱️  Failed after {time.time() - start_time:.2f} seconds"
+            )
             await db.rollback()
             raise
 
@@ -546,7 +580,9 @@ class RecommendationService:
             logger.info("-" * 50)
             db_start = time.time()
 
-            github_profile = await self._get_or_create_github_profile(db, github_data)
+            github_profile = await self._get_or_create_github_profile(
+                db, github_data
+            )
 
             db_end = time.time()
             logger.info(
@@ -571,10 +607,14 @@ class RecommendationService:
             logger.info(
                 f"⏱️  AI regeneration completed in {ai_end - ai_start:.2f} seconds"
             )
-            logger.info(f"✅ AI recommendation regenerated:")
-            logger.info(f"   • Content length: {len(ai_result['content'])} characters")
+            logger.info("✅ AI recommendation regenerated:")
+            logger.info(
+                f"   • Content length: {len(ai_result['content'])} characters"
+            )
             logger.info(f"   • Word count: {ai_result['word_count']}")
-            logger.info(f"   • Confidence score: {ai_result['confidence_score']}")
+            logger.info(
+                f"   • Confidence score: {ai_result['confidence_score']}"
+            )
 
             # Create recommendation record
             logger.info("💾 STEP 4: SAVING RECOMMENDATION")
@@ -616,7 +656,7 @@ class RecommendationService:
             logger.info("🎉 RECOMMENDATION REGENERATION SUMMARY")
             logger.info("-" * 50)
             logger.info(f"⏱️  Total processing time: {total_time:.2f} seconds")
-            logger.info(f"📊 Breakdown:")
+            logger.info("📊 Breakdown:")
             logger.info(
                 f"   • GitHub Analysis: {github_end - github_start:.2f}s ({((github_end - github_start)/total_time)*100:.1f}%)"
             )
@@ -636,7 +676,9 @@ class RecommendationService:
             logger.error(
                 f"💥 ERROR in recommendation regeneration for {github_username}: {e}"
             )
-            logger.error(f"⏱️  Failed after {time.time() - start_time:.2f} seconds")
+            logger.error(
+                f"⏱️  Failed after {time.time() - start_time:.2f} seconds"
+            )
             await db.rollback()
             raise
 
@@ -656,10 +698,18 @@ class RecommendationService:
 
         # Add repository-specific information
         if repository_data:
-            merged_data["repository_info"] = repository_data.get("repository_info", {})
-            merged_data["repository_languages"] = repository_data.get("languages", [])
-            merged_data["repository_commits"] = repository_data.get("commits", [])
-            merged_data["repository_skills"] = repository_data.get("skills", {})
+            merged_data["repository_info"] = repository_data.get(
+                "repository_info", {}
+            )
+            merged_data["repository_languages"] = repository_data.get(
+                "languages", []
+            )
+            merged_data["repository_commits"] = repository_data.get(
+                "commits", []
+            )
+            merged_data["repository_skills"] = repository_data.get(
+                "skills", {}
+            )
             merged_data["repository_commit_analysis"] = repository_data.get(
                 "commit_analysis", {}
             )
@@ -690,7 +740,10 @@ class RecommendationService:
                 # Merge tools
                 if repo_skills.get("tools"):
                     contributor_skills["tools"] = list(
-                        set(contributor_skills.get("tools", []) + repo_skills["tools"])
+                        set(
+                            contributor_skills.get("tools", [])
+                            + repo_skills["tools"]
+                        )
                     )
 
                 # Merge domains
@@ -707,11 +760,15 @@ class RecommendationService:
                 "commit_analysis"
             ):
                 # Use repository-specific commit analysis if available
-                merged_data["commit_analysis"] = repository_data["commit_analysis"]
+                merged_data["commit_analysis"] = repository_data[
+                    "commit_analysis"
+                ]
                 merged_data["commit_analysis"]["contributor_focused"] = True
                 merged_data["commit_analysis"][
                     "repository_context"
-                ] = repository_data.get("repository_info", {}).get("full_name", "")
+                ] = repository_data.get("repository_info", {}).get(
+                    "full_name", ""
+                )
 
         # Add metadata about the analysis type
         merged_data["analysis_type"] = "repository_contributor"
@@ -761,9 +818,13 @@ class RecommendationService:
                 )
 
                 # Analyze the specific contributor's profile
-                logger.info(f"👤 Analyzing contributor profile: {github_username}")
-                contributor_data = await self.github_service.analyze_github_profile(
-                    username=github_username, force_refresh=False
+                logger.info(
+                    f"👤 Analyzing contributor profile: {github_username}"
+                )
+                contributor_data = (
+                    await self.github_service.analyze_github_profile(
+                        username=github_username, force_refresh=False
+                    )
                 )
 
                 # Merge repository and contributor data
@@ -802,7 +863,9 @@ class RecommendationService:
             logger.info("-" * 50)
             db_start = time.time()
 
-            github_profile = await self._get_or_create_github_profile(db, github_data)
+            github_profile = await self._get_or_create_github_profile(
+                db, github_data
+            )
 
             db_end = time.time()
             logger.info(
@@ -822,12 +885,12 @@ class RecommendationService:
                 "model": selected_option.get("generation_parameters", {}).get(
                     "model", "unknown"
                 ),
-                "temperature": selected_option.get("generation_parameters", {}).get(
-                    "temperature", 0.7
-                ),
-                "max_tokens": selected_option.get("generation_parameters", {}).get(
-                    "max_tokens", 1000
-                ),
+                "temperature": selected_option.get(
+                    "generation_parameters", {}
+                ).get("temperature", 0.7),
+                "max_tokens": selected_option.get(
+                    "generation_parameters", {}
+                ).get("max_tokens", 1000),
                 "selected_from_options": True,
                 "selected_option_id": selected_option.get("id"),
                 "selected_option_name": selected_option.get("name"),
@@ -839,7 +902,8 @@ class RecommendationService:
             recommendation_data = RecommendationCreate(
                 github_profile_id=int(github_profile.id),
                 title=selected_option.get(
-                    "title", f"Professional Recommendation for {github_username}"
+                    "title",
+                    f"Professional Recommendation for {github_username}",
                 ),
                 content=selected_option["content"],
                 recommendation_type=generation_parameters.get(
@@ -884,7 +948,7 @@ class RecommendationService:
             logger.info("🎉 RECOMMENDATION CREATION FROM OPTION SUMMARY")
             logger.info("-" * 50)
             logger.info(f"⏱️  Total processing time: {total_time:.2f} seconds")
-            logger.info(f"📊 Breakdown:")
+            logger.info("📊 Breakdown:")
             logger.info(
                 f"   • GitHub Analysis: {github_end - github_start:.2f}s ({((github_end - github_start)/total_time)*100:.1f}%)"
             )
@@ -901,6 +965,8 @@ class RecommendationService:
             logger.error(
                 f"💥 ERROR in recommendation creation from option for {github_username}: {e}"
             )
-            logger.error(f"⏱️  Failed after {time.time() - start_time:.2f} seconds")
+            logger.error(
+                f"⏱️  Failed after {time.time() - start_time:.2f} seconds"
+            )
             await db.rollback()
             raise

@@ -1,7 +1,6 @@
 """AI service for generating recommendations using Google Gemini."""
 
 import logging
-from typing import Any, Dict, List, Optional
 
 try:
     import google.generativeai as genai
@@ -61,7 +60,9 @@ class AIService:
             )
 
             if settings.ENVIRONMENT == "development":
-                logger.info(f"✅ Prompt built with {len(initial_prompt)} characters")
+                logger.info(
+                    f"✅ Prompt built with {len(initial_prompt)} characters"
+                )
 
             # Check cache for final result
             cache_key = f"ai_recommendation_v3:{hash(initial_prompt)}"
@@ -72,7 +73,9 @@ class AIService:
                 return cached_result
 
             if settings.ENVIRONMENT == "development":
-                logger.info("🚀 CACHE MISS: Starting multi-option generation...")
+                logger.info(
+                    "🚀 CACHE MISS: Starting multi-option generation..."
+                )
 
             # Generate 3 different recommendation options
             options = await self._generate_multiple_options(
@@ -124,7 +127,7 @@ class AIService:
         """Build the AI generation prompt."""
 
         user_data = github_data["user_data"]
-        repositories = github_data["repositories"]
+        # repositories = ...  # Removed unused variable
         languages = github_data["languages"]
         skills = github_data["skills"]
         commit_analysis = github_data.get("commit_analysis", {})
@@ -169,7 +172,9 @@ class AIService:
             repo_skills = github_data.get("skills", {})
 
             if repo_languages:
-                top_languages = [lang["language"] for lang in repo_languages[:5]]
+                top_languages = [
+                    lang["language"] for lang in repo_languages[:5]
+                ]
                 prompt_parts.append(
                     f"- Programming languages they work with: {', '.join(top_languages)}"
                 )
@@ -212,13 +217,18 @@ class AIService:
                 )
 
         # Add commit analysis insights based on analysis type
-        if commit_analysis and commit_analysis.get("total_commits_analyzed", 0) > 0:
+        if (
+            commit_analysis
+            and commit_analysis.get("total_commits_analyzed", 0) > 0
+        ):
             if github_data.get("repository_info"):
                 # Repository-specific insights
                 prompt_parts.append("\nWhat their coding work shows:")
 
                 if commit_analysis.get("repository_focused"):
-                    excellence_areas = commit_analysis.get("excellence_areas", {})
+                    excellence_areas = commit_analysis.get(
+                        "excellence_areas", {}
+                    )
                     if excellence_areas.get("primary_strength"):
                         primary_strength = excellence_areas["primary_strength"]
                         prompt_parts.append(
@@ -251,7 +261,9 @@ class AIService:
                 excellence_areas = commit_analysis.get("excellence_areas", {})
                 if excellence_areas.get("primary_strength"):
                     primary_strength = (
-                        excellence_areas["primary_strength"].replace("_", " ").title()
+                        excellence_areas["primary_strength"]
+                        .replace("_", " ")
+                        .title()
                     )
                     prompt_parts.append(
                         f"- What they're really good at: {primary_strength}"
@@ -267,10 +279,14 @@ class AIService:
                         f"- How they approach development: {pattern_str}"
                     )
 
-                tech_contributions = commit_analysis.get("technical_contributions", {})
+                tech_contributions = commit_analysis.get(
+                    "technical_contributions", {}
+                )
                 if tech_contributions:
                     top_contributions = sorted(
-                        tech_contributions.items(), key=lambda x: x[1], reverse=True
+                        tech_contributions.items(),
+                        key=lambda x: x[1],
+                        reverse=True,
                     )[:2]
                     contrib_str = ", ".join(
                         [
@@ -290,7 +306,9 @@ class AIService:
 
         # Add custom prompt if provided
         if custom_prompt:
-            prompt_parts.append(f"\nAdditional information to include: {custom_prompt}")
+            prompt_parts.append(
+                f"\nAdditional information to include: {custom_prompt}"
+            )
 
         # Add guidelines based on length
         base_guidelines = [
@@ -337,10 +355,12 @@ class AIService:
             repo_info = github_data["repository_info"]
             repo_name = repo_info.get("name", "the repository")
             base_guidelines.insert(
-                3, f"- Focus on skills and technologies they showed in {repo_name}"
+                3,
+                f"- Focus on skills and technologies they showed in {repo_name}",
             )
             base_guidelines.insert(
-                4, "- Mention the project when it helps explain their contributions"
+                4,
+                "- Mention the project when it helps explain their contributions",
             )
 
         prompt_parts.extend(base_guidelines)
@@ -349,7 +369,11 @@ class AIService:
 
     def _get_length_guideline(self, length: str) -> str:
         """Get word count guideline for different lengths."""
-        length_map = {"short": "100-150", "medium": "150-200", "long": "200-300"}
+        length_map = {
+            "short": "100-150",
+            "medium": "150-200",
+            "long": "200-300",
+        }
         return length_map.get(length, "150-200")
 
     def _extract_title(self, content: str, username: str) -> str:
@@ -437,7 +461,9 @@ class AIService:
 
             # Create customized prompt for this option
             option_prompt = self._build_option_prompt(
-                initial_prompt, str(config["custom_instruction"]), str(config["focus"])
+                initial_prompt,
+                str(config["custom_instruction"]),
+                str(config["focus"]),
             )
 
             # Generate the option
@@ -492,7 +518,7 @@ class AIService:
         self, base_prompt: str, custom_instruction: str, focus: str
     ) -> str:
         """Build a customized prompt for a specific option."""
-        return f"""{base_prompt}
+        return """{base_prompt}
 
 FOR THIS VERSION, FOCUS ON:
 {custom_instruction}
@@ -506,12 +532,16 @@ Create a recommendation that really highlights their {focus.replace('_', ' ')} s
         """Generate a single recommendation option."""
         # Adjust temperature for variety
         config = genai.types.GenerationConfig(
-            temperature=min(settings.GEMINI_TEMPERATURE + temperature_modifier, 2.0),
+            temperature=min(
+                settings.GEMINI_TEMPERATURE + temperature_modifier, 2.0
+            ),
             max_output_tokens=settings.GEMINI_MAX_TOKENS,
             top_p=0.9,
             top_k=40,
         )
-        response = self.model.generate_content(prompt, generation_config=config)
+        response = self.model.generate_content(
+            prompt, generation_config=config
+        )
         return response.text
 
     async def regenerate_recommendation(
@@ -551,7 +581,8 @@ Create a recommendation that really highlights their {focus.replace('_', ' ')} s
             result = {
                 "content": refined_content.strip(),
                 "title": self._extract_title(
-                    refined_content, github_data["user_data"]["github_username"]
+                    refined_content,
+                    github_data["user_data"]["github_username"],
                 ),
                 "word_count": len(refined_content.split()),
                 "confidence_score": self._calculate_confidence_score(
@@ -590,7 +621,7 @@ Create a recommendation that really highlights their {focus.replace('_', ' ')} s
         username = github_data["user_data"]["github_username"]
         target_length = self._get_length_guideline(length)
 
-        return f"""
+        return """
 I have this LinkedIn recommendation that needs some changes:
 
 ORIGINAL RECOMMENDATION:
@@ -623,7 +654,9 @@ Just give me the updated recommendation text, nothing else.
             top_p=0.9,
             top_k=40,
         )
-        response = self.model.generate_content(prompt, generation_config=config)
+        response = self.model.generate_content(
+            prompt, generation_config=config
+        )
         return response.text
 
     def _score_data_completeness(self, github_data: Dict[str, Any]) -> int:
@@ -640,7 +673,7 @@ Just give me the updated recommendation text, nothing else.
             score += 10
 
         # Repository data
-        repositories = github_data.get("repositories", [])
+        # repositories = ...  # Removed unused variable
         if repositories:
             score += 20
         if len(repositories) >= 5:
@@ -689,8 +722,16 @@ Just give me the updated recommendation text, nothing else.
             score += 25
 
         # Specificity indicators
-        specific_indicators = ["github", "repository", "commit", "code", "programming"]
-        if any(indicator in content.lower() for indicator in specific_indicators):
+        specific_indicators = [
+            "github",
+            "repository",
+            "commit",
+            "code",
+            "programming",
+        ]
+        if any(
+            indicator in content.lower() for indicator in specific_indicators
+        ):
             score += 25
 
         return min(score, 100)

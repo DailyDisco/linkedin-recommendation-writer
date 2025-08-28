@@ -1,6 +1,5 @@
 """Application configuration using Pydantic Settings."""
 
-import os
 import secrets
 from functools import lru_cache
 from typing import List, Literal
@@ -13,7 +12,10 @@ class Settings(BaseSettings):
     """Application settings with comprehensive validation and typing."""
 
     model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", case_sensitive=True, extra="ignore"
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+        extra="ignore",
     )
 
     # Environment
@@ -23,7 +25,9 @@ class Settings(BaseSettings):
 
     # API Configuration
     API_HOST: str = Field(default="0.0.0.0", description="API host address")
-    API_PORT: int = Field(default=8000, ge=1000, le=65535, description="API port")
+    API_PORT: int = Field(
+        default=8000, ge=1000, le=65535, description="API port"
+    )
     API_DEBUG: bool = Field(default=False, description="Enable debug mode")
     API_RELOAD: bool = Field(default=True, description="Enable auto-reload")
     API_WORKERS: int = Field(
@@ -32,7 +36,10 @@ class Settings(BaseSettings):
 
     # Database Configuration
     DATABASE_URL: str = Field(
-        default="postgresql+asyncpg://postgres:password@localhost:5432/github_recommender",
+        default=(
+            "postgresql+asyncpg://postgres:password@localhost:5432/"
+            "github_recommender"
+        ),
         description="Database connection URL",
     )
     DATABASE_POOL_SIZE: int = Field(
@@ -62,7 +69,9 @@ class Settings(BaseSettings):
         default=5000, ge=1000, le=15000, description="GitHub API rate limit"
     )
 
-    GEMINI_API_KEY: str = Field(default="", description="Google Gemini API key")
+    GEMINI_API_KEY: str = Field(
+        default="", description="Google Gemini API key"
+    )
     GEMINI_MODEL: str = Field(
         default="gemini-2.5-flash-lite", description="Gemini model name"
     )
@@ -74,23 +83,28 @@ class Settings(BaseSettings):
     )
 
     # Logging
-    LOG_LEVEL: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(
-        default="INFO", description="Logging level"
-    )
+    LOG_LEVEL: Literal[
+        "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"
+    ] = Field(default="INFO", description="Logging level")
     LOG_FORMAT: str = Field(
         default="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         description="Log format string",
     )
 
     # Initialization flags
-    INIT_DB: bool = Field(default=True, description="Initialize database on startup")
+    INIT_DB: bool = Field(
+        default=True, description="Initialize database on startup"
+    )
     RUN_MIGRATIONS: bool = Field(
         default=False, description="Run database migrations on startup"
     )
 
     # CORS Configuration
     ALLOWED_ORIGINS: str = Field(
-        default="http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173",
+        default=(
+            "http://localhost:3000,http://localhost:5173,"
+            "http://127.0.0.1:3000,http://127.0.0.1:5173"
+        ),
         description="Comma-separated list of allowed CORS origins",
     )
 
@@ -102,7 +116,10 @@ class Settings(BaseSettings):
 
     # Rate Limiting
     RATE_LIMIT_REQUESTS_PER_MINUTE: int = Field(
-        default=60, ge=10, le=1000, description="Rate limit requests per minute"
+        default=60,
+        ge=10,
+        le=1000,
+        description="Rate limit requests per minute",
     )
     RATE_LIMIT_BURST_SIZE: int = Field(
         default=10, ge=1, le=100, description="Rate limit burst size"
@@ -112,8 +129,12 @@ class Settings(BaseSettings):
     ENABLE_RATE_LIMITING: bool = Field(
         default=True, description="Enable API rate limiting"
     )
-    ENABLE_METRICS: bool = Field(default=False, description="Enable metrics collection")
-    ENABLE_TRACING: bool = Field(default=False, description="Enable request tracing")
+    ENABLE_METRICS: bool = Field(
+        default=False, description="Enable metrics collection"
+    )
+    ENABLE_TRACING: bool = Field(
+        default=False, description="Enable request tracing"
+    )
 
     @computed_field
     def cors_origins(self) -> List[str]:
@@ -137,7 +158,9 @@ class Settings(BaseSettings):
     def validate_github_token(cls, v: str) -> str:
         """Validate GitHub token format."""
         if v and not v.startswith(("ghp_", "github_pat_")):
-            raise ValueError('GitHub token should start with "ghp_" or "github_pat_"')
+            raise ValueError(
+                'GitHub token should start with "ghp_" or "github_pat_"'
+            )
         return v
 
     @field_validator("GEMINI_API_KEY")

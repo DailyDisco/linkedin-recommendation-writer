@@ -1,10 +1,15 @@
 """Database configuration and utilities."""
 
 import logging
+import os
 from typing import AsyncGenerator
 
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 from sqlalchemy.orm import DeclarativeBase
 
 from app.core.config import settings
@@ -12,7 +17,9 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 # Create async engine with configuration from settings
-engine = create_async_engine(settings.DATABASE_URL, **settings.get_database_config())
+engine = create_async_engine(
+    settings.DATABASE_URL, **settings.get_database_config()
+)
 
 # Create async session maker
 AsyncSessionLocal = async_sessionmaker(
@@ -48,9 +55,6 @@ async def init_database():
     """Initialize database tables."""
     try:
         # Import all models here to ensure they are registered
-        from app.models.github_profile import GitHubProfile
-        from app.models.recommendation import Recommendation
-        from app.models.user import User
 
         async with engine.begin() as conn:
             # Create all tables
@@ -65,7 +69,6 @@ async def init_database():
 async def run_migrations():
     """Run database migrations using Alembic."""
     try:
-        import os
 
         from alembic import command
         from alembic.config import Config
@@ -80,7 +83,9 @@ async def run_migrations():
             command.upgrade(alembic_cfg, "head")
             logger.info("Database migrations completed successfully")
         else:
-            logger.warning("Alembic configuration not found, skipping migrations")
+            logger.warning(
+                "Alembic configuration not found, skipping migrations"
+            )
 
     except ImportError:
         logger.warning("Alembic not available, skipping migrations")

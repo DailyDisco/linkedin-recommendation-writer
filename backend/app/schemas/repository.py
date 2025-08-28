@@ -1,7 +1,6 @@
 """Repository-related Pydantic schemas."""
 
 from datetime import datetime
-from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -15,7 +14,9 @@ class RepositoryContributorsRequest(BaseModel):
     max_contributors: int = Field(
         50, ge=1, le=100, description="Maximum contributors to fetch"
     )
-    force_refresh: bool = Field(False, description="Force refresh of cached data")
+    force_refresh: bool = Field(
+        False, description="Force refresh of cached data"
+    )
 
 
 class ContributorInfo(BaseModel):

@@ -17,7 +17,9 @@ logger = logging.getLogger(__name__)
 class RequestIDMiddleware(BaseHTTPMiddleware):
     """Add unique request ID to each request for tracing."""
 
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+    async def dispatch(
+        self, request: Request, call_next: Callable
+    ) -> Response:
         request_id = str(uuid.uuid4())
         request.state.request_id = request_id
 
@@ -31,7 +33,9 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
 class LoggingMiddleware(BaseHTTPMiddleware):
     """Log request and response details."""
 
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+    async def dispatch(
+        self, request: Request, call_next: Callable
+    ) -> Response:
         start_time = time.time()
         request_id = getattr(request.state, "request_id", "unknown")
 
@@ -66,7 +70,9 @@ class LoggingMiddleware(BaseHTTPMiddleware):
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Add security headers to responses."""
 
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+    async def dispatch(
+        self, request: Request, call_next: Callable
+    ) -> Response:
         response = await call_next(request)
 
         # Add security headers
@@ -91,7 +97,9 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
         self.requests_per_minute = requests_per_minute
         self.requests: Dict[str, int] = {}  # In production, use Redis
 
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+    async def dispatch(
+        self, request: Request, call_next: Callable
+    ) -> Response:
         if not settings.ENABLE_RATE_LIMITING:
             return await call_next(request)
 
@@ -112,7 +120,9 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
         if count >= self.requests_per_minute:
             return JSONResponse(
                 status_code=429,
-                content={"detail": "Rate limit exceeded. Please try again later."},
+                content={
+                    "detail": "Rate limit exceeded. Please try again later."
+                },
                 headers={"Retry-After": "60"},
             )
 
@@ -123,13 +133,16 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
 class ErrorHandlingMiddleware(BaseHTTPMiddleware):
     """Centralized error handling middleware."""
 
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+    async def dispatch(
+        self, request: Request, call_next: Callable
+    ) -> Response:
         try:
             return await call_next(request)
         except ValueError as e:
             logger.warning(f"Validation error: {e}")
             return JSONResponse(
-                status_code=400, content={"detail": str(e), "type": "validation_error"}
+                status_code=400,
+                content={"detail": str(e), "type": "validation_error"},
             )
         except ConnectionError as e:
             logger.error(f"Connection error: {e}")
@@ -148,7 +161,9 @@ class ErrorHandlingMiddleware(BaseHTTPMiddleware):
             )
         except Exception as e:
             request_id = getattr(request.state, "request_id", "unknown")
-            logger.error(f"Unhandled error in request {request_id}: {e}", exc_info=True)
+            logger.error(
+                f"Unhandled error in request {request_id}: {e}", exc_info=True
+            )
 
             if settings.API_DEBUG:
                 return JSONResponse(

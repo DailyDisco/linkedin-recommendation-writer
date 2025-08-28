@@ -2,7 +2,15 @@
 
 from datetime import datetime
 
-from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    JSON,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+)
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
@@ -49,11 +57,15 @@ class Recommendation(Base):
 
     # Metadata
     created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
     # Relationships
     user = relationship("User", back_populates="recommendations")
-    github_profile = relationship("GitHubProfile", back_populates="recommendations")
+    github_profile = relationship(
+        "GitHubProfile", back_populates="recommendations"
+    )
 
     def __repr__(self):
         return f"<Recommendation(id={self.id}, title={self.title[:50]}...)>"

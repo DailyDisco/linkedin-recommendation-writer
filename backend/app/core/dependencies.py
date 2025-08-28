@@ -3,7 +3,7 @@
 import logging
 from typing import AsyncGenerator, Optional
 
-from fastapi import Depends, HTTPException, Request
+from fastapi import HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import AsyncSessionLocal
@@ -123,7 +123,9 @@ async def validate_github_username(username: str) -> str:
     import re
 
     if not re.match(r"^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$", username):
-        raise HTTPException(status_code=400, detail="Invalid GitHub username format")
+        raise HTTPException(
+            status_code=400, detail="Invalid GitHub username format"
+        )
 
     return username
 
@@ -146,6 +148,8 @@ class PaginationParams:
         self.limit = page_size
 
 
-def get_pagination_params(page: int = 1, page_size: int = 10) -> PaginationParams:
+def get_pagination_params(
+    page: int = 1, page_size: int = 10
+) -> PaginationParams:
     """Dependency provider for pagination parameters."""
     return PaginationParams(page, page_size)
