@@ -47,32 +47,10 @@ WORKDIR /app
 # Expose port (Railway will map this to the PORT env var)
 EXPOSE 8000
 
-# Health check - use the same PORT logic as startup script
+# Health check for the fixed port
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD ["/bin/sh", "-c", "PORT=${PORT:-8000} && curl -f http://localhost:$PORT/health || exit 1"]
+    CMD ["curl", "-f", "http://localhost:8000/health"]
 
-# Create a startup script to handle PORT properly
-RUN echo '#!/bin/sh\n\
-echo "=== Railway Docker Startup Script ===\n\
-echo "Environment variables:"\n\
-env | grep -E "(PORT|DATABASE|REDIS|GITHUB|GEMINI)" | sort\n\
-echo ""\n\
-\n\
-# Handle PORT environment variable\n\
-if [ -z "$PORT" ]; then\n\
-    echo "PORT environment variable not set, using default 8000"\n\
-    PORT=8000\n\
-else\n\
-    echo "PORT environment variable set to: $PORT"\n\
-fi\n\
-\n\
-echo "Starting application on port $PORT"\n\
-echo "Command: python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 4"\n\
-echo ""\n\
-\n\
-# Start the application\n\
-exec python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 4' > /app/start.sh && \
-chmod +x /app/start.sh
-
-# Start the application using the script
-CMD ["/app/start.sh"]
+# Start the application directly with a fixed port for now
+# Railway will map this port externally
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
