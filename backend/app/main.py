@@ -127,7 +127,7 @@ async def root() -> Dict[str, Any]:
     }
 
 
-@app.get("/health")
+@app.get("/health", response_model=None)
 async def health_check() -> Union[Dict[str, Any], JSONResponse]:
     """Health check endpoint for Docker and load balancers."""
     checks = {"api": "ok", "environment": settings.ENVIRONMENT}
