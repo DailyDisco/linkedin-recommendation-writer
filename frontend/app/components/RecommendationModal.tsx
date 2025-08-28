@@ -19,7 +19,7 @@ import type {
   RecommendationRequest,
 } from '../types';
 import ErrorBoundary from './ui/error-boundary';
-import { parseGitHubInput, validateGitHubInput } from '../lib/utils';
+import { parseGitHubInput, validateGitHubInput } from '@/lib/utils';
 
 interface RecommendationModalProps {
   contributor: ContributorInfo;

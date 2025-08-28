@@ -7,11 +7,12 @@ from pathlib import Path
 from app.core.config import settings
 
 
-def setup_logging():
+def setup_logging() -> None:
     """Setup application logging configuration."""
 
     # Create logs directory if it doesn't exist (use relative path for local dev)
-    log_dir = Path("logs") if not settings.is_production else Path("/app/logs")
+    is_production = bool(settings.is_production)
+    log_dir = Path("logs") if not is_production else Path("/app/logs")
     log_dir.mkdir(exist_ok=True, parents=True)
 
     # Configure root logger
@@ -24,7 +25,7 @@ def setup_logging():
     )
 
     # Set specific loggers based on environment
-    if settings.is_production:
+    if is_production:
         # More restrictive logging in production
         logging.getLogger("uvicorn").setLevel(logging.WARNING)
         logging.getLogger("sqlalchemy.engine").setLevel(logging.ERROR)

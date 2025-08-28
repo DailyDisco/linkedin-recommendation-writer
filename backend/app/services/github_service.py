@@ -25,7 +25,7 @@ class GitHubService:
     MAX_COMMITS_PER_REPO = 30  # Max commits per repository for better distribution
     COMMIT_ANALYSIS_CACHE_TTL = 14400  # 4 hours cache for expensive operations
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize GitHub service."""
         self.github_client = None
         if settings.GITHUB_TOKEN:
@@ -535,6 +535,10 @@ class GitHubService:
         max_commits_per_repo: int,
     ) -> List[Dict[str, Any]]:
         """Synchronous helper to fetch commits from a repository (runs in thread pool)."""
+        if not self.github_client:
+            logger.error("GitHub client not initialized")
+            return []
+
         try:
             user = self.github_client.get_user(username)
             repo = self.github_client.get_repo(f"{username}/{repo_data['name']}")
@@ -576,6 +580,10 @@ class GitHubService:
         max_commits_per_repo: int,
     ) -> List[Dict[str, Any]]:
         """Synchronous helper to fetch commits from a specific contributor in any repository."""
+        if not self.github_client:
+            logger.error("GitHub client not initialized")
+            return []
+
         try:
             # Get the contributor as a user object
             contributor = self.github_client.get_user(contributor_username)
@@ -1077,7 +1085,7 @@ class GitHubService:
         if not force_refresh:
             logger.info("🔍 Checking cache...")
             cached_data = await get_cache(cache_key)
-            if cached_data:
+            if cached_data and isinstance(cached_data, dict):
                 logger.info("💨 CACHE HIT! Returning cached repository data")
                 logger.info(f"   • Repository: {cached_data.get('repository_info', {}).get('name', 'N/A')}")
                 logger.info(f"   • Language: {cached_data.get('repository_info', {}).get('language', 'N/A')}")
@@ -1210,7 +1218,7 @@ class GitHubService:
                 "has_wiki": repo.has_wiki,
                 "has_pages": repo.has_pages,
                 "archived": repo.archived,
-                "disabled": repo.disabled,
+                "disabled": getattr(repo, "disabled", False),
                 "created_at": repo.created_at.isoformat() if repo.created_at else None,
                 "updated_at": repo.updated_at.isoformat() if repo.updated_at else None,
                 "pushed_at": repo.pushed_at.isoformat() if repo.pushed_at else None,
@@ -1246,7 +1254,7 @@ class GitHubService:
                 )
 
             # Sort by percentage
-            language_stats.sort(key=lambda x: x["percentage"], reverse=True)
+            language_stats.sort(key=lambda x: float(x["percentage"]), reverse=True)
 
             return language_stats
         except Exception as e:

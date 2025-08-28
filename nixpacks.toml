@@ -3,7 +3,7 @@
 # See RAILWAY_DEPLOYMENT.md for the recommended approach
 
 [phases.setup]
-nixPkgs = ["python311", "nodejs-20_x", "postgresql", "redis"]
+nixPkgs = ["python311", "nodejs", "postgresql", "redis"]
 
 [phases.install]
 cmds = [

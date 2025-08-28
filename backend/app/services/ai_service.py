@@ -1,12 +1,12 @@
 """AI service for generating recommendations using Google Gemini."""
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 try:
     import google.generativeai as genai
 except ImportError:
-    genai = None  # type: ignore
+    genai = None  # type: ignore[assignment]
 
 from app.core.config import settings
 from app.core.redis_client import get_cache, set_cache
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 class AIService:
     """Service for generating AI-powered recommendations."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize AI service."""
         self.model = None
         if genai and settings.GEMINI_API_KEY:
@@ -67,9 +67,9 @@ class AIService:
             cache_key = f"ai_recommendation_v3:{hash(initial_prompt)}"
 
             cached_result = await get_cache(cache_key)
-            if cached_result:
+            if cached_result and isinstance(cached_result, dict):
                 logger.info("Cache hit for AI recommendation")
-                return cached_result
+                return cast(Dict[str, Any], cached_result)
 
             if settings.ENVIRONMENT == "development":
                 logger.info("🚀 CACHE MISS: Starting multi-option generation...")
@@ -445,6 +445,9 @@ Create a recommendation that really highlights their {focus.replace('_', ' ')} s
 
     async def _generate_single_option(self, prompt: str, temperature_modifier: float) -> str:
         """Generate a single recommendation option."""
+        if not self.model:
+            raise ValueError("AI model not initialized")
+
         # Adjust temperature for variety
         config = genai.types.GenerationConfig(
             temperature=min(settings.GEMINI_TEMPERATURE + temperature_modifier, 2.0),
@@ -453,7 +456,7 @@ Create a recommendation that really highlights their {focus.replace('_', ' ')} s
             top_k=40,
         )
         response = self.model.generate_content(prompt, generation_config=config)
-        return response.text
+        return str(response.text)
 
     async def regenerate_recommendation(
         self,
@@ -554,6 +557,9 @@ Just give me the updated recommendation text, nothing else.
 
     async def _generate_refined_regeneration(self, prompt: str) -> str:
         """Generate refined recommendation for regeneration."""
+        if not self.model:
+            raise ValueError("AI model not initialized")
+
         config = genai.types.GenerationConfig(
             temperature=settings.GEMINI_TEMPERATURE + 0.1,  # Slightly higher for refinement
             max_output_tokens=settings.GEMINI_MAX_TOKENS,
@@ -561,7 +567,7 @@ Just give me the updated recommendation text, nothing else.
             top_k=40,
         )
         response = self.model.generate_content(prompt, generation_config=config)
-        return response.text
+        return str(response.text)
 
     def _score_data_completeness(self, github_data: Dict[str, Any]) -> int:
         """Score the completeness of GitHub data (0-100)."""

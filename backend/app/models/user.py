@@ -25,5 +25,5 @@ class User(Base):
     github_profiles = relationship("GitHubProfile", back_populates="user")
     recommendations = relationship("Recommendation", back_populates="user")
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<User(id={self.id}, username={self.username}, email={self.email})>"

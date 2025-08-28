@@ -1,7 +1,7 @@
 """Repository service for fetching repository contributors and details."""
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, cast
 
 from github import Github
 from github.GithubException import GithubException
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class RepositoryService:
     """Service for repository-related operations."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize repository service."""
         self.github_client = None
         if settings.GITHUB_TOKEN:
@@ -34,9 +34,9 @@ class RepositoryService:
         # Check cache first
         if not force_refresh:
             cached_data = await get_cache(cache_key)
-            if cached_data:
+            if cached_data and isinstance(cached_data, dict):
                 logger.info(f"Returning cached contributors for repository: " f"{repo_name}")
-                return cached_data
+                return cast(Dict[str, Any], cached_data)
 
         try:
             if not self.github_client:

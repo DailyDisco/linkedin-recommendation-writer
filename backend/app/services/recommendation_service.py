@@ -16,7 +16,7 @@ from app.services.github_service import GitHubService
 logger = logging.getLogger(__name__)
 
 
-def parse_datetime(dt):
+def parse_datetime(dt: Any) -> Any:
     if isinstance(dt, str):
         return datetime.fromisoformat(dt)
     return dt
@@ -25,7 +25,7 @@ def parse_datetime(dt):
 class RecommendationService:
     """Service for managing recommendations."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize recommendation service."""
         self.github_service = GitHubService()
         self.ai_service = AIService()

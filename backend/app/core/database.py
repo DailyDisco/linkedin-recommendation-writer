@@ -2,7 +2,7 @@
 
 import logging
 import os
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Dict, Any
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -45,7 +45,7 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             await session.close()
 
 
-async def init_database():
+async def init_database() -> None:
     """Initialize database tables."""
     try:
         # Import all models here to ensure they are registered
@@ -60,7 +60,7 @@ async def init_database():
         raise
 
 
-async def run_migrations():
+async def run_migrations() -> None:
     """Run database migrations using Alembic."""
     try:
         from alembic import command
@@ -85,7 +85,7 @@ async def run_migrations():
         raise
 
 
-async def get_database_info():
+async def get_database_info() -> Dict[str, Any]:
     """Get database connection information."""
     try:
         async with AsyncSessionLocal() as session:
@@ -98,9 +98,9 @@ async def get_database_info():
             return {
                 "version": version,
                 "database": database,
-                "pool_size": engine.pool.size(),
-                "checked_out_connections": engine.pool.checkedout(),
-                "overflow": engine.pool.overflow(),
+                "pool_size": getattr(engine.pool, "size", lambda: 0)(),
+                "checked_out_connections": getattr(engine.pool, "checkedout", lambda: 0)(),
+                "overflow": getattr(engine.pool, "overflow", lambda: 0)(),
             }
     except Exception as e:
         logger.error(f"Failed to get database info: {e}")

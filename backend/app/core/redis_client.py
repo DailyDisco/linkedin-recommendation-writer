@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 redis_client: Optional[Redis] = None
 
 
-async def init_redis():
+async def init_redis() -> None:
     """Initialize Redis connection."""
     global redis_client
     try:
@@ -29,8 +29,11 @@ async def init_redis():
         )
 
         # Test connection
-        await redis_client.ping()
-        logger.info("Redis connection established successfully")
+        if redis_client:
+            await redis_client.ping()
+            logger.info("Redis connection established successfully")
+        else:
+            raise ConnectionError("Failed to initialize Redis client")
 
     except (ConnectionError, TimeoutError) as e:
         logger.error(f"Failed to connect to Redis: {e}")

@@ -3,7 +3,7 @@
 import logging
 import time
 import uuid
-from typing import Callable, Dict
+from typing import Callable, Dict, Any, Awaitable
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 class RequestIDMiddleware(BaseHTTPMiddleware):
     """Add unique request ID to each request for tracing."""
 
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+    async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
         request_id = str(uuid.uuid4())
         request.state.request_id = request_id
 
@@ -31,7 +31,7 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
 class LoggingMiddleware(BaseHTTPMiddleware):
     """Log request and response details."""
 
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+    async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
         start_time = time.time()
         request_id = getattr(request.state, "request_id", "unknown")
 
@@ -62,7 +62,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Add security headers to responses."""
 
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+    async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
         response = await call_next(request)
 
         # Add security headers
@@ -80,12 +80,12 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 class RateLimitingMiddleware(BaseHTTPMiddleware):
     """Simple in-memory rate limiting middleware."""
 
-    def __init__(self, app, requests_per_minute: int = 60):
+    def __init__(self, app: Any, requests_per_minute: int = 60) -> None:
         super().__init__(app)
         self.requests_per_minute = requests_per_minute
         self.requests: Dict[str, int] = {}  # In production, use Redis
 
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+    async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
         if not settings.ENABLE_RATE_LIMITING:
             return await call_next(request)
 
@@ -113,7 +113,7 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
 class ErrorHandlingMiddleware(BaseHTTPMiddleware):
     """Centralized error handling middleware."""
 
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+    async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
         try:
             return await call_next(request)
         except ValueError as e:
