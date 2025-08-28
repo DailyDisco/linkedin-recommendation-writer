@@ -13,19 +13,36 @@ Generate professional LinkedIn recommendations using GitHub data and AI.
 - 💾 **History Tracking**: Save and manage all generated recommendations
 - 🚀 **Fast Results**: Intelligent caching for quick responses
 
-## 🚀 Quick Start
+## 🚀 Railway Deployment (Recommended)
 
-**Get everything running in 3 minutes!**
+**Deploy to Railway in 5 minutes:**
+
+1. **Go to Railway Dashboard**: https://railway.app/dashboard
+2. **Click "New Project"**
+3. **Choose "Deploy from GitHub repo"**
+4. **Select your repository**
+5. **Railway auto-detects Dockerfile and deploys**
+
+**That's it!** Your app will be live with:
+
+- ✅ **Frontend served automatically**
+- ✅ **Backend API running**
+- ✅ **PostgreSQL database**
+- ✅ **Redis cache**
+
+### Local Development
+
+**Get everything running locally:**
 
 ```bash
 git clone <repository-url>
 cd linkedin-recommendation-writer-app
-cp env.template .env
+cp env.example .env
 # Edit .env with your API keys
 make setup
 ```
 
-**That's it!** Access your app at:
+Access your local app at:
 
 - **Frontend**: http://localhost:5173
 - **Backend**: http://localhost:8000
@@ -70,23 +87,33 @@ DATABASE_URL=postgresql://postgres:your_password@localhost:5432/linkedin_recomme
 REDIS_URL=redis://localhost:6379/0
 ```
 
-## 🚀 Deployment
+## 🚀 Deployment Options
 
-### Docker (Recommended)
+### Railway (Recommended - Single Project)
+
+**Easiest deployment - everything in one project:**
+
+1. Push your code to GitHub
+2. Go to Railway Dashboard
+3. New Project → Deploy from GitHub → Select your repo
+4. Railway auto-detects Dockerfile and deploys
+5. Add PostgreSQL and Redis plugins to the same project
+
+**Result:** One URL with frontend + backend + database + cache!
+
+### Docker (Local Development)
 
 ```bash
 make setup-prod
 ```
 
-### Railway (Easiest)
+### Advanced: Separate Services
 
-Connect your repository to Railway - it auto-detects the Dockerfile and provides PostgreSQL/Redis.
+If you need separate frontend/backend deployments:
 
-### Vercel + Railway
-
-- Deploy frontend to Vercel
+- Deploy frontend to Vercel/Netlify
 - Deploy backend to Railway
-- Set `VITE_API_URL` in Vercel to your Railway backend URL
+- Set `VITE_API_URL` to your Railway backend URL
 
 ## 🔧 Development
 

@@ -47,10 +47,9 @@ WORKDIR /app
 # Expose port (Railway will map this to the PORT env var)
 EXPOSE 8000
 
-# Health check for the fixed port
+# Health check using PORT environment variable
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD ["curl", "-f", "http://localhost:8000/health"]
+    CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
 
-# Start the application directly with a fixed port for now
-# Railway will map this port externally
-CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+# Start the application using PORT environment variable
+CMD sh -c "python -m uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 4"
