@@ -5,7 +5,7 @@ import logging
 import re
 from collections import Counter
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from github import Github
 from github.GithubException import GithubException
@@ -60,7 +60,7 @@ class GitHubService:
                 logger.info("💨 CACHE HIT! Returning cached GitHub data")
                 logger.info(f"   • Cached repositories: {len(cached_data.get('repositories', []))}")
                 logger.info(f"   • Cached commits: {cached_data.get('commit_analysis', {}).get('total_commits_analyzed', 0)}")
-                return cached_data
+                return cast(Dict[str, Any], cached_data)
             logger.info("🚀 CACHE MISS: Proceeding with fresh analysis")
 
         try:
@@ -557,7 +557,7 @@ class GitHubService:
                         "date": (commit.commit.author.date.isoformat() if commit.commit.author.date else None),
                         "repository": repo_data["name"],
                         "sha": commit.sha,
-                        "files_changed": (len(commit.files) if hasattr(commit, "files") else 0),
+                        "files_changed": (len(list(commit.files)) if hasattr(commit, "files") else 0),
                     }
                     repo_commits.append(commit_data)
                     commits_collected += 1
@@ -635,7 +635,7 @@ class GitHubService:
                         "repository": repo_data["name"],
                         "repository_full_name": repo.full_name,
                         "sha": commit.sha,
-                        "files_changed": (len(commit.files) if hasattr(commit, "files") else 0),
+                        "files_changed": (len(list(commit.files)) if hasattr(commit, "files") else 0),
                         "contributor": contributor_username,
                     }
                     repo_commits.append(commit_data)
@@ -1089,7 +1089,7 @@ class GitHubService:
                 logger.info("💨 CACHE HIT! Returning cached repository data")
                 logger.info(f"   • Repository: {cached_data.get('repository_info', {}).get('name', 'N/A')}")
                 logger.info(f"   • Language: {cached_data.get('repository_info', {}).get('language', 'N/A')}")
-                return cached_data
+                return cast(Dict[str, Any], cached_data)
             logger.info("🚀 CACHE MISS: Proceeding with fresh repository analysis")
 
         try:
@@ -1254,7 +1254,7 @@ class GitHubService:
                 )
 
             # Sort by percentage
-            language_stats.sort(key=lambda x: float(x["percentage"]), reverse=True)
+            language_stats.sort(key=lambda x: float(cast(float, x["percentage"])), reverse=True)
 
             return language_stats
         except Exception as e:
@@ -1271,7 +1271,7 @@ class GitHubService:
             commits = repo.get_commits()[:limit]  # Get first 'limit' commits
 
             commit_data = []
-            for commit in commits:
+            for commit in commits:  # type: ignore
                 commit_data.append(
                     {
                         "sha": commit.sha,

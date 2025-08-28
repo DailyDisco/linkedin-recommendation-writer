@@ -186,6 +186,8 @@ async def analyze_github_profile(
 
     except Exception as e:
         _handle_api_error(e, "GitHub profile analysis")
+        # This return statement will never be reached, but mypy requires it
+        return None  # type: ignore
 
 
 @router.get("/user/{username}", response_model=GitHubProfileResponse)
@@ -232,6 +234,8 @@ async def get_repository_contributors(
 
     except Exception as e:
         _handle_api_error(e, "repository contributors analysis")
+        # This return statement will never be reached, but mypy requires it
+        return None  # type: ignore
 
 
 @router.get(
