@@ -28,6 +28,11 @@ COPY backend/ .
 # Copy frontend and build it
 COPY frontend/ ./frontend/
 WORKDIR /app/frontend
+
+# Fix path aliases for Docker build by replacing @/lib/utils with relative paths
+RUN find app -name "*.tsx" -o -name "*.ts" | xargs sed -i 's|@/lib/utils|../../lib/utils|g'
+
+# Install dependencies and build
 RUN npm ci --production=false && npm run build
 
 # Copy built frontend to backend static directory
