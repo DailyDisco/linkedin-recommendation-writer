@@ -61,9 +61,15 @@ if [ -n "$HAS_BACKEND" ]; then
 
   # Run backend formatting check
   if ! (cd backend && python -m black --check --diff app/); then
-    echo -e "${RED}❌ Python formatting check failed${NC}"
-    echo -e "${YELLOW}💡 Run 'cd backend && python -m black app/' to fix formatting${NC}"
-    failed=1
+    echo -e "${YELLOW}⚠️  Python formatting check failed${NC}"
+    echo -e "${BLUE}🔧 Running black to fix formatting...${NC}"
+    if (cd backend && python -m black app/); then
+      echo -e "${GREEN}✅ Python formatting fix completed successfully${NC}"
+      echo -e "${YELLOW}📝 Staged files have been updated with formatted Python code${NC}"
+    else
+      echo -e "${RED}❌ Python formatting fix failed${NC}"
+      failed=1
+    fi
   else
     echo -e "${GREEN}✅ Python formatting check completed successfully${NC}"
   fi

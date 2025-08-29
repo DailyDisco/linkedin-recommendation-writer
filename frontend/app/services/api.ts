@@ -127,7 +127,10 @@ export const recommendationApi = {
     selectedOption: RecommendationOption,
     allOptions: RecommendationOption[],
     analysisType?: string,
-    repositoryUrl?: string
+    repositoryUrl?: string,
+    recommendationType?: string,
+    tone?: string,
+    length?: string
   ): Promise<Recommendation> => {
     const response = await api.post('/recommendations/create-from-option', {
       github_username: githubUsername,
@@ -135,6 +138,9 @@ export const recommendationApi = {
       all_options: allOptions,
       analysis_type: analysisType || 'profile',
       repository_url: repositoryUrl,
+      recommendation_type: recommendationType,
+      tone: tone,
+      length: length,
     });
     return response.data;
   },
@@ -339,7 +345,7 @@ export const apiClient = {
   },
 };
 
-export const handleApiError = (error: unknown) => {
+export const handleApiError = (error: any) => {
   if (error.response) {
     // Server responded with error status
     const { status, data } = error.response;

@@ -1836,6 +1836,9 @@ class RecommendationService:
         user_id: Optional[int] = None,  # Added user_id
         analysis_context_type: str = "profile",
         repository_url: Optional[str] = None,
+        recommendation_type: Optional[str] = None,
+        tone: Optional[str] = None,
+        length: Optional[str] = None,
     ) -> RecommendationResponse:
         """Create a recommendation from a selected option."""
 
@@ -1895,6 +1898,7 @@ class RecommendationService:
             db_start = time.time()
 
             github_profile = await self._get_or_create_github_profile(db, github_data)
+            logger.debug(f"➡️ GitHub Profile ID: {github_profile.id}")
 
             db_end = time.time()
             logger.info(f"⏱️  Database operations completed in {db_end - db_start:.2f} seconds")
@@ -1916,7 +1920,12 @@ class RecommendationService:
                 "selected_option_focus": selected_option.get("focus"),
                 "analysis_context_type": analysis_context_type,
                 "repository_url": repository_url,
+                "recommendation_type": recommendation_type or selected_option.get("focus", "professional"),
+                "tone": tone or "professional",
+                "length": length or "medium",
             }
+            logger.debug(f"➡️ Generated Parameters: {generation_parameters}")
+            logger.debug(f"➡️ Selected Option Content Length: {len(selected_option.get("content", ""))}")
 
             recommendation_data = RecommendationCreate(
                 github_profile_id=int(github_profile.id),
@@ -1925,9 +1934,9 @@ class RecommendationService:
                     f"Professional Recommendation for {github_username}",
                 ),
                 content=selected_option["content"],
-                recommendation_type=generation_parameters.get("recommendation_type", "professional"),
-                tone=generation_parameters.get("tone", "professional"),
-                length=generation_parameters.get("length", "medium"),
+                recommendation_type=recommendation_type or selected_option.get("focus", "professional"),
+                tone=tone or "professional",
+                length=length or "medium",
                 ai_model=generation_parameters["model"],
                 generation_prompt=None,  # This comes from the options generation
                 generation_parameters=generation_parameters,
@@ -1936,13 +1945,15 @@ class RecommendationService:
                 selected_option_id=selected_option.get("id"),
                 selected_option_name=selected_option.get("name"),
                 selected_option_focus=selected_option.get("focus"),
-                generated_options=[option for option in all_options],  # Store all options for reference
+                generated_options=[option.model_dump() for option in all_options],  # Store all options for reference
             )
+            logger.debug(f"➡️ RecommendationCreate data: {recommendation_data.dict()}")
 
             recommendation = Recommendation(**recommendation_data.dict())
             db.add(recommendation)
             await db.commit()
             await db.refresh(recommendation)
+            logger.debug(f"➡️ Recommendation saved to DB with ID: {recommendation.id}")
 
             save_end = time.time()
             logger.info(f"⏱️  Database save completed in {save_end - save_start:.2f} seconds")

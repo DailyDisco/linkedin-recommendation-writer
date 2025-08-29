@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router';
-import { LogIn, Sparkles, FileText, History, Zap, Users } from 'lucide-react';
+import { Sparkles, FileText, History, Zap, Users } from 'lucide-react';
 
 export const PleaseSignInOrRegister = () => {
   return (

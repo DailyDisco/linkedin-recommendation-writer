@@ -100,6 +100,9 @@ class RecommendationFromOptionRequest(BaseModel):
     all_options: List[RecommendationOption] = Field(..., description="All generated options for reference")
     analysis_context_type: Optional[str] = Field("profile", description="Type of analysis performed")
     repository_url: Optional[str] = Field(None, description="Repository URL if repo-specific analysis")
+    recommendation_type: Optional[str] = Field(None, description="Type of recommendation")
+    tone: Optional[str] = Field(None, description="Tone of the recommendation")
+    length: Optional[str] = Field(None, description="Length of the recommendation")
 
 
 class RecommendationResponse(BaseModel):
