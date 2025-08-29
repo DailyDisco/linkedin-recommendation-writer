@@ -13,7 +13,7 @@ from .recommendation import (
     RecommendationRequest,
     RecommendationResponse,
 )
-from .repository import RepositoryInfo, RepositoryMetrics
+from .repository import RepositoryInfo
 from .user import Token, TokenData, UserCreate, UserLogin, UserResponse
 
 __all__ = [
@@ -32,7 +32,6 @@ __all__ = [
     "RecommendationResponse",
     "ReadmeGenerationRequest",
     "ReadmeGenerationResponse",
-    "RepositoryMetrics",
     "Token",
     "TokenData",
     "UserCreate",
