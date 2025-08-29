@@ -65,7 +65,7 @@ export default function RegisterPage() {
       const errorMessage =
         err && typeof err === 'object' && 'response' in err
           ? (err as { response?: { data?: { detail?: string } } }).response
-            ?.data?.detail
+              ?.data?.detail
           : 'Registration failed. Please try again.';
       setError(errorMessage || 'Registration failed. Please try again.');
     } finally {
