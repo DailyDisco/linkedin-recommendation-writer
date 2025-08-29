@@ -15,8 +15,12 @@ export function useLocalStorage<T>(
     try {
       // Get from local storage by key
       const item = window.localStorage.getItem(key);
-      // Parse stored json or if none return initialValue
-      return item ? JSON.parse(item) : initialValue;
+      // Directly return string items or parse others. Trim and remove quotes if found.
+      if (typeof item === 'string' && key === 'accessToken') {
+        return item.trim().replace(/^"|"$/g, '') as T;
+      }
+      const parsedItem = item ? JSON.parse(item) : initialValue;
+      return parsedItem;
     } catch (error) {
       // If error also return initialValue
       console.error(error);
@@ -31,11 +35,20 @@ export function useLocalStorage<T>(
       // Allow value to be a function so we have same API as useState
       const valueToStore =
         value instanceof Function ? value(storedValue) : value;
+
+      let finalValueToStore = valueToStore;
+      // If it's the accessToken, store it directly as a cleaned string without JSON.stringify
+      if (typeof finalValueToStore === 'string' && key === 'accessToken') {
+        finalValueToStore = finalValueToStore.trim().replace(/^"|"$/g, '') as T;
+        setStoredValue(finalValueToStore);
+        window.localStorage.setItem(key, finalValueToStore as string); // Store raw string
+        return;
+      }
       // Save state
-      setStoredValue(valueToStore);
+      setStoredValue(finalValueToStore);
       // Save to local storage
       if (typeof window !== 'undefined') {
-        window.localStorage.setItem(key, JSON.stringify(valueToStore));
+        window.localStorage.setItem(key, JSON.stringify(finalValueToStore));
       }
     } catch (error) {
       // A more advanced implementation would handle the error case

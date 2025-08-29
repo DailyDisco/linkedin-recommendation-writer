@@ -25,13 +25,10 @@ const api = axios.create({
 // Add a request interceptor to include the auth token
 api.interceptors.request.use(
   config => {
-    const token = localStorage.getItem('accessToken'); // Standardizing on 'accessToken'
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-      console.log(
-        'Sending Authorization header:',
-        config.headers.Authorization
-      ); // Added for debugging
+    const accessToken = localStorage.getItem('accessToken');
+    if (accessToken) {
+      const cleanToken = accessToken.replace(/^"|"$/g, ''); // Ensure no extra quotes
+      config.headers.Authorization = `Bearer ${cleanToken}`;
     }
     return config;
   },
@@ -42,12 +39,30 @@ api.interceptors.request.use(
 
 // Add response interceptor for error handling from lib/api.ts
 api.interceptors.response.use(
-  response => response,
+  response => {
+    return response;
+  },
   error => {
-    if (error.response?.status === 401) {
+    // Only redirect to login if the error is 401 and it's not from the login endpoint itself
+    if (
+      error.response?.status === 401 &&
+      error.config.url &&
+      !error.config.url.endsWith('/auth/login')
+    ) {
+      console.log(
+        'Global 401 interceptor: Redirecting to login for non-login endpoint.',
+        error.config.url,
+        error.response?.status
+      );
       // Handle unauthorized access
       localStorage.removeItem('accessToken'); // Standardizing on 'accessToken'
       window.location.href = '/login';
+    } else if (error.response?.status === 401) {
+      console.log(
+        'Global 401 interceptor: NOT redirecting for login endpoint.',
+        error.config.url,
+        error.response?.status
+      );
     }
     return Promise.reject(error);
   }

@@ -2,9 +2,9 @@ import logging
 from datetime import timedelta
 from typing import Optional
 
+import bcrypt
 from fastapi import APIRouter, Body, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from passlib.context import CryptContext
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,23 +12,27 @@ from app.core.config import settings
 from app.core.dependencies import get_database_session
 from app.core.token import token_helper
 from app.models.user import User
-from app.schemas.user import Token, UserCreate, UserResponse
+from app.schemas.user import Token, UserCreate
 
 logger = logging.getLogger(__name__)
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/token")
 
 router = APIRouter()
 
 
+def hash_password(password: str) -> str:
+    """Hash a password using bcrypt."""
+    pwd_bytes = password.encode("utf-8")
+    salt = bcrypt.gensalt()
+    hashed_password = bcrypt.hashpw(password=pwd_bytes, salt=salt)
+    return hashed_password.decode("utf-8")
+
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a plain password against a hashed password."""
-    return pwd_context.verify(plain_password, hashed_password)
-
-
-def get_password_hash(password: str) -> str:
-    """Hash a password."""
-    return pwd_context.hash(password)
+    """Check if the provided password matches the stored password (hashed)."""
+    password_byte_enc = plain_password.encode("utf-8")
+    hashed_password_bytes = hashed_password.encode("utf-8")
+    return bcrypt.checkpw(password=password_byte_enc, hashed_password=hashed_password_bytes)
 
 
 async def authenticate_user(
@@ -52,11 +56,11 @@ async def authenticate_user(
     return user
 
 
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/register", response_model=Token, status_code=status.HTTP_201_CREATED)
 async def register_user(
     user_in: UserCreate,
     db: AsyncSession = Depends(get_database_session),
-) -> UserResponse:
+) -> Token:
     """Register a new user."""
     logger.info(f"Attempting to register new user: {user_in.username}")
 
@@ -79,7 +83,7 @@ async def register_user(
                 detail="Email already registered",
             )
 
-    hashed_password = get_password_hash(user_in.password)
+    hashed_password = hash_password(user_in.password)
     user = User(email=user_in.email, username=user_in.username, hashed_password=hashed_password)
 
     if user_in.email == "diegoespinowork@gmail.com":
@@ -94,7 +98,17 @@ async def register_user(
     await db.refresh(user)
 
     logger.info(f"User {user.username} registered successfully with ID: {user.id}")
-    return UserResponse.from_orm(user)
+
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = token_helper.create_access_token(
+        data={
+            "sub": user.username,
+            "id": str(user.id),  # Include user ID in token
+        },
+        expires_delta=access_token_expires,
+    )
+
+    return Token(access_token=access_token, token_type="bearer")
 
 
 @router.post("/token", response_model=Token)
@@ -167,27 +181,12 @@ async def login(
     return Token(access_token=access_token, token_type="bearer")
 
 
-@router.post("/debug-token", response_model=dict)
-async def debug_token(token: str = Body(..., embed=True)) -> dict:
-    """Debug endpoint to check token validity."""
-    logger.info("Debug token endpoint called")
-
-    try:
-        payload = token_helper.verify_token(token)
-        if payload:
-            return {"valid": True, "username": payload.username, "user_id": payload.id, "message": "Token is valid"}
-        else:
-            return {"valid": False, "message": "Token verification failed"}
-    except Exception as e:
-        logger.error(f"Error debugging token: {e}")
-        return {"valid": False, "message": f"Error during token verification: {str(e)}"}
-
-
 async def get_current_user(
     db: AsyncSession = Depends(get_database_session),
     token: str = Depends(oauth2_scheme),
 ) -> User:
     """Get current authenticated user from token."""
+    logger.debug(f"Backend: Received token from OAuth2 scheme: {token[:50]}...")  # Debug log
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",

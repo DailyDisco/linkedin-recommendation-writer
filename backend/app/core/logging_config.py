@@ -24,6 +24,9 @@ def setup_logging() -> None:
         ],
     )
 
+    # Explicitly set app logger to DEBUG
+    logging.getLogger("app").setLevel(logging.DEBUG)
+
     # Set specific loggers based on environment
     if is_production:
         # More restrictive logging in production
@@ -31,9 +34,11 @@ def setup_logging() -> None:
         logging.getLogger("sqlalchemy.engine").setLevel(logging.ERROR)
         logging.getLogger("httpx").setLevel(logging.ERROR)
         logging.getLogger("github").setLevel(logging.ERROR)
+        logging.getLogger("uvicorn.access").setLevel(logging.INFO)
     else:
         # Development logging
         logging.getLogger("uvicorn").setLevel(logging.INFO)
+        logging.getLogger("uvicorn.access").setLevel(logging.INFO)
         logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
         logging.getLogger("httpx").setLevel(logging.WARNING)
 

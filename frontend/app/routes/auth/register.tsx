@@ -59,20 +59,9 @@ export default function RegisterPage() {
         password: values.password,
       });
 
-      // Check if registration returns an access token for auto-login
-      if (response.access_token) {
-        await login(response.access_token);
-        setSuccess('Registration successful! Redirecting to home page...');
-        setTimeout(() => {
-          navigate('/');
-        }, 1000);
-      } else {
-        // If no token returned, just redirect to home page
-        setSuccess('Registration successful! Redirecting to home page...');
-        setTimeout(() => {
-          navigate('/');
-        }, 1000);
-      }
+      await login(response.access_token);
+      setSuccess('Registration successful! Redirecting to home page...');
+      navigate('/generate');
     } catch (err: unknown) {
       console.error('Registration failed:', err);
       const errorMessage =

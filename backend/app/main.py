@@ -362,5 +362,5 @@ if __name__ == "__main__":
         port=settings.API_PORT,
         reload=settings.API_RELOAD and settings.ENVIRONMENT != "production",
         workers=(settings.API_WORKERS if settings.ENVIRONMENT == "production" else 1),
-        log_level=settings.LOG_LEVEL.lower(),
+        log_level=settings.LOG_LEVEL.lower(),  # Revert to use settings
     )
