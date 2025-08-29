@@ -121,11 +121,11 @@ export default function RecommendationModal({
     timeWorkedTogether: string;
     notableAchievements: string;
     recommendation_type:
-    | 'professional'
-    | 'technical'
-    | 'leadership'
-    | 'academic'
-    | 'personal';
+      | 'professional'
+      | 'technical'
+      | 'leadership'
+      | 'academic'
+      | 'personal';
     tone: 'professional' | 'friendly' | 'formal' | 'casual';
     length: 'short' | 'medium' | 'long';
     github_input: string;
@@ -340,7 +340,7 @@ Key Achievements: ${formData.notableAchievements}
       const error = err as HttpError; // Type assertion for axios error structure
       setError(
         error.response?.data?.detail ||
-        'Failed to create recommendation from selected option'
+          'Failed to create recommendation from selected option'
       );
     } finally {
       setIsCreatingFromOption(false);
@@ -390,7 +390,7 @@ Key Achievements: ${formData.notableAchievements}
 
       setError(
         error.response?.data?.detail ||
-        'Failed to regenerate recommendation. Please try again.'
+          'Failed to regenerate recommendation. Please try again.'
       );
       setIsRegenerating(false);
     }
@@ -498,10 +498,11 @@ Key Achievements: ${formData.notableAchievements}
                     id='github-input'
                     type='text'
                     required
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${validationErrors.github_input
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${
+                      validationErrors.github_input
                         ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
                         : 'border-gray-300'
-                      }`}
+                    }`}
                     placeholder='e.g., johnsmith or https://github.com/johnsmith/myproject'
                     value={formData.github_input}
                     onChange={e => {
@@ -655,10 +656,11 @@ Key Achievements: ${formData.notableAchievements}
                     id='working-relationship'
                     ref={firstInputRef}
                     required
-                    className={`w-full h-20 px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${validationErrors.workingRelationship
+                    className={`w-full h-20 px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${
+                      validationErrors.workingRelationship
                         ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
                         : 'border-gray-300'
-                      }`}
+                    }`}
                     placeholder='e.g., We collaborated on the frontend development team for 8 months...'
                     value={formData.workingRelationship}
                     onChange={e => {
@@ -982,12 +984,13 @@ Key Achievements: ${formData.notableAchievements}
                             <span className='flex items-center space-x-1'>
                               <span className='font-medium'>Confidence:</span>
                               <span
-                                className={`font-semibold ${option.confidence_score >= 80
+                                className={`font-semibold ${
+                                  option.confidence_score >= 80
                                     ? 'text-green-600'
                                     : option.confidence_score >= 60
                                       ? 'text-yellow-600'
                                       : 'text-red-600'
-                                  }`}
+                                }`}
                               >
                                 {option.confidence_score}%
                               </span>

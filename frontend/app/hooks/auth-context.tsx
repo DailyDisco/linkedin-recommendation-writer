@@ -75,7 +75,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         console.error('Failed to fetch user details:', error);
         setUserDetailsError(
           (error instanceof Error && error.message) ||
-          'Failed to fetch user details'
+            'Failed to fetch user details'
         );
         // Only logout if it's an authentication error (401/403), not network issues
         // The global API interceptor will handle token removal and redirect for 401s

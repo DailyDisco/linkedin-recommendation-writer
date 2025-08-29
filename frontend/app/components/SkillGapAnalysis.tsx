@@ -119,15 +119,20 @@ export const SkillGapAnalysis: React.FC<SkillGapAnalysisProps> = ({
   const [targetRole, setTargetRole] = useState('');
   const [industry, setIndustry] = useState('technology');
   const [experienceLevel, setExperienceLevel] = useState('mid');
-  const [analysisResult, setAnalysisResult] = useState<({
+  const [analysisResult, setAnalysisResult] = useState<{
     overall_match_score: number;
-    skill_analysis: Array<{ skill: string; match_level: string; evidence: string[]; confidence_score: number; }>;
+    skill_analysis: Array<{
+      skill: string;
+      match_level: string;
+      evidence: string[];
+      confidence_score: number;
+    }>;
     strengths: string[];
     gaps: string[];
     recommendations: string[];
     learning_resources: string[];
     analysis_summary: string;
-  }) | null>(null);
+  } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
