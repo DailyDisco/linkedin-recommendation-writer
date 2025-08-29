@@ -10,7 +10,7 @@ services:
       target: development # Use 'production' for production builds
     container_name: linkedin-recommender-frontend
     ports:
-      - "5173:5173" # Vite dev server (development mode)
+      - '5173:5173' # Vite dev server (development mode)
     environment:
       # API Configuration
       VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
@@ -19,11 +19,12 @@ services:
       # Environment
       NODE_ENV: ${NODE_ENV:-development}
 
+    # Run with current user's UID/GID to avoid permission issues
+    user: '${UID:-1000}:${GID:-1000}'
+
     volumes:
       # Mount source code for development (live reload enabled)
       - ./frontend:/app
-      # Mount node_modules from container to avoid conflicts
-      - /app/node_modules
 
     depends_on:
       backend:
@@ -36,7 +37,7 @@ services:
 
     # Health check
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5173/"]
+      test: ['CMD', 'curl', '-f', 'http://localhost:5173/']
       interval: 30s
       timeout: 10s
       retries: 3
@@ -54,7 +55,7 @@ services:
       target: development # Use 'production' for production builds
     container_name: linkedin-recommender-backend
     ports:
-      - "8000:8000"
+      - '8000:8000'
     environment:
       # Database Configuration
       DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-github_recommender}
@@ -104,7 +105,7 @@ services:
 
     # Health check
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ['CMD', 'curl', '-f', 'http://localhost:8000/health']
       interval: 30s
       timeout: 10s
       retries: 3
@@ -118,10 +119,10 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-github_recommender}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
-      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+      POSTGRES_INITDB_ARGS: '--encoding=UTF-8 --lc-collate=C --lc-ctype=C'
 
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - '${POSTGRES_PORT:-5432}:5432'
 
     volumes:
       # Persistent database storage
@@ -138,8 +139,8 @@ services:
     healthcheck:
       test:
         [
-          "CMD-SHELL",
-          "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-github_recommender}",
+          'CMD-SHELL',
+          'pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-github_recommender}',
         ]
       interval: 10s
       timeout: 5s
@@ -173,7 +174,7 @@ services:
       --timeout 300
 
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - '${REDIS_PORT:-6379}:6379'
 
     volumes:
       # Persistent Redis data
@@ -188,7 +189,7 @@ services:
 
     # Health check
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 10s
       timeout: 5s
       retries: 3
