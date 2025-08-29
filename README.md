@@ -6,9 +6,46 @@
 
 Generate professional LinkedIn recommendations using GitHub data and AI.
 
+## Table of Contents
+
+- [🌐 Live Demo](#-live-demo)
+- [✨ Features](#-features)
+- [💻 Technology Stack](#-technology-stack)
+- [🚀 Railway Deployment (Recommended)](#-railway-deployment-recommended)
+  - [Option 1: Full-Stack Deployment (Easiest)](#option-1-full-stack-deployment-easiest)
+  - [Option 2: Separate Frontend/Backend (Advanced)](#option-2-separate-frontendbackend-advanced)
+  - [Railway Environment Setup](#railway-environment-setup)
+  - [Local Development](#local-development)
+- [📋 Prerequisites](#-prerequisites)
+  - [Accounts & API Keys](#accounts--api-keys)
+  - [API Keys Setup](#api-keys-setup)
+  - [Development Tools](#development-tools)
+  - [Deployment Platforms](#deployment-platforms)
+  - [Quick Start Checklist](#quick-start-checklist)
+- [🛠️ Installation](#️-installation)
+- [⚙️ Configuration](#️-configuration)
+  - [Environment Variables](#environment-variables)
+  - [Getting API Keys](#getting-api-keys)
+  - [Security Notes](#security-notes)
+- [🚀 Deployment Options](#-deployment-options)
+  - [Option A: Railway Full-Stack (Recommended)](#option-a-railway-full-stack-recommended)
+  - [Option B: Vercel + Railway (Scalable)](#option-b-vercel--railway-scalable)
+  - [Option C: Docker Production](#option-c-docker-production)
+  - [Deployment Comparison](#deployment-comparison)
+  - [Troubleshooting Deployment](#troubleshooting-deployment)
+- [🔧 Development](#-development)
+- [📚 API Documentation](#-api-documentation)
+- [🤝 Contributing](#-contributing)
+- [📄 License](#-license)
+- [📞 Support](#-support)
+
 ## 🌐 Live Demo
 
 Try the live application: **[linkedin-recommendation-writer-production.up.railway.app](https://linkedin-recommendation-writer-production.up.railway.app/)**
+
+## 🖼️ Screenshots / Demos
+
+_(Add your application screenshots or GIFs here to showcase key features.)_
 
 ## ✨ Features
 
@@ -17,6 +54,36 @@ Try the live application: **[linkedin-recommendation-writer-production.up.railwa
 - ⚙️ **Customizable**: Multiple types, tones, and lengths available
 - 💾 **History Tracking**: Save and manage all generated recommendations
 - 🚀 **Fast Results**: Intelligent caching for quick responses
+
+## 💻 Technology Stack
+
+This project leverages a modern full-stack architecture with the following key technologies:
+
+**Frontend:**
+
+- **React**: A JavaScript library for building user interfaces.
+- **Vite**: A fast frontend build tool.
+- **Tailwind CSS**: A utility-first CSS framework for styling.
+- **ShadCN UI**: A collection of reusable components built with Radix UI and Tailwind CSS.
+
+**Backend:**
+
+- **FastAPI**: A modern, fast (high-performance) web framework for building APIs with Python.
+- **Pydantic**: Data validation and settings management using Python type hints.
+- **SQLAlchemy**: An SQL toolkit and Object-Relational Mapper (ORM) for Python.
+- **PostgreSQL**: A powerful, open-source object-relational database system.
+- **Redis**: An open-source, in-memory data store, used as a cache and message broker.
+
+**AI/Machine Learning:**
+
+- **Google Gemini API**: For natural language processing and recommendation generation.
+
+**Deployment & Containerization:**
+
+- **Docker**: For containerizing the application and its services.
+- **Docker Compose**: For defining and running multi-container Docker applications.
+- **Railway**: Recommended platform for full-stack deployment.
+- **Vercel**: Optional platform for frontend deployment.
 
 ## 🚀 Railway Deployment (Recommended)
 
@@ -117,7 +184,7 @@ After deployment, configure these environment variables in Railway:
 **Get everything running locally:**
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/day0009/linkedin-recommendation-writer-app
 cd linkedin-recommendation-writer-app
 cp env.example .env
 # Edit .env with your API keys
@@ -173,11 +240,11 @@ Access your local app at:
 
 ```bash
 # Clone repository
-git clone <repository-url>
+git clone https://github.com/day0009/linkedin-recommendation-writer-app
 cd linkedin-recommendation-writer-app
 
 # Configure environment
-cp env.template .env
+cp env.example .env
 # Edit .env with your API keys (GITHUB_TOKEN, GEMINI_API_KEY)
 
 # Quick setup (builds and starts everything)
@@ -388,11 +455,53 @@ Once running, visit:
 
 ## 🤝 Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Run tests: `make test`
-5. Submit a pull request
+We welcome contributions to the LinkedIn Recommendation Writer! To ensure a smooth collaboration process, please follow these guidelines:
+
+### Getting Started
+
+1.  **Fork the repository** on GitHub.
+2.  **Clone your forked repository** to your local machine:
+    ```bash
+    git clone https://github.com/day0009/linkedin-recommendation-writer-app
+    cd linkedin-recommendation-writer-app
+    ```
+3.  **Set up your development environment** by following the [Local Development](#local-development) instructions.
+4.  **Create a new feature branch** for your changes:
+    ```bash
+    git checkout -b feature/your-feature-name
+    ```
+    (Use `fix/bug-description` for bug fixes, `chore/task-description` for maintenance, etc.)
+
+### Coding Standards
+
+- **Follow existing code style**: We use `black` for Python and `ESLint` with `Prettier` for JavaScript/TypeScript.
+- **Type Hinting**: Ensure all Python functions and complex variables use type hints.
+- **Docstrings**: Add clear and concise docstrings to all public functions and classes.
+- **Comments**: Use comments sparingly for explaining _why_ something is done, not _what_ it does (which should be clear from the code).
+
+### Testing
+
+- **Write tests**: All new features and bug fixes should be accompanied by appropriate unit and integration tests.
+- **Run tests**: Before submitting a pull request, ensure all tests pass:
+  ```bash
+  make test
+  ```
+- **Test coverage**: Aim for high test coverage, focusing on critical paths and edge cases.
+
+### Pull Request Guidelines
+
+1.  **Keep it focused**: Each pull request should address a single feature or bug fix.
+2.  **Descriptive title**: Use a clear and concise title that summarizes your changes (e.g., `feat: Add dark mode toggle`).
+3.  **Detailed description**: Provide a detailed description of your changes, including:
+    - The problem it solves.
+    - How you solved it.
+    - Any relevant design decisions or trade-offs.
+    - Instructions for testing (if applicable).
+4.  **Link to issues**: If your pull request addresses an open issue, link to it in the description (e.g., `Closes #123`).
+5.  **Review**: Your pull request will be reviewed by a maintainer. Please be responsive to feedback.
+6.  **Merge**: Once approved, your changes will be merged into the `main` branch.
+
+Thank you for contributing to the LinkedIn Recommendation Writer!
 
 ## 📄 License
 
@@ -401,8 +510,8 @@ MIT License - see [LICENSE](LICENSE) file for details.
 ## 📞 Support
 
 - 📖 **Documentation**: Check the API docs at `/docs`
-- 🐛 **Bug Reports**: [Create GitHub issues](https://github.com/your-repo/issues)
-- 💬 **Discussions**: [Start GitHub discussions](https://github.com/your-repo/discussions)
+- 🐛 **Bug Reports**: [Create GitHub issues](https://github.com/day0009/linkedin-recommendation-writer-app/issues)
+- 💬 **Discussions**: [Start GitHub discussions](https://github.com/day0009/linkedin-recommendation-writer-app/discussions)
 
 ---
 
