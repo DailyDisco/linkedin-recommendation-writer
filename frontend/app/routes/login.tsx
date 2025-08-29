@@ -6,7 +6,12 @@ import { Lock, Mail, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import ErrorBoundary from '../components/ui/error-boundary';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '../components/ui/card';
 import { recommendationApi } from '../services/api'; // Assuming auth endpoints are here
 import { useAuth } from '../hooks/useAuth';
 import { Link, useNavigate } from 'react-router';
@@ -47,7 +52,7 @@ export default function LoginPage() {
       const errorMessage =
         err && typeof err === 'object' && 'response' in err
           ? (err as { response?: { data?: { detail?: string } } }).response
-            ?.data?.detail
+              ?.data?.detail
           : 'Invalid username or password';
       setError(errorMessage || 'Invalid username or password');
     } finally {
@@ -66,7 +71,10 @@ export default function LoginPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <form onSubmit={form.handleSubmit(onSubmit)} className='space-y-6'>
+              <form
+                onSubmit={form.handleSubmit(onSubmit)}
+                className='space-y-6'
+              >
                 <div>
                   <label
                     htmlFor='username'
@@ -76,7 +84,10 @@ export default function LoginPage() {
                   </label>
                   <div className='relative mt-2 rounded-md shadow-sm'>
                     <div className='pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3'>
-                      <Mail className='h-5 w-5 text-gray-400' aria-hidden='true' />
+                      <Mail
+                        className='h-5 w-5 text-gray-400'
+                        aria-hidden='true'
+                      />
                     </div>
                     <Input
                       id='username'
@@ -102,7 +113,10 @@ export default function LoginPage() {
                   </label>
                   <div className='relative mt-2 rounded-md shadow-sm'>
                     <div className='pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3'>
-                      <Lock className='h-5 w-5 text-gray-400' aria-hidden='true' />
+                      <Lock
+                        className='h-5 w-5 text-gray-400'
+                        aria-hidden='true'
+                      />
                     </div>
                     <Input
                       id='password'

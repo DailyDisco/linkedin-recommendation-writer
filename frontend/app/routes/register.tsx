@@ -7,7 +7,12 @@ import { User, Mail, Lock, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import ErrorBoundary from '../components/ui/error-boundary';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '../components/ui/card';
 import { recommendationApi } from '../services/api';
 import { Link, useNavigate } from 'react-router';
 
@@ -60,7 +65,7 @@ export default function RegisterPage() {
       const errorMessage =
         err && typeof err === 'object' && 'response' in err
           ? (err as { response?: { data?: { detail?: string } } }).response
-            ?.data?.detail
+              ?.data?.detail
           : 'Registration failed. Please try again.';
       setError(errorMessage || 'Registration failed. Please try again.');
     } finally {
@@ -79,7 +84,10 @@ export default function RegisterPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <form onSubmit={form.handleSubmit(onSubmit)} className='space-y-6'>
+              <form
+                onSubmit={form.handleSubmit(onSubmit)}
+                className='space-y-6'
+              >
                 <div>
                   <label
                     htmlFor='username'
@@ -89,7 +97,10 @@ export default function RegisterPage() {
                   </label>
                   <div className='relative mt-2 rounded-md shadow-sm'>
                     <div className='pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3'>
-                      <User className='h-5 w-5 text-gray-400' aria-hidden='true' />
+                      <User
+                        className='h-5 w-5 text-gray-400'
+                        aria-hidden='true'
+                      />
                     </div>
                     <Input
                       id='username'
@@ -115,7 +126,10 @@ export default function RegisterPage() {
                   </label>
                   <div className='relative mt-2 rounded-md shadow-sm'>
                     <div className='pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3'>
-                      <Mail className='h-5 w-5 text-gray-400' aria-hidden='true' />
+                      <Mail
+                        className='h-5 w-5 text-gray-400'
+                        aria-hidden='true'
+                      />
                     </div>
                     <Input
                       id='email'
@@ -141,7 +155,10 @@ export default function RegisterPage() {
                   </label>
                   <div className='relative mt-2 rounded-md shadow-sm'>
                     <div className='pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3'>
-                      <Lock className='h-5 w-5 text-gray-400' aria-hidden='true' />
+                      <Lock
+                        className='h-5 w-5 text-gray-400'
+                        aria-hidden='true'
+                      />
                     </div>
                     <Input
                       id='password'
@@ -167,7 +184,10 @@ export default function RegisterPage() {
                   </label>
                   <div className='relative mt-2 rounded-md shadow-sm'>
                     <div className='pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3'>
-                      <Lock className='h-5 w-5 text-gray-400' aria-hidden='true' />
+                      <Lock
+                        className='h-5 w-5 text-gray-400'
+                        aria-hidden='true'
+                      />
                     </div>
                     <Input
                       id='confirmPassword'
