@@ -35,6 +35,7 @@ class KeywordRefinementService:
         recommendation_type: str,
         tone: str,
         length: str,
+        include_keywords: Optional[List[str]] = None,
         exclude_keywords: Optional[List[str]] = None,
         regeneration_params: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
@@ -49,7 +50,7 @@ class KeywordRefinementService:
             # Build the refinement prompt
             refinement_prompt = self.prompt_service.build_keyword_refinement_prompt(
                 original_content=original_content,
-                include_keywords=None,  # Could be extended to support include keywords
+                include_keywords=include_keywords,  # Pass include keywords
                 exclude_keywords=exclude_keywords,
                 refinement_instructions=refinement_instructions,
                 github_data=github_data,
@@ -70,7 +71,7 @@ class KeywordRefinementService:
             formatted_content = self._format_refined_content(refined_content, length, {"tone": tone, "length": length})
 
             # Validate keyword compliance
-            validation = self._validate_keyword_compliance(formatted_content, exclude_keywords=exclude_keywords)
+            validation = self._validate_keyword_compliance(formatted_content, include_keywords=None, exclude_keywords=exclude_keywords)
 
             # Generate refinement summary
             refinement_summary = self._generate_refinement_summary(validation)
@@ -84,6 +85,7 @@ class KeywordRefinementService:
                 "refined_title": self.prompt_service.extract_title(formatted_content, github_data["user_data"]["github_username"]),
                 "word_count": len(formatted_content.split()),
                 "confidence_score": 85,  # Placeholder - will be calculated by ConfidenceScorerService
+                "include_keywords_used": validation["include_compliance"],
                 "exclude_keywords_avoided": validation["exclude_compliance"],
                 "refinement_summary": refinement_summary,
                 "validation_issues": validation["issues"],

@@ -176,6 +176,8 @@ class RecommendationVersionInfo(BaseModel):
     word_count: int
     created_at: datetime
     created_by: Optional[str]
+    include_keywords_used: Optional[List[str]] = None
+    exclude_keywords_avoided: Optional[List[str]] = None
 
 
 class RecommendationVersionDetail(BaseModel):
@@ -193,6 +195,8 @@ class RecommendationVersionDetail(BaseModel):
     word_count: int
     created_at: datetime
     created_by: Optional[str]
+    include_keywords_used: Optional[List[str]] = None
+    exclude_keywords_avoided: Optional[List[str]] = None
 
 
 class RecommendationVersionHistoryResponse(BaseModel):

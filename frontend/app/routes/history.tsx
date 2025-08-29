@@ -1,5 +1,5 @@
-import { useEffect, useState, useRef } from 'react';
-import { FileText, Loader2, AlertCircle, History } from 'lucide-react';
+import { useEffect, useState, useRef, useCallback } from 'react';
+import { FileText, Loader2, History } from 'lucide-react';
 import { toast } from 'sonner';
 import { recommendationApi, apiClient } from '../services/api';
 import type { Recommendation } from '../types';
@@ -17,6 +17,9 @@ import {
 } from '@/components/ui/dialog';
 import { VersionHistory } from '@/components/VersionHistory';
 import { PleaseSignInOrRegister } from '../components/PleaseSignInOrRegister';
+import { KeywordRefinement } from '../components/KeywordRefinement';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import type { KeywordRefinementResult } from '../types';
 
 const RecommendationsHistory = () => {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
@@ -32,33 +35,33 @@ const RecommendationsHistory = () => {
     }
   }, [isLoggedIn]);
 
-  useEffect(() => {
-    const fetchRecommendations = async () => {
-      if (!isLoggedIn) {
-        setIsLoading(false);
-        setRecommendations([]);
-        return;
+  const fetchRecommendations = useCallback(async () => {
+    if (!isLoggedIn) {
+      setIsLoading(false);
+      setRecommendations([]);
+      return;
+    }
+    try {
+      setIsLoading(true);
+      const data = await recommendationApi.getAll();
+      setRecommendations(data);
+      if (data.length > 0 && !hasShownToastRef.current) {
+        toast.success(
+          `Loaded ${data.length} recommendation${data.length === 1 ? '' : 's'} from your history!`
+        );
+        hasShownToastRef.current = true;
       }
-      try {
-        setIsLoading(true);
-        const data = await recommendationApi.getAll();
-        setRecommendations(data);
-        if (data.length > 0 && !hasShownToastRef.current) {
-          toast.success(
-            `Loaded ${data.length} recommendation${data.length === 1 ? '' : 's'} from your history!`
-          );
-          hasShownToastRef.current = true;
-        }
-      } catch (err) {
-        console.error('Failed to fetch recommendations:', err);
-        toast.error('Failed to load recommendations. Please try again later.');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchRecommendations();
+    } catch (err) {
+      console.error('Failed to fetch recommendations:', err);
+      toast.error('Failed to load recommendations. Please try again later.');
+    } finally {
+      setIsLoading(false);
+    }
   }, [isLoggedIn]);
+
+  useEffect(() => {
+    fetchRecommendations();
+  }, [fetchRecommendations]);
 
   // Version History API handlers
   const handleGetVersionHistory = async (recommendationId: number) => {
@@ -170,9 +173,49 @@ const RecommendationsHistory = () => {
                     </span>
                   </div>
                 </div>
-                <p className='text-gray-700 whitespace-pre-wrap'>
-                  {rec.content}
-                </p>
+                {/* Add Tabs for content and refinement */}
+                <Tabs defaultValue='content' className='w-full'>
+                  <TabsList className='grid w-full grid-cols-2 h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground'>
+                    <TabsTrigger
+                      value='content'
+                      className='inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm'
+                    >
+                      Content
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value='refine'
+                      className='inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm'
+                    >
+                      Refine
+                    </TabsTrigger>
+                  </TabsList>
+                  <TabsContent value='content'>
+                    <p className='text-gray-700 whitespace-pre-wrap'>
+                      {rec.content}
+                    </p>
+                  </TabsContent>
+                  <TabsContent value='refine'>
+                    <KeywordRefinement
+                      recommendationId={rec.id}
+                      onRefinementComplete={(
+                        refinedContent: KeywordRefinementResult
+                      ) => {
+                        // Update recommendation content
+                        setRecommendations(prev =>
+                          prev.map(r =>
+                            r.id === rec.id
+                              ? {
+                                  ...r,
+                                  content: refinedContent.refined_content,
+                                }
+                              : r
+                          )
+                        );
+                        toast.success('Recommendation refined successfully');
+                      }}
+                    />
+                  </TabsContent>
+                </Tabs>
                 <div className='flex flex-wrap gap-2 text-sm text-gray-600'>
                   <span className='px-2 py-1 bg-gray-100 rounded-full'>
                     Type: {rec.recommendation_type}

@@ -1,6 +1,6 @@
 import { AdvancedFeatures } from '@/components/AdvancedFeatures';
 import { useAuth } from '../hooks/useAuth';
-import type { MultiContributorData } from '../types';
+import type { ReadmeGenerationData, SkillAnalysisData } from '../types';
 import { apiClient } from '@/services/api';
 import { PleaseSignInOrRegister } from '../components/PleaseSignInOrRegister';
 
@@ -11,19 +11,19 @@ interface KeywordRefineData {
   length?: string;
 }
 
-interface ReadmeGenerationData {
-  repository_full_name: string;
-  style: string;
-  include_sections?: string[];
-  target_audience: string;
-}
+// interface ReadmeGenerationData {
+//   repository_full_name: string;
+//   style: string;
+//   include_sections?: string[];
+//   target_audience: string;
+// }
 
-interface SkillAnalysisData {
-  github_username: string;
-  target_role: string;
-  industry: string;
-  experience_level: string;
-}
+// interface SkillAnalysisData {
+//   github_username: string;
+//   target_role: string;
+//   industry: string;
+//   experience_level: string;
+// }
 
 export default function AdvancedPage() {
   const { isLoggedIn } = useAuth();
@@ -48,7 +48,15 @@ export default function AdvancedPage() {
     // This would be handled by the parent component
   };
 
-  const handleMultiContributor = async (data: MultiContributorData) => {
+  const handleMultiContributor = async (data: {
+    repository_full_name: string;
+    max_contributors: number;
+    min_contributions: number;
+    focus_areas?: string[];
+    recommendation_type: string;
+    tone: string;
+    length: string;
+  }) => {
     try {
       const result = await apiClient.generateMultiContributor(data);
       return result;

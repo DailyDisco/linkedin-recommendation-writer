@@ -69,6 +69,10 @@ class RecommendationVersion(Base):
     change_type = Column(String, nullable=False)  # 'created', 'refined', 'keyword_refinement', 'manual_edit'
     change_description = Column(Text, nullable=True)  # Description of what changed
 
+    # Keyword refinement specific metadata
+    include_keywords_used = Column(JSON, nullable=True)  # List of keywords successfully included
+    exclude_keywords_avoided = Column(JSON, nullable=True)  # List of keywords successfully avoided
+
     # Content at this version
     title = Column(String, nullable=False)
     content = Column(Text, nullable=False)

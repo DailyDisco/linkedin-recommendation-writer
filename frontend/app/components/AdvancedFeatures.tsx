@@ -9,7 +9,6 @@ import {
 } from '@/components/ui/card';
 
 import {
-  Settings,
   FileText,
   Users,
   Target,
@@ -18,58 +17,65 @@ import {
   TrendingUp,
   Sparkles,
 } from 'lucide-react';
-import { KeywordRefinement } from './KeywordRefinement';
 import { ReadmeGenerator } from './ReadmeGenerator';
 import { SkillGapAnalysis } from './SkillGapAnalysis';
 import { MultiContributorGenerator } from './MultiContributorGenerator';
-
-interface KeywordRefineData {
-  keywords: string[];
-  exclude_keywords?: string[];
-  tone?: string;
-  length?: string;
-}
-
-interface ReadmeGenerationData {
-  repository_full_name: string;
-  style: string;
-  include_sections?: string[];
-  target_audience: string;
-}
-
-interface SkillAnalysisData {
-  github_username: string;
-  target_role: string;
-  industry: string;
-  experience_level: string;
-}
-
-interface MultiContributorData {
-  contributors: Array<{
-    github_username: string;
-    contribution_type: string;
-    project_role?: string;
-  }>;
-  project_description: string;
-  recommendation_tone?: string;
-}
+import type { ReadmeGenerationData, SkillAnalysisData } from '../types/index';
 
 interface AdvancedFeaturesProps {
   // API functions that would be passed from parent
-  onKeywordRefine: (data: KeywordRefineData) => Promise<unknown>;
-  onGenerateReadme: (data: ReadmeGenerationData) => Promise<unknown>;
-  onAnalyzeSkills: (data: SkillAnalysisData) => Promise<unknown>;
-  onGenerateMultiContributor: (data: MultiContributorData) => Promise<unknown>;
+  onGenerateReadme: (data: ReadmeGenerationData) => Promise<{
+    repository_name: string;
+    generated_content: string;
+    sections: Record<string, string>;
+    confidence_score: number;
+  }>;
+  onAnalyzeSkills: (data: SkillAnalysisData) => Promise<{
+    overall_match_score: number;
+    skill_analysis: Array<{
+      skill: string;
+      match_level: string;
+      evidence: string[];
+      confidence_score: number;
+    }>;
+    strengths: string[];
+    gaps: string[];
+    recommendations: string[];
+    learning_resources: string[];
+    analysis_summary: string;
+  }>;
+  onGenerateMultiContributor: (data: {
+    repository_full_name: string;
+    max_contributors: number;
+    min_contributions: number;
+    focus_areas?: string[];
+    recommendation_type: string;
+    tone: string;
+    length: string;
+  }) => Promise<{
+    repository_name: string;
+    repository_full_name: string;
+    total_contributors: number;
+    contributors_analyzed: number;
+    contributors: Array<{
+      username: string;
+      full_name?: string;
+      contributions: number;
+      primary_languages: string[];
+      top_skills: string[];
+      contribution_focus: string;
+      key_contributions: string[];
+    }>;
+    recommendation: string;
+    team_highlights: string[];
+    collaboration_insights: string[];
+    technical_diversity: Record<string, number>;
+    word_count: number;
+    confidence_score: number;
+  }>;
 }
 
 const FEATURES = [
-  {
-    id: 'keyword-refinement',
-    title: 'Keyword Refinement',
-    description: 'Fine-tune recommendations with specific keywords and phrases',
-    icon: Settings,
-    component: KeywordRefinement,
-  },
   {
     id: 'readme-generator',
     title: 'README Generator',
@@ -96,7 +102,6 @@ const FEATURES = [
 ];
 
 export const AdvancedFeatures: React.FC<AdvancedFeaturesProps> = ({
-  onKeywordRefine,
   onGenerateReadme,
   onAnalyzeSkills,
   onGenerateMultiContributor,
@@ -104,26 +109,17 @@ export const AdvancedFeatures: React.FC<AdvancedFeaturesProps> = ({
   const [activeFeature, setActiveFeature] = useState(FEATURES[0].id);
 
   const renderFeatureComponent = (feature: (typeof FEATURES)[0]) => {
-    const Component = feature.component;
-
-    const props: Record<string, unknown> = {};
-
     switch (feature.id) {
-      case 'keyword-refinement':
-        props.onRefine = onKeywordRefine;
-        break;
       case 'readme-generator':
-        props.onGenerate = onGenerateReadme;
-        break;
+        return <ReadmeGenerator onGenerate={onGenerateReadme} />;
       case 'skill-gap-analysis':
-        props.onAnalyze = onAnalyzeSkills;
-        break;
+        return <SkillGapAnalysis onAnalyze={onAnalyzeSkills} />;
       case 'multi-contributor':
-        props.onGenerate = onGenerateMultiContributor;
-        break;
+        return (
+          <MultiContributorGenerator onGenerate={onGenerateMultiContributor} />
+        );
     }
-
-    return <Component {...props} />;
+    return null;
   };
 
   return (
@@ -145,7 +141,7 @@ export const AdvancedFeatures: React.FC<AdvancedFeaturesProps> = ({
             onValueChange={setActiveFeature}
             className='w-full'
           >
-            <TabsList className='grid w-full grid-cols-4'>
+            <TabsList className='grid w-full grid-cols-3'>
               {FEATURES.map(feature => {
                 const Icon = feature.icon;
                 return (

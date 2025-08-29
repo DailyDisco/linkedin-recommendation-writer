@@ -12,6 +12,7 @@ from app.core.dependencies import PaginationParams, get_database_session, get_pa
 from app.models.user import User
 from app.schemas.recommendation import (
     KeywordRefinementRequest,
+    KeywordRefinementResponse,
     MultiContributorRequest,
     MultiContributorResponse,
     ReadmeGenerationRequest,
@@ -216,7 +217,7 @@ async def generate_recommendation_options(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.post("/refine-keywords", response_model=RecommendationResponse)
+@router.post("/refine-keywords", response_model=KeywordRefinementResponse)
 async def refine_recommendation_with_keywords(
     request: KeywordRefinementRequest,
     db: AsyncSession = Depends(get_database_session),
@@ -240,8 +241,8 @@ async def refine_recommendation_with_keywords(
 
         logger.info("✅ KEYWORD REFINEMENT API COMPLETED SUCCESSFULLY")
         logger.info("📊 Final Results:")
-        logger.info(f"   • Refined recommendation ID: {refined_recommendation.id}")
-        logger.info(f"   • Confidence score: {refined_recommendation.confidence_score}")
+        logger.info(f"   • Refined recommendation ID: {refined_recommendation['id']}")
+        logger.info(f"   • Confidence score: {refined_recommendation['confidence_score']}")
         logger.info("=" * 80)
 
         return refined_recommendation

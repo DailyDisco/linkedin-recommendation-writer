@@ -24,7 +24,7 @@ interface KeywordRefinementProps {
     exclude_keywords: string[];
     refinement_instructions?: string;
   }) => Promise<void>;
-  onRefinementComplete?: (result: unknown) => void;
+  onRefinementComplete?: (result: KeywordRefinementResult) => void;
 }
 
 export const KeywordRefinement: React.FC<KeywordRefinementProps> = ({
@@ -303,7 +303,7 @@ export const KeywordRefinement: React.FC<KeywordRefinementProps> = ({
               <h4 className='font-medium mb-2'>Refined Content</h4>
               <div className='prose prose-sm max-w-none'>
                 <pre className='whitespace-pre-wrap font-sans text-sm bg-muted p-4 rounded-md'>
-                  {result.content}
+                  {result.refined_content}
                 </pre>
               </div>
             </div>

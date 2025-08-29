@@ -113,10 +113,17 @@ export interface Recommendation {
   github_username?: string;
 }
 
-export interface KeywordRefinementResult extends Recommendation {
-  refinement_summary?: string;
+export interface KeywordRefinementResult {
+  id: number;
+  refined_content: string;
+  refined_title: string;
+  word_count: number;
+  confidence_score: number;
   include_keywords_used?: string[];
   exclude_keywords_avoided?: string[];
+  refinement_summary?: string;
+  validation_issues?: string[];
+  generation_parameters?: Record<string, unknown>;
 }
 
 // HTTP Error types for axios/fetch error handling
@@ -307,4 +314,18 @@ export interface MultiContributorData {
   }>;
   project_description: string;
   recommendation_tone?: string;
+}
+
+export interface ReadmeGenerationData {
+  repository_full_name: string;
+  style?: string;
+  include_sections?: string[];
+  target_audience?: string;
+}
+
+export interface SkillAnalysisData {
+  github_username: string;
+  target_role: string;
+  industry?: string;
+  experience_level?: string;
 }

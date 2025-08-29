@@ -1,6 +1,7 @@
 """Service for managing recommendations."""
 
 import logging
+import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -574,12 +575,8 @@ class RecommendationService:
         include_keywords: Optional[List[str]] = None,
         exclude_keywords: Optional[List[str]] = None,
         refinement_instructions: Optional[str] = None,
-    ) -> RecommendationResponse:
+    ) -> Dict[str, Any]:
         """Refine an existing recommendation based on keyword constraints."""
-        import time
-
-        start_time = time.time()
-
         try:
             logger.info("🔧 KEYWORD REFINEMENT STARTED")
             logger.info("=" * 60)
@@ -642,6 +639,7 @@ class RecommendationService:
             ai_result = await self.ai_service.refine_recommendation_with_keywords(
                 original_content=original_recommendation.content,  # type: ignore
                 github_data=github_data,
+                include_keywords=include_keywords,
                 exclude_keywords=exclude_keywords,
                 refinement_instructions=refinement_instructions or "",
                 recommendation_type=recommendation_type,
@@ -654,88 +652,37 @@ class RecommendationService:
             logger.info("✅ Keyword refinement successful:")
             logger.info(f"   • Word count: {ai_result['word_count']}")
             logger.info(f"   • Confidence score: {ai_result['confidence_score']}")
-            logger.info(f"   • Keywords included: {len(ai_result['include_keywords_used'])}")
-            logger.info(f"   • Keywords avoided: {len(ai_result['exclude_keywords_avoided'])}")
+            if ai_result.get("include_compliance"):
+                logger.info(f"   • Keywords included: {len(ai_result['include_compliance'])}")
+            if ai_result.get("exclude_compliance"):
+                logger.info(f"   • Exclude keywords avoided: {len(ai_result['exclude_compliance'])}")
 
-            # Create new recommendation record for the refined version
-            logger.info("💾 STEP 2: SAVING REFINED RECOMMENDATION")
-            logger.info("-" * 50)
-            save_start = time.time()
-
-            # Update generation parameters to include refinement info
-            refined_params = original_params.copy()
-            refined_params.update(
-                {
-                    "keyword_refinement": True,
-                    "original_recommendation_id": recommendation_id,
-                    "include_keywords": include_keywords or [],
-                    "exclude_keywords": exclude_keywords or [],
-                    "refinement_instructions": refinement_instructions,
-                    "refined_at": datetime.utcnow().isoformat(),
-                }
+            # Save the refined recommendation as a new version
+            new_recommendation = await self._create_recommendation_version(
+                db=db,
+                recommendation=original_recommendation,
+                change_type="keyword_refinement",
+                change_description=ai_result["refinement_summary"],
+                include_keywords_used=ai_result.get("include_compliance"),
+                exclude_keywords_avoided=ai_result.get("exclude_compliance"),
             )
 
-            recommendation_data = RecommendationCreate(
-                github_profile_id=original_recommendation.github_profile_id,  # type: ignore
-                title=ai_result["refined_title"],
-                content=ai_result["refined_content"],
-                recommendation_type=recommendation_type,
-                tone=tone,
-                length=length,
-                ai_model=refined_params.get("model", "gemini"),
-                generation_prompt=refinement_instructions,
-                generation_parameters=refined_params,
-                confidence_score=ai_result["confidence_score"],
-                word_count=ai_result["word_count"],
-                selected_option_id=original_recommendation.selected_option_id,  # type: ignore
-                selected_option_name=original_recommendation.selected_option_name,  # type: ignore
-                selected_option_focus=original_recommendation.selected_option_focus,  # type: ignore
-                generated_options=original_recommendation.generated_options,  # type: ignore
-            )
-
-            refined_recommendation = Recommendation(**recommendation_data.dict())
-            db.add(refined_recommendation)
-            await db.commit()
-            await db.refresh(refined_recommendation)
-
-            save_end = time.time()
-            logger.info(f"⏱️  Database save completed in {save_end - save_start:.2f} seconds")
-            logger.info(f"✅ Refined recommendation saved with ID: {refined_recommendation.id}")
-
-            # Convert to response
-            response = RecommendationResponse.from_orm(refined_recommendation)
-            response.github_username = github_profile.github_username  # type: ignore
-
-            # Add refinement-specific metadata
-            response.__dict__.update(
-                {
-                    "refinement_summary": ai_result["refinement_summary"],
-                    "include_keywords_used": ai_result["include_keywords_used"],
-                    "exclude_keywords_avoided": ai_result["exclude_keywords_avoided"],
-                    "validation_issues": ai_result.get("validation_issues", []),
-                    "original_recommendation_id": recommendation_id,
-                }
-            )
-
-            end_time = time.time()
-            total_time = end_time - start_time
-
-            logger.info("🎉 KEYWORD REFINEMENT COMPLETED")
-            logger.info("-" * 50)
-            logger.info(f"⏱️  Total processing time: {total_time:.2f} seconds")
-            logger.info("📊 Refinement Results:")
-            logger.info(f"   • Original ID: {recommendation_id}")
-            logger.info(f"   • Refined ID: {refined_recommendation.id}")
-            logger.info(f"   • Confidence Score: {ai_result['confidence_score']}")
-            logger.info("=" * 60)
-
-            return response
-
+            return {
+                "id": new_recommendation.id,
+                "original_recommendation_id": original_recommendation.id,  # Added this line
+                "refined_content": new_recommendation.content,
+                "refined_title": new_recommendation.title,
+                "word_count": new_recommendation.word_count,
+                "confidence_score": new_recommendation.confidence_score,
+                "exclude_keywords_avoided": ai_result.get("exclude_compliance", []),
+                "include_keywords_used": ai_result.get("include_compliance", []),
+                "refinement_summary": ai_result["refinement_summary"],
+                "validation_issues": ai_result["validation_issues"],
+                "generation_parameters": ai_result["generation_parameters"],
+            }
         except Exception as e:
             logger.error(f"💥 ERROR in keyword refinement for recommendation {recommendation_id}: {e}")
-            logger.error(f"⏱️  Failed after {time.time() - start_time:.2f} seconds")
-            await db.rollback()
-            raise
+            raise e
 
     async def generate_repository_readme(
         self,
@@ -871,11 +818,18 @@ class RecommendationService:
             raise
 
     async def _create_recommendation_version(
-        self, db: AsyncSession, recommendation: Recommendation, change_type: str, change_description: Optional[str] = None, created_by: str = "system"
+        self,
+        db: AsyncSession,
+        recommendation: Recommendation,
+        change_type: str,
+        change_description: Optional[str] = None,
+        created_by: str = "system",
+        include_keywords_used: Optional[List[str]] = None,
+        exclude_keywords_avoided: Optional[List[str]] = None,
     ) -> RecommendationVersion:
         """Create a new version entry for a recommendation."""
         # Get the next version number
-        query = select(RecommendationVersion).where(RecommendationVersion.recommendation_id == recommendation.id).order_by(desc(RecommendationVersion.version_number))
+        query = select(RecommendationVersion).where(RecommendationVersion.recommendation_id == recommendation.id).order_by(desc(RecommendationVersion.version_number)).limit(1)
 
         result = await db.execute(query)
         last_version = result.scalar_one_or_none()
@@ -894,6 +848,8 @@ class RecommendationService:
             confidence_score=recommendation.confidence_score,
             word_count=recommendation.word_count,
             created_by=created_by,
+            include_keywords_used=include_keywords_used,
+            exclude_keywords_avoided=exclude_keywords_avoided,
         )
 
         db.add(version)
@@ -932,6 +888,8 @@ class RecommendationService:
                     word_count=version.word_count,  # type: ignore
                     created_at=version.created_at,  # type: ignore
                     created_by=version.created_by,  # type: ignore
+                    include_keywords_used=version.include_keywords_used,  # Added
+                    exclude_keywords_avoided=version.exclude_keywords_avoided,  # Added
                 )
             )
 
