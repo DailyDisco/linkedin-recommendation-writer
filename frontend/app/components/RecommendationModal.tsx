@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import {
   X,
   Loader2,
-  Copy,
   FileText,
   CheckCircle,
   AlertCircle,
@@ -37,6 +36,8 @@ export default function RecommendationModal({
 }: RecommendationModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const firstInputRef = useRef<HTMLTextAreaElement>(null);
+  const optionsRef = useRef<HTMLDivElement>(null); // New ref for options
+  const resultRef = useRef<HTMLDivElement>(null); // New ref for result
 
   const { count: anonRecommendationCount, incrementCount: incrementAnonCount } =
     useRecommendationCount();
@@ -48,13 +49,6 @@ export default function RecommendationModal({
   // Log modal open/close events
   useEffect(() => {
     if (isOpen) {
-      console.log('🎭 FRONTEND: Recommendation modal opened');
-      console.log('👤 Target contributor:', {
-        username: contributor.username,
-        fullName: contributor.full_name || 'N/A',
-        avatarUrl: contributor.avatar_url ? 'Present' : 'Missing',
-      });
-
       // Focus the first input when modal opens
       setTimeout(() => {
         firstInputRef.current?.focus();
@@ -66,8 +60,6 @@ export default function RecommendationModal({
       } else {
         setShowLimitExceededMessage(false);
       }
-    } else {
-      console.log('🚪 FRONTEND: Recommendation modal closed');
     }
   }, [isOpen, contributor, isLoggedIn, anonRecommendationCount]);
 
@@ -89,6 +81,8 @@ export default function RecommendationModal({
       onClose();
     }
   };
+
+  // State declarations
   const [step, setStep] = useState<
     'form' | 'generating' | 'options' | 'result'
   >('form');
@@ -102,12 +96,24 @@ export default function RecommendationModal({
     useState<RecommendationOption | null>(null);
   const [isCreatingFromOption, setIsCreatingFromOption] = useState(false);
   const [error, setError] = useState<string>('');
-  const [copied, setCopied] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [regenerateInstructions, setRegenerateInstructions] = useState('');
   const [viewingFullContent, setViewingFullContent] = useState<number | null>(
     null
   );
+
+  // Auto-scroll to options/result when step changes
+  useEffect(() => {
+    if ((step === 'options' || step === 'result') && modalRef.current) {
+      const targetRef = step === 'options' ? optionsRef : resultRef;
+      if (targetRef.current) {
+        modalRef.current.scrollTo({
+          top: targetRef.current.offsetTop - modalRef.current.offsetTop,
+          behavior: 'smooth',
+        });
+      }
+    }
+  }, [step, recommendationOptions.length, generatedRecommendation]); // Dependency on options/generated recs ensures it runs after content renders
 
   const [formData, setFormData] = useState<{
     workingRelationship: string;
@@ -220,25 +226,10 @@ export default function RecommendationModal({
       return;
     }
 
-    console.log('🚀 FRONTEND: Recommendation generation started');
-    console.log('='.repeat(80));
-    console.log('📋 Form data submitted:', {
-      contributor: contributor.username,
-      workingRelationship:
-        formData.workingRelationship.substring(0, 100) + '...',
-      recommendation_type: formData.recommendation_type,
-      tone: formData.tone,
-      length: formData.length,
-      hasSpecificSkills: !!formData.specificSkills,
-      hasAchievements: !!formData.notableAchievements,
-    });
-
     if (!validateForm()) {
-      console.log('❌ FRONTEND: Validation failed');
       return;
     }
 
-    console.log('🔄 FRONTEND: Starting generation process...');
     setIsGenerating(true);
     setError('');
     setStep('generating');
@@ -246,7 +237,6 @@ export default function RecommendationModal({
     const startTime = Date.now();
 
     try {
-      console.log('📝 FRONTEND: Building custom prompt...');
       // Create custom prompt from form data
       const customPrompt = `
 Working Relationship: ${formData.workingRelationship}
@@ -273,20 +263,6 @@ Key Achievements: ${formData.notableAchievements}
         repository_url: formData.repository_url,
       };
 
-      console.log('📡 FRONTEND: Sending API request...');
-      console.log('   • Endpoint: /api/v1/recommendations/generate-options');
-      console.log('   • GitHub Username:', request.github_username);
-      console.log('   • Request Type:', request.recommendation_type);
-      console.log(
-        '   • Custom Prompt Length:',
-        customPrompt.length,
-        'characters'
-      );
-      console.log(
-        '   • Specific Skills Count:',
-        request.include_specific_skills?.length || 0
-      );
-
       const optionsResponse = await recommendationApi.generateOptions(request);
 
       // Increment count only if not logged in and generation was successful
@@ -294,40 +270,12 @@ Key Achievements: ${formData.notableAchievements}
         incrementAnonCount();
       }
 
-      const endTime = Date.now();
-      const duration = (endTime - startTime) / 1000;
-
-      console.log('✅ FRONTEND: Recommendation options received successfully!');
-      console.log('📊 Generation completed:', {
-        duration: `${duration.toFixed(2)} seconds`,
-        optionsCount: optionsResponse.options.length,
-        options: optionsResponse.options.map(opt => ({
-          name: opt.name,
-          wordCount: opt.word_count,
-          confidenceScore: opt.confidence_score,
-          focus: opt.focus,
-        })),
-      });
-
       setRecommendationOptions(optionsResponse.options);
       setStep('options');
-
-      console.log('🎉 FRONTEND: UI updated with recommendation results');
     } catch (err: unknown) {
       const endTime = Date.now();
-      const duration = (endTime - startTime) / 1000;
 
-      console.error('💥 FRONTEND: Recommendation generation failed');
-      console.error('⏱️  Failed after:', `${duration.toFixed(2)} seconds`);
-      const errorDetails = err as HttpError; // Type assertion for logging
-      console.error('❌ Error details:', {
-        status: errorDetails.response?.status,
-        statusText: errorDetails.response?.statusText,
-        detail: errorDetails.response?.data?.detail,
-        message: errorDetails.message,
-        code: errorDetails.code,
-        fullError: err,
-      });
+      console.error('Recommendation generation failed:', err);
 
       // Provide more specific error messages based on error type
       let errorMessage = 'Failed to generate recommendation. Please try again.';
@@ -356,26 +304,6 @@ Key Achievements: ${formData.notableAchievements}
       setStep('form');
     } finally {
       setIsGenerating(false);
-      console.log('🔄 FRONTEND: Generation process completed');
-      console.log('='.repeat(80));
-    }
-  };
-
-  const handleCopy = async () => {
-    const content = generatedRecommendation?.content || selectedOption?.content;
-    if (content) {
-      console.log('📋 FRONTEND: Copying recommendation to clipboard');
-      console.log('   • Content length:', content.length, 'characters');
-      console.log(
-        '   • Word count:',
-        generatedRecommendation?.word_count || selectedOption?.word_count
-      );
-
-      await navigator.clipboard.writeText(content);
-      setCopied(true);
-
-      console.log('✅ FRONTEND: Recommendation copied successfully');
-      setTimeout(() => setCopied(false), 2000);
     }
   };
 
@@ -384,13 +312,6 @@ Key Achievements: ${formData.notableAchievements}
       setShowLimitExceededMessage(true);
       return;
     }
-    console.log('🎯 FRONTEND: Option selected:', {
-      name: option.name,
-      focus: option.focus,
-      wordCount: option.word_count,
-      confidenceScore: option.confidence_score,
-    });
-
     setIsCreatingFromOption(true);
     setError('');
 
@@ -400,7 +321,10 @@ Key Achievements: ${formData.notableAchievements}
         option,
         recommendationOptions,
         formData.analysis_type,
-        formData.repository_url
+        formData.repository_url,
+        formData.recommendation_type,
+        formData.tone,
+        formData.length
       );
 
       // Increment count only if not logged in and creation was successful
@@ -408,20 +332,11 @@ Key Achievements: ${formData.notableAchievements}
         incrementAnonCount();
       }
 
-      console.log('✅ FRONTEND: Recommendation created from option:', {
-        id: recommendation.id,
-        wordCount: recommendation.word_count,
-        confidenceScore: recommendation.confidence_score,
-      });
-
       setGeneratedRecommendation(recommendation);
       setSelectedOption(option);
       setStep('result');
     } catch (err: unknown) {
-      console.error(
-        '💥 FRONTEND: Failed to create recommendation from option:',
-        err
-      );
+      console.error('Failed to create recommendation from option:', err);
       const error = err as HttpError; // Type assertion for axios error structure
       setError(
         error.response?.data?.detail ||
@@ -433,7 +348,6 @@ Key Achievements: ${formData.notableAchievements}
   };
 
   const handleViewMore = (optionId: number) => {
-    console.log('👁️ FRONTEND: Viewing full content for option:', optionId);
     setViewingFullContent(viewingFullContent === optionId ? null : optionId);
   };
 
@@ -447,10 +361,7 @@ Key Achievements: ${formData.notableAchievements}
       return;
     }
 
-    console.log('🔄 FRONTEND: Starting regeneration process...');
     setIsRegenerating(true);
-
-    const startTime = Date.now();
 
     try {
       const request: RegenerateRequest = {
@@ -462,17 +373,6 @@ Key Achievements: ${formData.notableAchievements}
         length: formData.length,
       };
 
-      console.log('📡 FRONTEND: Sending regeneration request...');
-      console.log(
-        '   • Original Content Length:',
-        selectedOption.content.length,
-        'characters'
-      );
-      console.log(
-        '   • Refinement Instructions:',
-        regenerateInstructions.substring(0, 100) + '...'
-      );
-
       const regeneratedRecommendation =
         await recommendationApi.regenerate(request);
 
@@ -481,31 +381,12 @@ Key Achievements: ${formData.notableAchievements}
         incrementAnonCount();
       }
 
-      const endTime = Date.now();
-      const duration = (endTime - startTime) / 1000;
-
-      console.log('✅ FRONTEND: Regenerated recommendation received!');
-      console.log('📊 Regeneration completed:', {
-        duration: `${duration.toFixed(2)} seconds`,
-        wordCount: regeneratedRecommendation.word_count,
-        confidenceScore: regeneratedRecommendation.confidence_score,
-        contentLength: regeneratedRecommendation.content.length,
-      });
-
       setGeneratedRecommendation(regeneratedRecommendation);
       setRegenerateInstructions('');
       setIsRegenerating(false);
     } catch (err: unknown) {
-      const endTime = Date.now();
-      const duration = (endTime - startTime) / 1000;
-
-      console.error('💥 FRONTEND: Regeneration failed');
-      console.error('⏱️  Failed after:', `${duration.toFixed(2)} seconds`);
+      console.error('Regeneration failed:', err);
       const error = err as HttpError; // Type assertion for axios error structure
-      console.error(
-        '❌ Error details:',
-        error.response?.data?.detail || error.message
-      );
 
       setError(
         error.response?.data?.detail ||
@@ -516,24 +397,23 @@ Key Achievements: ${formData.notableAchievements}
   };
 
   const handleReset = () => {
-    console.log('🔄 FRONTEND: Resetting modal for new recommendation');
     setStep('form');
     setGeneratedRecommendation(null);
     setRecommendationOptions([]);
     setSelectedOption(null);
     setError('');
     setValidationErrors({});
-    setCopied(false);
     setRegenerateInstructions('');
     setParsedGitHubInput(null);
     setViewingFullContent(null);
+    setIsCreatingFromOption(false);
+    setIsRegenerating(false);
     setFormData(prev => ({
       ...prev,
       github_input: '',
       analysis_type: 'profile',
       repository_url: undefined,
     }));
-    console.log('✅ FRONTEND: Modal reset completed');
   };
 
   if (!isOpen) return null;
@@ -604,7 +484,7 @@ Key Achievements: ${formData.notableAchievements}
                   Create Account
                 </button>
               </div>
-            ) : (
+            ) : step === 'form' ? (
               <form onSubmit={handleSubmit} className='space-y-6'>
                 {/* GitHub Input Section */}
                 <div>
@@ -1005,9 +885,7 @@ Key Achievements: ${formData.notableAchievements}
                   </button>
                 </div>
               </form>
-            )}
-
-            {step === 'generating' && (
+            ) : step === 'generating' ? (
               <div className='text-center py-12'>
                 <Loader2 className='w-12 h-12 animate-spin text-blue-600 mx-auto mb-4' />
                 <h3 className='text-lg font-medium text-gray-900 mb-2'>
@@ -1027,93 +905,142 @@ Key Achievements: ${formData.notableAchievements}
                   This may take up to 60 seconds...
                 </p>
               </div>
-            )}
-
-            {step === 'options' && recommendationOptions.length > 0 && (
-              <div className='space-y-6'>
+            ) : step === 'options' && recommendationOptions.length > 0 ? (
+              <div ref={optionsRef} className='space-y-6'>
+                {/* Header with navigation */}
                 <div className='flex items-center justify-between'>
-                  <div className='flex items-center space-x-2'>
-                    <CheckCircle className='w-5 h-5 text-green-600' />
-                    <h3 className='text-lg font-medium text-gray-900'>
-                      Choose Your Recommendation
-                    </h3>
+                  <div className='flex items-center space-x-3'>
+                    <CheckCircle className='w-6 h-6 text-green-600' />
+                    <div>
+                      <h3 className='text-xl font-semibold text-gray-900'>
+                        Choose Your Recommendation
+                      </h3>
+                      <p className='text-sm text-gray-600'>
+                        for {contributor.full_name || contributor.username}
+                      </p>
+                    </div>
                   </div>
-                  <button
-                    onClick={handleReset}
-                    className='px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors'
-                  >
-                    Start Over
-                  </button>
+                  <div className='flex space-x-2'>
+                    <button
+                      onClick={() => setStep('form')}
+                      className='px-3 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors text-sm'
+                    >
+                      ← Edit Details
+                    </button>
+                    <button
+                      onClick={handleReset}
+                      className='px-3 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors text-sm'
+                    >
+                      Start Over
+                    </button>
+                  </div>
+                </div>
+
+                {/* Generation summary */}
+                <div className='bg-blue-50 border border-blue-200 rounded-lg p-4'>
+                  <div className='flex items-center space-x-2 mb-2'>
+                    <div className='w-2 h-2 bg-blue-600 rounded-full'></div>
+                    <span className='text-sm font-medium text-blue-900'>
+                      Generated based on your inputs
+                    </span>
+                  </div>
+                  <p className='text-sm text-blue-800'>
+                    {parsedGitHubInput?.type === 'repo_url'
+                      ? `Repository: ${parsedGitHubInput.username}/${parsedGitHubInput.repository}`
+                      : `GitHub Profile: ${parsedGitHubInput?.username || contributor.username}`}{' '}
+                    • {formData.recommendation_type} • {formData.tone} tone •{' '}
+                    {formData.length}
+                  </p>
                 </div>
 
                 <p className='text-gray-600'>
-                  Here are 3 different recommendation options based on{' '}
-                  {contributor.username}&apos;s GitHub profile. Each option has
-                  a different focus area. Choose the one that best fits your
-                  needs.
+                  Here are 3 different recommendation options based on the
+                  GitHub analysis. Each option has a different focus area.
+                  Choose the one that best fits your needs.
                 </p>
 
                 <div className='space-y-4'>
                   {recommendationOptions.map(option => (
                     <div
                       key={option.id}
-                      className='border rounded-lg p-4 hover:bg-gray-50 transition-colors'
+                      className='border-2 border-gray-200 rounded-lg p-6 hover:border-blue-300 hover:shadow-md transition-all duration-200'
                     >
-                      <div className='flex items-start justify-between mb-3'>
-                        <div>
-                          <h4 className='font-medium text-gray-900'>
+                      <div className='flex items-start justify-between mb-4'>
+                        <div className='flex-1'>
+                          <h4 className='text-lg font-semibold text-gray-900 mb-1'>
                             {option.name}
                           </h4>
-                          <p className='text-sm text-gray-600'>
-                            Focus: {option.focus.replace('_', ' ')}
-                          </p>
-                        </div>
-                        <div className='flex items-center space-x-2 text-sm text-gray-500'>
-                          <span>{option.word_count} words</span>
-                          <span>•</span>
-                          <span>Confidence: {option.confidence_score}%</span>
+                          <div className='flex items-center space-x-4 text-sm text-gray-600'>
+                            <span className='flex items-center space-x-1'>
+                              <span className='font-medium'>Focus:</span>
+                              <span className='capitalize'>
+                                {option.focus.replace('_', ' ')}
+                              </span>
+                            </span>
+                            <span className='flex items-center space-x-1'>
+                              <span className='font-medium'>Words:</span>
+                              <span>{option.word_count}</span>
+                            </span>
+                            <span className='flex items-center space-x-1'>
+                              <span className='font-medium'>Confidence:</span>
+                              <span
+                                className={`font-semibold ${
+                                  option.confidence_score >= 80
+                                    ? 'text-green-600'
+                                    : option.confidence_score >= 60
+                                      ? 'text-yellow-600'
+                                      : 'text-red-600'
+                                }`}
+                              >
+                                {option.confidence_score}%
+                              </span>
+                            </span>
+                          </div>
                         </div>
                       </div>
 
-                      <div className='bg-gray-50 p-3 rounded-md mb-3'>
-                        <p className='text-gray-900 text-sm leading-relaxed'>
+                      <div className='bg-gray-50 p-4 rounded-md mb-4 border-l-4 border-blue-200'>
+                        <p className='text-gray-900 leading-relaxed'>
                           {viewingFullContent === option.id
                             ? option.content
-                            : option.content.length > 300
-                              ? option.content.substring(0, 300) + '...'
+                            : option.content.length > 400
+                              ? option.content.substring(0, 400) + '...'
                               : option.content}
                         </p>
                       </div>
 
-                      <div className='flex space-x-2'>
+                      <div className='flex space-x-3'>
                         <button
                           onClick={() => handleViewMore(option.id)}
-                          className='flex-1 px-3 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors text-sm flex items-center justify-center space-x-1'
+                          className='flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors text-sm flex items-center justify-center space-x-2'
                         >
                           {viewingFullContent === option.id ? (
                             <>
-                              <EyeOff className='w-3 h-3' />
+                              <EyeOff className='w-4 h-4' />
                               <span>Show Less</span>
                             </>
                           ) : (
                             <>
-                              <Eye className='w-3 h-3' />
-                              <span>View More</span>
+                              <Eye className='w-4 h-4' />
+                              <span>Read Full</span>
                             </>
                           )}
                         </button>
                         <button
                           onClick={() => handleOptionSelect(option)}
                           disabled={isCreatingFromOption}
-                          className='flex-1 px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm flex items-center justify-center space-x-1'
+                          className='flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm flex items-center justify-center space-x-2 font-medium'
                         >
                           {isCreatingFromOption ? (
                             <>
-                              <Loader2 className='w-3 h-3 animate-spin' />
+                              <Loader2 className='w-4 h-4 animate-spin' />
                               <span>Creating...</span>
                             </>
                           ) : (
-                            <span>Select This Option</span>
+                            <>
+                              <CheckCircle className='w-4 h-4' />
+                              <span>Select This</span>
+                            </>
                           )}
                         </button>
                       </div>
@@ -1121,110 +1048,108 @@ Key Achievements: ${formData.notableAchievements}
                   ))}
                 </div>
               </div>
-            )}
-
-            {step === 'result' &&
-              (generatedRecommendation || selectedOption) && (
-                <div className='space-y-6'>
-                  <div className='flex items-center justify-between'>
-                    <div className='flex items-center space-x-2'>
-                      <CheckCircle className='w-5 h-5 text-green-600' />
-                      <h3 className='text-lg font-medium text-gray-900'>
-                        Recommendation Generated
+            ) : step === 'result' &&
+              (generatedRecommendation || selectedOption) ? (
+              <div ref={resultRef} className='space-y-6'>
+                <div className='flex items-center justify-between'>
+                  <div className='flex items-center space-x-3'>
+                    <CheckCircle className='w-6 h-6 text-green-600' />
+                    <div>
+                      <h3 className='text-xl font-semibold text-gray-900'>
+                        Recommendation Ready
                       </h3>
-                    </div>
-                    <div className='flex space-x-2'>
-                      <button
-                        onClick={handleCopy}
-                        className='px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center space-x-2'
-                      >
-                        <Copy className='w-4 h-4' />
-                        <span>{copied ? 'Copied!' : 'Copy'}</span>
-                      </button>
-                      <button
-                        onClick={handleReset}
-                        className='px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors'
-                      >
-                        Generate Another
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className='bg-gray-50 p-6 rounded-lg'>
-                    <div className='mb-4 flex items-center justify-between text-sm text-gray-600'>
-                      <div className='flex items-center space-x-4'>
-                        <span>
-                          Type:{' '}
-                          {generatedRecommendation?.recommendation_type ||
-                            formData.recommendation_type}
-                        </span>
-                        <span>
-                          Tone: {generatedRecommendation?.tone || formData.tone}
-                        </span>
-                        <span>
-                          Length:{' '}
-                          {generatedRecommendation?.length || formData.length}
-                        </span>
-                      </div>
-                      <span>
-                        {generatedRecommendation?.word_count ||
-                          selectedOption?.word_count}{' '}
-                        words
-                      </span>
-                    </div>
-                    <div className='prose max-w-none'>
-                      <p className='text-gray-900 leading-relaxed whitespace-pre-wrap'>
-                        {generatedRecommendation?.content ||
-                          selectedOption?.content}
+                      <p className='text-sm text-gray-600'>
+                        for {contributor.full_name || contributor.username}
                       </p>
                     </div>
                   </div>
-
-                  {/* Regeneration Section */}
-                  <div className='bg-blue-50 p-4 rounded-lg'>
-                    <h4 className='font-medium text-gray-900 mb-2'>
-                      Want to refine this recommendation?
-                    </h4>
-                    <p className='text-sm text-gray-600 mb-3'>
-                      Provide specific instructions for how you&apos;d like the
-                      recommendation modified.
-                    </p>
-                    <textarea
-                      className='w-full h-20 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 mb-3'
-                      placeholder='e.g., Make it more specific about their React skills, focus less on teamwork, emphasize their problem-solving abilities...'
-                      value={regenerateInstructions}
-                      onChange={e => setRegenerateInstructions(e.target.value)}
-                    />
+                  <div className='flex space-x-2'>
                     <button
-                      onClick={handleRegenerate}
-                      disabled={
-                        !regenerateInstructions.trim() || isRegenerating
-                      }
-                      className='px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2'
+                      onClick={() => setStep('options')}
+                      className='px-3 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors text-sm'
                     >
-                      {isRegenerating ? (
-                        <Loader2 className='w-4 h-4 animate-spin' />
-                      ) : (
-                        <FileText className='w-4 h-4' />
-                      )}
-                      <span>
-                        {isRegenerating
-                          ? 'Refining...'
-                          : 'Refine Recommendation'}
-                      </span>
+                      ← Back to Options
                     </button>
-                  </div>
-
-                  <div className='flex justify-end space-x-3'>
                     <button
-                      onClick={onClose}
-                      className='px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors'
+                      onClick={handleReset}
+                      className='px-3 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors text-sm'
                     >
-                      Done
+                      Generate Another
                     </button>
                   </div>
                 </div>
-              )}
+
+                <div className='bg-gray-50 p-6 rounded-lg'>
+                  <div className='mb-4 flex items-center justify-between text-sm text-gray-600'>
+                    <div className='flex items-center space-x-4'>
+                      <span>
+                        Type:{' '}
+                        {generatedRecommendation?.recommendation_type ||
+                          formData.recommendation_type}
+                      </span>
+                      <span>
+                        Tone: {generatedRecommendation?.tone || formData.tone}
+                      </span>
+                      <span>
+                        Length:{' '}
+                        {generatedRecommendation?.length || formData.length}
+                      </span>
+                    </div>
+                    <span>
+                      {generatedRecommendation?.word_count ||
+                        selectedOption?.word_count}{' '}
+                      words
+                    </span>
+                  </div>
+                  <div className='prose max-w-none'>
+                    <p className='text-gray-900 leading-relaxed whitespace-pre-wrap'>
+                      {generatedRecommendation?.content ||
+                        selectedOption?.content}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Regeneration Section */}
+                <div className='bg-blue-50 p-4 rounded-lg'>
+                  <h4 className='font-medium text-gray-900 mb-2'>
+                    Want to refine this recommendation?
+                  </h4>
+                  <p className='text-sm text-gray-600 mb-3'>
+                    Provide specific instructions for how you&apos;d like the
+                    recommendation modified.
+                  </p>
+                  <textarea
+                    className='w-full h-20 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 mb-3'
+                    placeholder='e.g., Make it more specific about their React skills, focus less on teamwork, emphasize their problem-solving abilities...'
+                    value={regenerateInstructions}
+                    onChange={e => setRegenerateInstructions(e.target.value)}
+                  />
+                  <button
+                    onClick={handleRegenerate}
+                    disabled={!regenerateInstructions.trim() || isRegenerating}
+                    className='px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2'
+                  >
+                    {isRegenerating ? (
+                      <Loader2 className='w-4 h-4 animate-spin' />
+                    ) : (
+                      <FileText className='w-4 h-4' />
+                    )}
+                    <span>
+                      {isRegenerating ? 'Refining...' : 'Refine Recommendation'}
+                    </span>
+                  </button>
+                </div>
+
+                <div className='flex justify-end space-x-3'>
+                  <button
+                    onClick={onClose}
+                    className='px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors'
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       </ErrorBoundary>

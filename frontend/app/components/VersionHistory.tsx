@@ -21,6 +21,12 @@ import { Label } from '@/components/ui/label';
 import { Clock, RotateCcw, Eye, GitBranch } from 'lucide-react';
 import { format } from 'date-fns';
 
+interface VersionDifference {
+  changed: boolean;
+  version_a: string | number;
+  version_b: string | number;
+}
+
 interface Version {
   id: number;
   version_number: number;
@@ -105,10 +111,14 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
   onCompareVersions,
   onRevertToVersion,
 }) => {
-  const [history, setHistory] = useState<any>(null);
+  const [history, setHistory] = useState<Awaited<
+    ReturnType<VersionHistoryProps['onGetHistory']>
+  > | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedVersions, setSelectedVersions] = useState<number[]>([]);
-  const [comparison, setComparison] = useState<any>(null);
+  const [comparison, setComparison] = useState<Awaited<
+    ReturnType<VersionHistoryProps['onCompareVersions']>
+  > | null>(null);
   const [revertVersion, setRevertVersion] = useState<number | null>(null);
   const [revertReason, setRevertReason] = useState('');
 
@@ -374,7 +384,7 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
                 <h4 className='font-semibold mb-3'>Key Differences</h4>
                 <div className='space-y-2'>
                   {Object.entries(comparison.differences).map(
-                    ([key, diff]: [string, any]) => (
+                    ([key, diff]: [string, VersionDifference]) => (
                       <div
                         key={key}
                         className='flex items-center gap-2 p-2 bg-muted rounded'

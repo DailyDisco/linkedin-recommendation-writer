@@ -14,6 +14,8 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { X, Plus, Loader2 } from 'lucide-react';
 import { apiClient, handleApiError } from '@/services/api';
+import type { HttpError } from '../types';
+import type { KeywordRefinementResult } from '../types';
 
 interface KeywordRefinementProps {
   recommendationId: number;
@@ -37,7 +39,7 @@ export const KeywordRefinement: React.FC<KeywordRefinementProps> = ({
   const [newExcludeKeyword, setNewExcludeKeyword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<KeywordRefinementResult | null>(null);
 
   const addKeyword = (keyword: string, type: 'include' | 'exclude') => {
     if (!keyword.trim()) return;
@@ -98,10 +100,11 @@ export const KeywordRefinement: React.FC<KeywordRefinementProps> = ({
       if (onRefinementComplete) {
         onRefinementComplete(apiResult);
       }
-    } catch (err: any) {
-      const errorInfo = handleApiError(err);
+    } catch (err: unknown) {
+      const error = err as HttpError;
+      const errorInfo = handleApiError(error);
       setError(errorInfo.message);
-      console.error('Keyword refinement failed:', err);
+      console.error('Keyword refinement failed:', error);
     } finally {
       setIsLoading(false);
     }

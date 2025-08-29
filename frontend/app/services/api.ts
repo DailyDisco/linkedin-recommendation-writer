@@ -345,13 +345,13 @@ export const apiClient = {
   },
 };
 
-export const handleApiError = (error: any) => {
+export const handleApiError = (error: unknown) => {
   if (error.response) {
     // Server responded with error status
-    const { status, data } = error.response;
+    const { status, data } = (error as HttpError).response!;
     return {
       status,
-      message: data.detail || data.message || 'An error occurred',
+      message: data?.detail || data?.message || 'An error occurred',
       data: data,
     };
   } else if (error.request) {
@@ -365,7 +365,7 @@ export const handleApiError = (error: any) => {
     // Other error
     return {
       status: -1,
-      message: error.message || 'An unexpected error occurred',
+      message: (error as Error).message || 'An unexpected error occurred',
       data: null,
     };
   }

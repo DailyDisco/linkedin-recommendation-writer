@@ -8,6 +8,7 @@ import React, {
 } from 'react';
 import { recommendationApi } from '../services/api';
 import { useLocalStorage } from '../hooks/useLocalStorage';
+import type { HttpError } from '../types';
 
 export interface AuthContextType {
   isLoggedIn: boolean;
@@ -70,24 +71,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         const response = await recommendationApi.getUserDetails();
         setUserRecommendationCount(response.recommendation_count);
         setUserDailyLimit(response.daily_limit);
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('Failed to fetch user details:', error);
         setUserDetailsError(
-          error instanceof Error
-            ? error.message
-            : 'Failed to fetch user details'
+          (error instanceof Error && error.message) ||
+            'Failed to fetch user details'
         );
         // Only logout if it's an authentication error (401/403), not network issues
         // The global API interceptor will handle token removal and redirect for 401s
         if (
-          error?.response?.status === 401 ||
-          error?.response?.status === 403
+          (error as HttpError)?.response?.status === 401 ||
+          (error as HttpError)?.response?.status === 403
         ) {
           // Let the global interceptor handle this to avoid conflicts
           console.log(
             'Auth error detected, letting global interceptor handle logout'
           );
-        } else if (error?.code === 'NETWORK_ERROR' || !error?.response) {
+        } else if (
+          (error as HttpError)?.code === 'NETWORK_ERROR' ||
+          !(error as HttpError)?.response
+        ) {
           // For network errors, don't logout - just show error
           console.log(
             'Network error fetching user details, keeping user logged in'
@@ -102,7 +105,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setUserDailyLimit(null);
       setUserDetailsError(null);
     }
-  }, [isLoggedIn, logout, THROTTLE_MS]);
+  }, [isLoggedIn, THROTTLE_MS]);
 
   useEffect(() => {
     // Only fetch user details if we're logged in
@@ -120,7 +123,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setAccessToken(token);
       try {
         await fetchUserDetails(); // Fetch user details immediately after login
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error(
           'Login: Failed to fetch user details after token set:',
           error
@@ -128,8 +131,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         // If user details fetch fails with auth error, the global interceptor will handle logout
         // For other errors, we keep the user logged in but show an error
         if (
-          error?.response?.status === 401 ||
-          error?.response?.status === 403
+          (error as HttpError)?.response?.status === 401 ||
+          (error as HttpError)?.response?.status === 403
         ) {
           console.log(
             'Login: Auth error during user details fetch, global interceptor will handle'

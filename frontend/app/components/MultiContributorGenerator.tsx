@@ -126,7 +126,9 @@ export const MultiContributorGenerator: React.FC<
   const [recommendationType, setRecommendationType] = useState('professional');
   const [tone, setTone] = useState('professional');
   const [length, setLength] = useState('medium');
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<Awaited<
+    ReturnType<MultiContributorGeneratorProps['onGenerate']>
+  > | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const toggleFocusArea = (area: string) => {
