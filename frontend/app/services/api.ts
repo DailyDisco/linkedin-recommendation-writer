@@ -55,8 +55,8 @@ api.interceptors.response.use(
 
 export const githubApi = {
   analyzeProfile: async (username: string): Promise<GitHubProfile> => {
-    const response = await api.post('/github/analyze', {
-      github_username: username,
+    const response = await api.post('/github/analyze', null, {
+      params: { username },
     });
     return response.data;
   },
@@ -65,9 +65,11 @@ export const githubApi = {
     repository: string,
     maxContributors: number = 50
   ): Promise<RepositoryContributorsResponse> => {
-    const response = await api.post('/github/repository/contributors', {
-      repository_name: repository,
-      max_contributors: maxContributors,
+    const response = await api.post('/github/repository/contributors', null, {
+      params: {
+        repository_full_name: repository,
+        max_contributors: maxContributors,
+      },
     });
     return response.data;
   },

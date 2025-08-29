@@ -27,16 +27,19 @@ export default [
     route('register', 'routes/auth/register.tsx'), // renders at "/register"
   ]),
 
+  route('advanced', 'routes/auth/advanced.tsx'), // renders at "/advanced"
+  route('history', 'routes/auth/history.tsx'), // renders at "/history"
+
   // Protected routes - require authentication
   // Using prefix to group related functionality under "/app"
-  ...prefix('app', [
-    route('advanced', 'routes/protected/advanced.tsx'), // renders at "/app/advanced"
-    route('history', 'routes/protected/history.tsx'), // renders at "/app/history"
+  //   ...prefix('app', [
+  //     route('advanced', 'routes/protected/advanced.tsx'), // renders at "/app/advanced"
+  //     route('history', 'routes/protected/history.tsx'), // renders at "/app/history"
 
-    // Example of nested routes with dynamic segments:
-    // route("recommendations/:id", "./recommendation.tsx"),          // "/app/recommendations/123"
-    // route("recommendations/:id/edit", "./edit-recommendation.tsx"), // "/app/recommendations/123/edit"
-  ]),
+  // Example of nested routes with dynamic segments:
+  // route("recommendations/:id", "./recommendation.tsx"),          // "/app/recommendations/123"
+  // route("recommendations/:id/edit", "./edit-recommendation.tsx"), // "/app/recommendations/123/edit"
+  //   ]),
 
   // Admin routes - require admin privileges
   // Example admin section:
