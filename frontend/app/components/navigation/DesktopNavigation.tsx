@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useLocation } from 'react-router';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 export interface NavigationItem {
   name: string;
@@ -11,9 +12,15 @@ export interface NavigationItem {
 
 interface DesktopNavigationProps {
   navigation: NavigationItem[];
+  isLoggedIn: boolean;
+  onLogout: () => void;
 }
 
-export const DesktopNavigation = ({ navigation }: DesktopNavigationProps) => {
+export const DesktopNavigation = ({
+  navigation,
+  isLoggedIn,
+  onLogout,
+}: DesktopNavigationProps) => {
   const location = useLocation();
 
   return (
@@ -39,6 +46,24 @@ export const DesktopNavigation = ({ navigation }: DesktopNavigationProps) => {
           </Link>
         );
       })}
+      <div className='flex items-center space-x-2 ml-4'>
+        {!isLoggedIn ? (
+          <>
+            <Link to='/login'>
+              <Button variant='ghost' size='sm'>
+                Login
+              </Button>
+            </Link>
+            <Link to='/register'>
+              <Button size='sm'>Sign Up</Button>
+            </Link>
+          </>
+        ) : (
+          <Button variant='ghost' size='sm' onClick={onLogout}>
+            Logout
+          </Button>
+        )}
+      </div>
     </div>
   );
 };

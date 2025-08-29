@@ -22,6 +22,10 @@ api.interceptors.request.use(
     const token = localStorage.getItem('accessToken'); // Placeholder: Replace with actual token retrieval
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+      console.log(
+        'Sending Authorization header:',
+        config.headers.Authorization
+      ); // Added for debugging
     }
     return config;
   },

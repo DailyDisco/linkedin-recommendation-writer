@@ -9,8 +9,12 @@ import {
   Target,
   History,
 } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
+import { Button } from '../components/ui/button';
 
 export default function HomePage() {
+  const { isLoggedIn, logout } = useAuth();
+
   return (
     <div className='space-y-16'>
       {/* Hero Section */}
@@ -28,6 +32,29 @@ export default function HomePage() {
         </div>
 
         <div className='flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center max-w-md sm:max-w-none mx-auto'>
+          {!isLoggedIn ? (
+            <>
+              <Link
+                to='/login'
+                className='inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-blue-600 text-white shadow hover:bg-blue-700 active:bg-blue-800 h-10 px-8 space-x-2'
+              >
+                <span>Login</span>
+              </Link>
+              <Link
+                to='/register'
+                className='inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-blue-300 bg-blue-50 text-blue-700 shadow-sm hover:bg-blue-100 active:bg-blue-200 h-10 px-8 space-x-2'
+              >
+                <span>Sign Up</span>
+              </Link>
+            </>
+          ) : (
+            <Button
+              onClick={logout}
+              className='inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-red-600 text-white shadow hover:bg-red-700 active:bg-red-800 h-10 px-8 space-x-2'
+            >
+              <span>Logout</span>
+            </Button>
+          )}
           <Link
             to='/generate'
             className='inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-blue-600 text-white shadow hover:bg-blue-700 active:bg-blue-800 h-10 px-8 space-x-2'
@@ -38,7 +65,7 @@ export default function HomePage() {
           </Link>
           <Link
             to='/advanced'
-            className='inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-purple-300 bg-purple-50 text-purple-700 shadow-sm hover:bg-purple-100 active:bg-purple-200 h-10 px-8 space-x-2'
+            className='inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-1-ring disabled:pointer-events-none disabled:opacity-50 border border-purple-300 bg-purple-50 text-purple-700 shadow-sm hover:bg-purple-100 active:bg-purple-200 h-10 px-8 space-x-2'
           >
             <Settings className='w-5 h-5' />
             <span>Advanced Features</span>

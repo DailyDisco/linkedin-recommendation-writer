@@ -1,4 +1,5 @@
 import axios from 'axios';
+import type { MultiContributorData } from '../app/types';
 
 // Configure axios instance
 const api = axios.create({
@@ -187,15 +188,7 @@ export const apiClient = {
     return response.data;
   },
 
-  async generateMultiContributor(data: {
-    repository_full_name: string;
-    max_contributors?: number;
-    min_contributions?: number;
-    focus_areas?: string[];
-    recommendation_type?: string;
-    tone?: string;
-    length?: string;
-  }) {
+  async generateMultiContributor(data: MultiContributorData) {
     const response = await api.post(
       apiEndpoints.generateMultiContributor,
       data

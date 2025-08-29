@@ -4,6 +4,7 @@ import { Logo } from './Logo';
 import { DesktopNavigation, type NavigationItem } from './DesktopNavigation';
 import { MobileNavigation } from './MobileNavigation';
 import { MobileMenuButton } from './MobileMenuButton';
+import { useAuth } from '../../hooks/useAuth';
 
 const navigation: NavigationItem[] = [
   { name: 'Home', href: '/', icon: Github },
@@ -15,6 +16,7 @@ const navigation: NavigationItem[] = [
 
 export const NavigationBar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { isLoggedIn, logout } = useAuth();
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
@@ -34,7 +36,7 @@ export const NavigationBar = () => {
           </div>
 
           {/* Desktop navigation */}
-          <DesktopNavigation navigation={navigation} />
+          <DesktopNavigation navigation={navigation} isLoggedIn={isLoggedIn} onLogout={logout} />
 
           {/* Mobile menu button */}
           <MobileMenuButton
@@ -49,6 +51,8 @@ export const NavigationBar = () => {
         navigation={navigation}
         isOpen={isMobileMenuOpen}
         onClose={closeMobileMenu}
+        isLoggedIn={isLoggedIn}
+        onLogout={logout}
       />
     </nav>
   );

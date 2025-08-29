@@ -256,3 +256,13 @@ export interface FilterState {
     end: Date;
   };
 }
+
+export interface MultiContributorData {
+  contributors: Array<{
+    github_username: string;
+    contribution_type: string;
+    project_role?: string;
+  }>;
+  project_description: string;
+  recommendation_tone?: string;
+}

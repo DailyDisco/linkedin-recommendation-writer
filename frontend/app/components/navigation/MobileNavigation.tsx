@@ -2,17 +2,22 @@ import React from 'react';
 import { Link, useLocation } from 'react-router';
 import { cn } from '@/lib/utils';
 import type { NavigationItem } from './DesktopNavigation';
+import { Button } from '@/components/ui/button';
 
 interface MobileNavigationProps {
   navigation: NavigationItem[];
   isOpen: boolean;
   onClose: () => void;
+  isLoggedIn: boolean;
+  onLogout: () => void;
 }
 
 export const MobileNavigation = ({
   navigation,
   isOpen,
   onClose,
+  isLoggedIn,
+  onLogout,
 }: MobileNavigationProps) => {
   const location = useLocation();
 
@@ -50,6 +55,36 @@ export const MobileNavigation = ({
             </Link>
           );
         })}
+        <div className='mt-4 pt-4 border-t border-gray-200 space-y-2'>
+          {!isLoggedIn ? (
+            <>
+              <Link to='/login' onClick={onClose}>
+                <Button
+                  variant='ghost'
+                  className='w-full justify-start text-base'
+                >
+                  Login
+                </Button>
+              </Link>
+              <Link to='/register' onClick={onClose}>
+                <Button className='w-full justify-start text-base'>
+                  Sign Up
+                </Button>
+              </Link>
+            </>
+          ) : (
+            <Button
+              variant='ghost'
+              className='w-full justify-start text-base'
+              onClick={() => {
+                onLogout();
+                onClose();
+              }}
+            >
+              Logout
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );
