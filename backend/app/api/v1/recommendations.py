@@ -33,31 +33,62 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-RECOMMENDATION_DAILY_LIMIT = 3
+# Role-based recommendation limits
+DEFAULT_LIMITS = {"free": 3, "premium": 10, "admin": float("inf")}  # Unlimited
+
+
+async def check_recommendation_limit_only(
+    db: AsyncSession,
+    user: User,
+) -> None:
+    """Checks user's daily recommendation limit WITHOUT incrementing the counter."""
+    today = date.today()
+
+    # Reset count if it's a new day
+    if not user.last_recommendation_date or user.last_recommendation_date.date() < today:
+        user.recommendation_count = 0  # type: ignore
+        user.last_recommendation_date = today  # type: ignore
+
+    # Admin users have unlimited access - skip limit checks entirely
+    if user.role == "admin":
+        logger.info(f"Admin user {user.username} (ID: {user.id}) has unlimited access - skipping limit check")
+        return
+
+    # Get user's daily limit based on their role or stored limit
+    daily_limit = user.daily_limit or DEFAULT_LIMITS.get(user.role or "free", 3)
+
+    if user.recommendation_count >= daily_limit:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Daily recommendation limit ({int(daily_limit)}) exceeded. Please try again tomorrow.",
+        )
+
+
+async def increment_recommendation_count(
+    db: AsyncSession,
+    user: User,
+) -> None:
+    """Increments the user's recommendation count after successful generation."""
+    # Admin users still get their usage tracked for analytics
+    user.recommendation_count += 1  # type: ignore
+    await db.commit()
+    await db.refresh(user)
+
+    # Get user's daily limit for logging (admins show unlimited)
+    if user.role == "admin":
+        logger.info(f"Admin user {user.username} (ID: {user.id}) generated recommendation (unlimited access)")
+    else:
+        daily_limit = user.daily_limit or DEFAULT_LIMITS.get(user.role or "free", 3)
+        logger.info(f"User {user.username} (ID: {user.id}) has used {user.recommendation_count}/{int(daily_limit)} recommendations today (role: {user.role})")
 
 
 async def check_and_update_recommendation_limit(
     db: AsyncSession,
     user: User,
 ) -> None:
-    """Checks user's daily recommendation limit and updates count."""
-    today = date.today()
-
-    # If last recommendation was not today, reset count and date
-    if not user.last_recommendation_date or user.last_recommendation_date.date() < today:
-        user.recommendation_count = 0  # type: ignore
-        user.last_recommendation_date = today  # type: ignore
-
-    if user.recommendation_count >= RECOMMENDATION_DAILY_LIMIT:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Daily recommendation limit ({RECOMMENDATION_DAILY_LIMIT}) exceeded. Please try again tomorrow.",
-        )
-
-    user.recommendation_count += 1  # type: ignore
-    await db.commit()
-    await db.refresh(user)
-    logger.info(f"User {user.username} (ID: {user.id}) has used {user.recommendation_count}/{RECOMMENDATION_DAILY_LIMIT} recommendations today.")
+    """Legacy function - kept for backward compatibility."""
+    await check_recommendation_limit_only(db, user)
+    await increment_recommendation_count(db, user)
 
 
 @router.post("/generate", response_model=RecommendationResponse)
@@ -69,7 +100,8 @@ async def generate_recommendation(
 ) -> RecommendationResponse:
     """Generate a new LinkedIn recommendation."""
 
-    await check_and_update_recommendation_limit(db, current_user)
+    # Check limit but don't increment yet
+    await check_recommendation_limit_only(db, current_user)
 
     logger.info("=" * 80)
     logger.info("🚀 RECOMMENDATION GENERATION STARTED")
@@ -98,6 +130,9 @@ async def generate_recommendation(
             include_keywords=request.include_keywords,
             exclude_keywords=request.exclude_keywords,
         )
+
+        # Only increment after successful generation
+        await increment_recommendation_count(db, current_user)
 
         logger.info("✅ RECOMMENDATION GENERATION COMPLETED SUCCESSFULLY")
         logger.info("📊 Final Stats:")
@@ -128,7 +163,8 @@ async def generate_recommendation_options(
 ) -> RecommendationOptionsResponse:
     """Generate multiple recommendation options."""
 
-    await check_and_update_recommendation_limit(db, current_user)
+    # Check limit but don't increment yet
+    await check_recommendation_limit_only(db, current_user)
 
     logger.info("=" * 80)
     logger.info("🎭 MULTIPLE RECOMMENDATION OPTIONS GENERATION STARTED")
@@ -158,6 +194,9 @@ async def generate_recommendation_options(
             analysis_context_type=getattr(request, "analysis_context_type", "profile"),
             repository_url=getattr(request, "repository_url", None),
         )
+
+        # Only increment after successful generation
+        await increment_recommendation_count(db, current_user)
 
         logger.info("✅ MULTIPLE OPTIONS GENERATION COMPLETED SUCCESSFULLY")
         logger.info("📊 Final Stats:")
@@ -435,7 +474,8 @@ async def create_recommendation_from_option(
 ) -> RecommendationResponse:
     """Create a recommendation from a selected option."""
 
-    await check_and_update_recommendation_limit(db, current_user)
+    # Check limit but don't increment yet
+    await check_recommendation_limit_only(db, current_user)
 
     logger.info("=" * 80)
     logger.info("🎯 RECOMMENDATION CREATION FROM SELECTED OPTION STARTED")
@@ -458,6 +498,9 @@ async def create_recommendation_from_option(
             analysis_context_type=request.analysis_context_type or "profile",
             repository_url=request.repository_url,
         )
+
+        # Only increment after successful generation
+        await increment_recommendation_count(db, current_user)
 
         logger.info("✅ RECOMMENDATION CREATION FROM OPTION COMPLETED SUCCESSFULLY")
         logger.info("📊 Final Stats:")
@@ -488,7 +531,8 @@ async def regenerate_recommendation(
 ) -> RecommendationResponse:
     """Regenerate a recommendation with refinement instructions."""
 
-    await check_and_update_recommendation_limit(db, current_user)
+    # Check limit but don't increment yet
+    await check_recommendation_limit_only(db, current_user)
 
     logger.info("=" * 80)
     logger.info("🔄 RECOMMENDATION REGENERATION STARTED")
@@ -524,6 +568,9 @@ async def regenerate_recommendation(
             tone=tone,
             length=length,
         )
+
+        # Only increment after successful generation
+        await increment_recommendation_count(db, current_user)
 
         logger.info("✅ RECOMMENDATION REGENERATION COMPLETED SUCCESSFULLY")
         logger.info("📊 Final Stats:")

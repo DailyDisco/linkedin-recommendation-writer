@@ -283,12 +283,24 @@ export default function GeneratorPage() {
             ? rawErrorMessage
             : JSON.stringify(rawErrorMessage);
 
-        // Add diagnostic suggestion if it looks like a configuration issue
-        const enhancedMessage =
-          errorMessage.includes('GitHub token') ||
-          errorMessage.includes('not configured')
-            ? `${errorMessage} Please check the Service Diagnostics section below for configuration issues.`
-            : errorMessage;
+        // Provide more specific guidance based on error type
+        let enhancedMessage = errorMessage;
+
+        if (errorMessage.includes('not found')) {
+          enhancedMessage = `${errorMessage}\n\n💡 Tips:\n• Check for typos in the username\n• GitHub usernames are case-sensitive\n• Make sure the user exists and has a public profile\n• Try the username in lowercase`;
+        } else if (errorMessage.includes('rate limit')) {
+          enhancedMessage = `${errorMessage}\n\n💡 The GitHub API rate limit has been exceeded. Please wait a few minutes and try again.`;
+        } else if (
+          errorMessage.includes('403') ||
+          errorMessage.includes('forbidden')
+        ) {
+          enhancedMessage = `${errorMessage}\n\n💡 Access denied. This could mean:\n• The user's profile is private\n• GitHub API rate limit exceeded\n• Authentication issues`;
+        } else if (
+          errorMessage.includes('401') ||
+          errorMessage.includes('authentication')
+        ) {
+          enhancedMessage = `${errorMessage}\n\n💡 Authentication failed. Please contact support if this persists.`;
+        }
 
         setError(enhancedMessage);
       }
