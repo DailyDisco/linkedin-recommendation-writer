@@ -1,5 +1,7 @@
 import type { ParsedGitHubInput } from '../types';
 
+// #########################################################
+
 /**
  * Parse GitHub input to determine if it's a username or repository URL
  */
@@ -54,6 +56,8 @@ export function parseGitHubInput(input: string): ParsedGitHubInput {
   };
 }
 
+// #########################################################
+
 /**
  * Validate GitHub input
  */
@@ -86,3 +90,16 @@ export function validateGitHubInput(input: string): {
 
   return { isValid: true };
 }
+
+// #########################################################
+
+// Tailwind merge
+
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+
+// #########################################################
