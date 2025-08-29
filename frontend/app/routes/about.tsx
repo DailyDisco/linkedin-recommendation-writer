@@ -1,4 +1,11 @@
-import { Github, Sparkles, Database, Shield, Globe, Workflow } from 'lucide-react';
+import {
+  Github,
+  Sparkles,
+  Database,
+  Shield,
+  Globe,
+  Workflow,
+} from 'lucide-react';
 
 export default function AboutPage() {
   return (
@@ -136,8 +143,8 @@ export default function AboutPage() {
                 <div>
                   <h3 className='font-semibold'>Containerization</h3>
                   <p className='text-gray-600'>
-                    The application is containerized using Docker, ensuring consistent
-                    environments across development and production.
+                    The application is containerized using Docker, ensuring
+                    consistent environments across development and production.
                   </p>
                 </div>
               </div>
@@ -146,8 +153,8 @@ export default function AboutPage() {
                 <div>
                   <h3 className='font-semibold'>Cloud Deployment</h3>
                   <p className='text-gray-600'>
-                    Deployed on Railway, leveraging its robust infrastructure for
-                    scalability and reliability.
+                    Deployed on Railway, leveraging its robust infrastructure
+                    for scalability and reliability.
                   </p>
                 </div>
               </div>
@@ -158,8 +165,14 @@ export default function AboutPage() {
               <li>Implement user authentication and personalized dashboards</li>
               <li>Expand AI models for more nuanced recommendation styles</li>
               <li>Integrate with other professional networking platforms</li>
-              <li>Offer advanced customization options for generated recommendations</li>
-              <li>Improve GitHub analysis with deeper insights into project contributions</li>
+              <li>
+                Offer advanced customization options for generated
+                recommendations
+              </li>
+              <li>
+                Improve GitHub analysis with deeper insights into project
+                contributions
+              </li>
             </ul>
 
             <h2 className='text-2xl font-bold text-gray-900'>Open Source</h2>
