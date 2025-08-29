@@ -303,7 +303,7 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
                             />
                           </div>
                           <div className='flex justify-end gap-2'>
-                            <Button variant='outline' onClick={() => { }}>
+                            <Button variant='outline' onClick={() => {}}>
                               Cancel
                             </Button>
                             <Button

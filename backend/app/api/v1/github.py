@@ -1,18 +1,16 @@
 """GitHub API endpoints."""
 
 import logging
-from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_database_session, get_github_service, get_repository_service, validate_github_username
-from app.schemas.github import GitHubAnalysisRequest, GitHubProfileResponse, LanguageStats, RepositoryInfo, SkillAnalysis
-from app.schemas.repository import RepositoryContributorsRequest, RepositoryContributorsResponse
-from app.services.github_service import GitHubService
-from app.services.repository_service import RepositoryService
+from app.core.dependencies import get_github_service, get_repository_service, validate_github_username
+from app.schemas.github import ProfileAnalysisResponse, RepositoryAnalysisResponse
+from app.schemas.repository import RepositoryContributorsResponse
+from app.services.github_repository_service import GitHubRepositoryService
+from app.services.github_user_service import GitHubUserService
 
 logger = logging.getLogger(__name__)
 
@@ -27,162 +25,59 @@ def _handle_api_error(error: Exception, operation: str, status_code: int = 500) 
     raise HTTPException(status_code=status_code, detail="Internal server error")
 
 
-def _build_github_profile_response(
-    user_data: dict,
-    repositories: list,
-    languages: list,
-    skills: dict,
-    analyzed_at: datetime,
-) -> GitHubProfileResponse:
-    """Build GitHubProfileResponse from raw analysis data."""
-    return GitHubProfileResponse(
-        github_username=user_data["github_username"],
-        github_id=user_data["github_id"],
-        full_name=user_data.get("full_name"),
-        bio=user_data.get("bio"),
-        company=user_data.get("company"),
-        location=user_data.get("location"),
-        email=user_data.get("email"),
-        blog=user_data.get("blog"),
-        avatar_url=user_data.get("avatar_url"),
-        public_repos=user_data["public_repos"],
-        followers=user_data["followers"],
-        following=user_data["following"],
-        public_gists=user_data["public_gists"],
-        repositories=[
-            RepositoryInfo(
-                name=repo["name"],
-                description=repo.get("description"),
-                language=repo.get("language"),
-                stars=repo.get("stars", 0),
-                forks=repo.get("forks", 0),
-                size=repo.get("size", 0),
-                created_at=repo["created_at"],
-                updated_at=repo["updated_at"],
-                topics=repo.get("topics", []),
-                url=repo["url"],
-            )
-            for repo in repositories
-        ],
-        languages=[
-            LanguageStats(
-                language=lang["language"],
-                percentage=lang["percentage"],
-                lines_of_code=lang["lines_of_code"],
-                repository_count=lang["repository_count"],
-            )
-            for lang in languages
-        ],
-        skills=SkillAnalysis(
-            technical_skills=skills["technical_skills"],
-            frameworks=skills["frameworks"],
-            tools=skills["tools"],
-            domains=skills["domains"],
-            soft_skills=skills["soft_skills"],
-        ),
-        last_analyzed=analyzed_at,
-    )
-
-
 class GitHubServiceHealthResponse(BaseModel):
     """Response schema for GitHub service health check."""
 
     status: str  # "healthy", "unhealthy", "degraded"
     message: str
-    github_token_configured: bool
-    rate_limit_remaining: Optional[int] = None
-    rate_limit_reset: Optional[int] = None
 
 
 @router.get("/health", response_model=GitHubServiceHealthResponse)
-async def check_github_service_health(
-    github_service: GitHubService = Depends(get_github_service),
+async def get_github_service_health(
+    github_user_service: GitHubUserService = Depends(get_github_service),
 ) -> GitHubServiceHealthResponse:
-    """Check GitHub service health and configuration."""
+    """Get GitHub service health status."""
+    if not github_user_service.github_client:
+        return GitHubServiceHealthResponse(status="error", message="GitHub client not initialized.")
     try:
-        github_token_configured = github_service.github_client is not None
-
-        if not github_token_configured:
+        github_user_service.github_client.get_user("octocat")  # Test with a public user
+        # Check rate limit
+        rate_limit = github_user_service.github_client.get_rate_limit()
+        core_rate_limit = rate_limit.core
+        if core_rate_limit.remaining < 500:
+            logger.warning("GitHub API rate limit low: {remaining}/{limit}".format(remaining=core_rate_limit.remaining, limit=core_rate_limit.limit))
             return GitHubServiceHealthResponse(
-                status="unhealthy",
-                message="GitHub token not configured. Please set GITHUB_TOKEN environment variable.",
-                github_token_configured=False,
+                status="warning",
+                message=(f"GitHub API rate limit remaining: {core_rate_limit.remaining}/" f"{core_rate_limit.limit}. Reset at {core_rate_limit.reset}."),
             )
-
-        # Try to get rate limit information
-        # rate_limit_info = ...  # Removed unused variable
-        try:
-            if github_service.github_client:
-                rate_limit = github_service.github_client.get_rate_limit()
-                rate_limit_remaining = getattr(getattr(rate_limit, "core", None), "remaining", None)
-                rate_limit_reset = None
-                if hasattr(rate_limit, "core") and hasattr(rate_limit.core, "reset"):
-                    rate_limit_reset = getattr(rate_limit.core.reset, "timestamp", lambda: None)()
-            else:
-                rate_limit_remaining = None
-                rate_limit_reset = None
-        except Exception:
-            rate_limit_remaining = None
-            rate_limit_reset = None
-
-        # Determine health status
-        if rate_limit_remaining is not None and rate_limit_remaining > 100:
-            status = "healthy"
-            message = "GitHub service is healthy and has sufficient API quota."
-        elif rate_limit_remaining is not None and rate_limit_remaining > 0:
-            status = "degraded"
-            message = f"GitHub service has limited API quota remaining ({rate_limit_remaining} requests)."
-        else:
-            status = "unhealthy"
-            message = "GitHub API rate limit exceeded or service unavailable."
-
-        return GitHubServiceHealthResponse(
-            status=status,
-            message=message,
-            github_token_configured=github_token_configured,
-            rate_limit_remaining=rate_limit_remaining,
-            rate_limit_reset=rate_limit_reset,
-        )
-
+        return GitHubServiceHealthResponse(status="ok", message="GitHub service is healthy.")
     except Exception as e:
-        logger.error(f"Error checking GitHub service health: {e}")
-        return GitHubServiceHealthResponse(
-            status="unhealthy",
-            message=f"Error checking GitHub service health: {str(e)}",
-            github_token_configured=github_service.github_client is not None,
-        )
+        logger.error(f"GitHub service health check failed: {e}")
+        return GitHubServiceHealthResponse(status="error", message=f"GitHub service is unhealthy: {e}")
 
 
-@router.post("/analyze", response_model=GitHubProfileResponse)
+@router.post("/analyze", response_model=ProfileAnalysisResponse)
 async def analyze_github_profile(
-    request: GitHubAnalysisRequest,
-    db: AsyncSession = Depends(get_database_session),
-    github_service: GitHubService = Depends(get_github_service),
-) -> GitHubProfileResponse:
+    username: str,
+    force_refresh: bool = False,
+    github_user_service: GitHubUserService = Depends(get_github_service),
+) -> Optional[ProfileAnalysisResponse]:
     """Analyze a GitHub profile and return comprehensive data."""
 
     try:
-        analysis = await github_service.analyze_github_profile(
-            username=request.github_username,
-            force_refresh=request.force_refresh,
-            max_repositories=request.max_repositories,
+        analysis = await github_user_service.analyze_github_profile(
+            username=username,
+            force_refresh=force_refresh,
+            max_repositories=10,  # Assuming a default max_repositories for this endpoint
         )
 
         if not analysis:
             raise HTTPException(
                 status_code=404,
-                detail=f"GitHub user '{request.github_username}' not found or could not be analyzed",
+                detail=f"GitHub user '{username}' not found or could not be analyzed",
             )
 
-        user_data = analysis["user_data"]
-        repositories = analysis["repositories"]
-        languages = analysis["languages"]
-        skills = analysis["skills"]
-
-        # Convert to response format
-        response = _build_github_profile_response(user_data, repositories, languages, skills, analysis["analyzed_at"])
-
-        return response
+        return ProfileAnalysisResponse(**analysis)
 
     except Exception as e:
         _handle_api_error(e, "GitHub profile analysis")
@@ -190,44 +85,75 @@ async def analyze_github_profile(
         return None  # type: ignore
 
 
-@router.get("/user/{username}", response_model=GitHubProfileResponse)
+@router.get("/user/{username}", response_model=ProfileAnalysisResponse)
 async def get_github_profile(
     username: str = Depends(validate_github_username),
     force_refresh: bool = False,
-    db: AsyncSession = Depends(get_database_session),
-    github_service: GitHubService = Depends(get_github_service),
-) -> GitHubProfileResponse:
+    github_user_service: GitHubUserService = Depends(get_github_service),
+) -> Optional[ProfileAnalysisResponse]:
     """Get a GitHub profile analysis (convenience endpoint)."""
 
-    request = GitHubAnalysisRequest(
-        github_username=username,
-        force_refresh=force_refresh,
-        analyze_repositories=True,
-        max_repositories=10,
-    )
+    return await analyze_github_profile(username, force_refresh, github_user_service)
 
-    return await analyze_github_profile(request, db, github_service)
+
+@router.post("/repository/analyze", response_model=RepositoryAnalysisResponse)
+async def analyze_repository(
+    repository_full_name: str,
+    force_refresh: bool = False,
+    github_repository_service: GitHubRepositoryService = Depends(get_repository_service),
+) -> Optional[RepositoryAnalysisResponse]:
+    """Analyze a specific GitHub repository and return comprehensive data."""
+
+    try:
+        analysis = await github_repository_service.analyze_repository(
+            repository_full_name=repository_full_name,
+            force_refresh=force_refresh,
+        )
+
+        if not analysis:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Repository '{repository_full_name}' not found or could not be analyzed",
+            )
+        return RepositoryAnalysisResponse(**analysis)
+
+    except Exception as e:
+        _handle_api_error(e, "repository analysis")
+        # This return statement will never be reached, but mypy requires it
+        return None  # type: ignore
+
+
+@router.get("/repository/{owner}/{repo}", response_model=RepositoryAnalysisResponse)
+async def get_repository_analysis_by_path(
+    owner: str,
+    repo: str,
+    force_refresh: bool = False,
+    github_repository_service: GitHubRepositoryService = Depends(get_repository_service),
+) -> Optional[RepositoryAnalysisResponse]:
+    """Get a GitHub repository analysis (convenience endpoint)."""
+    return await analyze_repository(f"{owner}/{repo}", force_refresh, github_repository_service)
 
 
 @router.post("/repository/contributors", response_model=RepositoryContributorsResponse)
 async def get_repository_contributors(
-    request: RepositoryContributorsRequest,
-    db: AsyncSession = Depends(get_database_session),
-    repository_service: RepositoryService = Depends(get_repository_service),
-) -> RepositoryContributorsResponse:
+    repository_full_name: str,
+    max_contributors: int = 50,
+    force_refresh: bool = False,
+    github_repository_service: GitHubRepositoryService = Depends(get_repository_service),
+) -> Optional[RepositoryContributorsResponse]:
     """Get contributors from a GitHub repository with their real names."""
 
     try:
-        result = await repository_service.get_repository_contributors(
-            repo_name=request.repository_name,
-            max_contributors=request.max_contributors,
-            force_refresh=request.force_refresh,
+        result = await github_repository_service.get_repository_contributors(
+            repo_name=repository_full_name,
+            max_contributors=max_contributors,
+            force_refresh=force_refresh,
         )
 
         if not result:
             raise HTTPException(
                 status_code=404,
-                detail=f"Repository '{request.repository_name}' not found or could not be accessed",
+                detail=f"Repository '{repository_full_name}' not found or could not be accessed",
             )
 
         return RepositoryContributorsResponse(**result)
@@ -247,15 +173,8 @@ async def get_repository_contributors_by_path(
     repo: str,
     max_contributors: int = 50,
     force_refresh: bool = False,
-    db: AsyncSession = Depends(get_database_session),
-    repository_service: RepositoryService = Depends(get_repository_service),
-) -> RepositoryContributorsResponse:
+    github_repository_service: GitHubRepositoryService = Depends(get_repository_service),
+) -> Optional[RepositoryContributorsResponse]:
     """Get contributors from a GitHub repository (convenience endpoint)."""
 
-    request = RepositoryContributorsRequest(
-        repository_name=f"{owner}/{repo}",
-        max_contributors=max_contributors,
-        force_refresh=force_refresh,
-    )
-
-    return await get_repository_contributors(request, db, repository_service)
+    return await get_repository_contributors(f"{owner}/{repo}", max_contributors, force_refresh, github_repository_service)

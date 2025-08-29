@@ -11,9 +11,10 @@ from app.core.database import AsyncSessionLocal
 from app.core.exceptions import DatabaseError
 from app.core.redis_client import get_redis
 from app.services.ai_service import AIService
-from app.services.github_service import GitHubService
+from app.services.github_commit_service import GitHubCommitService
+from app.services.github_repository_service import GitHubRepositoryService
+from app.services.github_user_service import GitHubUserService
 from app.services.recommendation_service import RecommendationService
-from app.services.repository_service import RepositoryService
 from app.services.user_service import UserService
 
 T = TypeVar("T")
@@ -62,17 +63,18 @@ class ServiceContainer:
     _instances: dict = {}
 
     @classmethod
-    def _get_service(cls, service_name: str, service_class: type[T]) -> T:
+    def _get_service(cls, service_name: str, service_class: type[T], *args, **kwargs) -> T:
         """Generic service getter with singleton pattern."""
         if service_name not in cls._instances:
             logger.info(f"Initializing {service_name} service")
-            cls._instances[service_name] = service_class()
+            cls._instances[service_name] = service_class(*args, **kwargs)
         return cast(T, cls._instances[service_name])
 
     @classmethod
-    def get_github_service(cls) -> GitHubService:
+    def get_github_service(cls) -> GitHubUserService:
         """Get or create GitHub service instance."""
-        return cls._get_service("github", GitHubService)
+        # GitHubUserService requires GitHubCommitService
+        return cls._get_service("github_user", GitHubUserService, GitHubCommitService())
 
     @classmethod
     def get_ai_service(cls) -> AIService:
@@ -85,9 +87,10 @@ class ServiceContainer:
         return cls._get_service("recommendation", RecommendationService)
 
     @classmethod
-    def get_repository_service(cls) -> RepositoryService:
+    def get_repository_service(cls) -> GitHubRepositoryService:
         """Get or create repository service instance."""
-        return cls._get_service("repository", RepositoryService)
+        # GitHubRepositoryService requires GitHubCommitService
+        return cls._get_service("github_repository", GitHubRepositoryService, GitHubCommitService())
 
     @classmethod
     def get_user_service(cls) -> UserService:
@@ -101,8 +104,8 @@ class ServiceContainer:
 
 
 # Service provider functions
-def get_github_service() -> GitHubService:
-    """Dependency provider for GitHub service."""
+def get_github_service() -> GitHubUserService:
+    """Dependency injector for GitHubUserService."""
     return ServiceContainer.get_github_service()
 
 
@@ -116,8 +119,8 @@ def get_recommendation_service() -> RecommendationService:
     return ServiceContainer.get_recommendation_service()
 
 
-def get_repository_service() -> RepositoryService:
-    """Dependency provider for repository service."""
+def get_repository_service() -> GitHubRepositoryService:
+    """Dependency injector for GitHubRepositoryService."""
     return ServiceContainer.get_repository_service()
 
 
