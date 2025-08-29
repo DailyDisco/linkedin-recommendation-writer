@@ -25,7 +25,9 @@ from app.schemas.recommendation import (
     VersionComparisonResponse,
 )
 from app.services.ai_service import AIService
-from app.services.github_service import GitHubService
+from app.services.github_commit_service import GitHubCommitService
+from app.services.github_repository_service import GitHubRepositoryService
+from app.services.github_user_service import GitHubUserService
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +43,8 @@ class RecommendationService:
 
     def __init__(self) -> None:
         """Initialize recommendation service."""
-        self.github_service = GitHubService()
+        self.github_service = GitHubUserService(GitHubCommitService())
+        self.repository_service = GitHubRepositoryService(GitHubCommitService())
         self.ai_service = AIService()
 
     async def create_recommendation(
@@ -340,7 +343,7 @@ class RecommendationService:
                     repo_name = repository_url
 
                 # Analyze the repository
-                repository_data = await self.github_service.analyze_repository(repository_full_name=repo_name, force_refresh=False)
+                repository_data = await self.repository_service.analyze_repository(repository_full_name=repo_name, force_refresh=False)
 
                 # Analyze the specific contributor's profile
                 logger.info(f"👤 Analyzing contributor profile: {github_username}")
@@ -748,7 +751,7 @@ class RecommendationService:
             logger.info("-" * 50)
             repo_start = time.time()
 
-            repository_data = await self.github_service.analyze_repository(repository_full_name=repository_full_name, force_refresh=False)
+            repository_data = await self.repository_service.analyze_repository(repository_full_name=repository_full_name, force_refresh=False)
 
             if not repository_data:
                 logger.error(f"❌ Failed to analyze repository {repository_full_name}")
@@ -1848,7 +1851,7 @@ class RecommendationService:
                     repo_name = repository_url
 
                 # Analyze the repository
-                repository_data = await self.github_service.analyze_repository(repository_full_name=repo_name, force_refresh=False)
+                repository_data = await self.repository_service.analyze_repository(repository_full_name=repo_name, force_refresh=False)
 
                 # Analyze the specific contributor's profile
                 logger.info(f"👤 Analyzing contributor profile: {github_username}")
