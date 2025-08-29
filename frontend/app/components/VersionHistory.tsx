@@ -27,6 +27,17 @@ interface VersionDifference {
   version_b: string | number;
 }
 
+interface VersionDetail {
+  id: number;
+  version_number: number;
+  change_type: string;
+  change_description: string | null;
+  confidence_score: number;
+  word_count: number;
+  created_at: string;
+  created_by: string | null;
+}
+
 interface Version {
   id: number;
   version_number: number;
@@ -60,9 +71,9 @@ interface VersionHistoryProps {
     versionA: number,
     versionB: number
   ) => Promise<{
-    version_a: Record<string, unknown>;
-    version_b: Record<string, unknown>;
-    differences: Record<string, unknown>;
+    version_a: VersionDetail;
+    version_b: VersionDetail;
+    differences: Record<string, VersionDifference>;
   }>;
   onRevertToVersion: (
     recId: number,
@@ -116,9 +127,11 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
   > | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedVersions, setSelectedVersions] = useState<number[]>([]);
-  const [comparison, setComparison] = useState<Awaited<
-    ReturnType<VersionHistoryProps['onCompareVersions']>
-  > | null>(null);
+  const [comparison, setComparison] = useState<{
+    version_a: VersionDetail;
+    version_b: VersionDetail;
+    differences: Record<string, VersionDifference>;
+  } | null>(null);
   const [revertVersion, setRevertVersion] = useState<number | null>(null);
   const [revertReason, setRevertReason] = useState('');
 
@@ -384,21 +397,24 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
                 <h4 className='font-semibold mb-3'>Key Differences</h4>
                 <div className='space-y-2'>
                   {Object.entries(comparison.differences).map(
-                    ([key, diff]: [string, VersionDifference]) => (
-                      <div
-                        key={key}
-                        className='flex items-center gap-2 p-2 bg-muted rounded'
-                      >
-                        <Badge variant='outline'>
-                          {key.replace(/_/g, ' ')}
-                        </Badge>
-                        <span className='text-sm'>
-                          {diff.changed
-                            ? 'Changed'
-                            : `${diff.version_a} → ${diff.version_b}`}
-                        </span>
-                      </div>
-                    )
+                    ([key, diff]: [string, unknown]) => {
+                      const versionDiff = diff as VersionDifference;
+                      return (
+                        <div
+                          key={key}
+                          className='flex items-center gap-2 p-2 bg-muted rounded'
+                        >
+                          <Badge variant='outline'>
+                            {key.replace(/_/g, ' ')}
+                          </Badge>
+                          <span className='text-sm'>
+                            {versionDiff.changed
+                              ? 'Changed'
+                              : `${versionDiff.version_a} → ${versionDiff.version_b}`}
+                          </span>
+                        </div>
+                      );
+                    }
                   )}
                 </div>
               </div>

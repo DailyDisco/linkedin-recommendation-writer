@@ -1,17 +1,27 @@
 import { useEffect, useState } from 'react';
-import { FileText, Loader2, AlertCircle } from 'lucide-react';
+import { FileText, Loader2, AlertCircle, History } from 'lucide-react';
 import { toast } from 'sonner';
-import { recommendationApi } from '../services/api';
+import { recommendationApi, apiClient } from '../services/api';
 import type { Recommendation } from '../types';
 import { formatDate } from '../utils/formatDate';
 import ErrorBoundary from '../components/ui/error-boundary';
 import { useAuth } from '../hooks/useAuth';
 import { Link } from 'react-router';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { VersionHistory } from '@/components/VersionHistory';
 import { PleaseSignInOrRegister } from '../components/PleaseSignInOrRegister';
 
 const RecommendationsHistory = () => {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedRecId, setSelectedRecId] = useState<number | null>(null);
   const { isLoggedIn } = useAuth(); // Get authentication status from context
 
   useEffect(() => {
@@ -40,6 +50,55 @@ const RecommendationsHistory = () => {
 
     fetchRecommendations();
   }, [isLoggedIn]);
+
+  // Version History API handlers
+  const handleGetVersionHistory = async (recommendationId: number) => {
+    try {
+      const history = await apiClient.getVersionHistory(recommendationId);
+      return history;
+    } catch (error) {
+      console.error('Failed to get version history:', error);
+      toast.error('Failed to load version history');
+      throw error;
+    }
+  };
+
+  const handleCompareVersions = async (
+    recommendationId: number,
+    versionA: number,
+    versionB: number
+  ) => {
+    try {
+      const comparison = await apiClient.compareVersions(
+        recommendationId,
+        versionA,
+        versionB
+      );
+      return comparison;
+    } catch (error) {
+      console.error('Failed to compare versions:', error);
+      toast.error('Failed to compare versions');
+      throw error;
+    }
+  };
+
+  const handleRevertVersion = async (
+    recommendationId: number,
+    versionId: number,
+    reason: string
+  ): Promise<void> => {
+    try {
+      const data = { version_id: versionId, revert_reason: reason };
+      await apiClient.revertVersion(recommendationId, data);
+      toast.success('Successfully reverted to previous version');
+      // Refresh the recommendations list
+      fetchRecommendations();
+    } catch (error) {
+      console.error('Failed to revert version:', error);
+      toast.error('Failed to revert version');
+      throw error;
+    }
+  };
 
   if (!isLoggedIn) {
     return <PleaseSignInOrRegister />;
@@ -87,9 +146,20 @@ const RecommendationsHistory = () => {
                   <h2 className='text-xl font-semibold text-gray-900'>
                     Recommendation for {rec.github_username}
                   </h2>
-                  <span className='text-sm text-gray-500'>
-                    {formatDate(rec.created_at)}
-                  </span>
+                  <div className='flex items-center gap-2'>
+                    <Button
+                      variant='outline'
+                      size='sm'
+                      onClick={() => setSelectedRecId(rec.id)}
+                      className='flex items-center gap-1'
+                    >
+                      <History className='w-4 h-4' />
+                      View History
+                    </Button>
+                    <span className='text-sm text-gray-500'>
+                      {formatDate(rec.created_at)}
+                    </span>
+                  </div>
                 </div>
                 <p className='text-gray-700 whitespace-pre-wrap'>
                   {rec.content}
@@ -112,6 +182,29 @@ const RecommendationsHistory = () => {
             ))}
           </div>
         )}
+
+        {/* Version History Modal */}
+        <Dialog
+          open={!!selectedRecId}
+          onOpenChange={() => setSelectedRecId(null)}
+        >
+          <DialogContent className='max-w-4xl max-h-[80vh] overflow-y-auto'>
+            <DialogHeader>
+              <DialogTitle>Version History</DialogTitle>
+              <DialogDescription>
+                Track changes and manage versions of this recommendation
+              </DialogDescription>
+            </DialogHeader>
+            {selectedRecId && (
+              <VersionHistory
+                recommendationId={selectedRecId}
+                onGetHistory={handleGetVersionHistory}
+                onCompareVersions={handleCompareVersions}
+                onRevertToVersion={handleRevertVersion}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </ErrorBoundary>
   );

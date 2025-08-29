@@ -13,7 +13,6 @@ import {
   FileText,
   Users,
   Target,
-  History,
   GitBranch,
   Lightbulb,
   TrendingUp,
@@ -22,7 +21,6 @@ import {
 import { KeywordRefinement } from './KeywordRefinement';
 import { ReadmeGenerator } from './ReadmeGenerator';
 import { SkillGapAnalysis } from './SkillGapAnalysis';
-import { VersionHistory } from './VersionHistory';
 import { MultiContributorGenerator } from './MultiContributorGenerator';
 
 interface KeywordRefineData {
@@ -56,46 +54,11 @@ interface MultiContributorData {
   recommendation_tone?: string;
 }
 
-interface VersionHistoryData {
-  recommendation_id: number;
-  total_versions: number;
-  current_version: number;
-  versions: Array<{
-    id: number;
-    version_number: number;
-    change_type: string;
-    change_description: string | null;
-    confidence_score: number;
-    word_count: number;
-    created_at: string;
-    created_by: string | null;
-  }>;
-}
-
-interface VersionComparisonData {
-  version_a: Record<string, unknown>;
-  version_b: Record<string, unknown>;
-  differences: Record<string, unknown>;
-}
-
 interface AdvancedFeaturesProps {
   // API functions that would be passed from parent
   onKeywordRefine: (data: KeywordRefineData) => Promise<unknown>;
   onGenerateReadme: (data: ReadmeGenerationData) => Promise<unknown>;
   onAnalyzeSkills: (data: SkillAnalysisData) => Promise<unknown>;
-  onGetVersionHistory: (
-    recommendationId: number
-  ) => Promise<VersionHistoryData>;
-  onCompareVersions: (
-    recId: number,
-    versionA: number,
-    versionB: number
-  ) => Promise<VersionComparisonData>;
-  onRevertVersion: (
-    recId: number,
-    versionId: number,
-    reason: string
-  ) => Promise<void>;
   onGenerateMultiContributor: (data: MultiContributorData) => Promise<unknown>;
 }
 
@@ -122,13 +85,7 @@ const FEATURES = [
     icon: Target,
     component: SkillGapAnalysis,
   },
-  {
-    id: 'version-history',
-    title: 'Version History',
-    description: 'Track, compare, and revert recommendation versions',
-    icon: History,
-    component: VersionHistory,
-  },
+
   {
     id: 'multi-contributor',
     title: 'Team Recommendations',
@@ -142,9 +99,6 @@ export const AdvancedFeatures: React.FC<AdvancedFeaturesProps> = ({
   onKeywordRefine,
   onGenerateReadme,
   onAnalyzeSkills,
-  onGetVersionHistory,
-  onCompareVersions,
-  onRevertVersion,
   onGenerateMultiContributor,
 }) => {
   const [activeFeature, setActiveFeature] = useState(FEATURES[0].id);
@@ -163,11 +117,6 @@ export const AdvancedFeatures: React.FC<AdvancedFeaturesProps> = ({
         break;
       case 'skill-gap-analysis':
         props.onAnalyze = onAnalyzeSkills;
-        break;
-      case 'version-history':
-        props.onGetHistory = onGetVersionHistory;
-        props.onCompare = onCompareVersions;
-        props.onRevert = onRevertVersion;
         break;
       case 'multi-contributor':
         props.onGenerate = onGenerateMultiContributor;
@@ -196,7 +145,7 @@ export const AdvancedFeatures: React.FC<AdvancedFeaturesProps> = ({
             onValueChange={setActiveFeature}
             className='w-full'
           >
-            <TabsList className='grid w-full grid-cols-5'>
+            <TabsList className='grid w-full grid-cols-4'>
               {FEATURES.map(feature => {
                 const Icon = feature.icon;
                 return (
