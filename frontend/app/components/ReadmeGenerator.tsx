@@ -18,9 +18,10 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileText, Download, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { apiClient, handleApiError } from '@/services/api';
 
 interface ReadmeGeneratorProps {
@@ -85,11 +86,13 @@ export const ReadmeGenerator: React.FC<ReadmeGeneratorProps> = ({
   const [style, setStyle] = useState('comprehensive');
   const [targetAudience, setTargetAudience] = useState('developers');
   const [includeSections, setIncludeSections] = useState<string[]>([]);
-  const [generatedReadme, setGeneratedReadme] = useState<Awaited<
-    ReturnType<ReadmeGeneratorProps['onGenerate']>
-  > | null>(null);
+  const [generatedReadme, setGeneratedReadme] = useState<{
+    repository_name: string;
+    generated_content: string;
+    sections: Record<string, string>;
+    confidence_score: number;
+  } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const toggleSection = (section: string) => {
     setIncludeSections(prev =>
@@ -101,12 +104,11 @@ export const ReadmeGenerator: React.FC<ReadmeGeneratorProps> = ({
 
   const handleGenerate = async () => {
     if (!repositoryName.trim()) {
-      setError('Please enter a repository name.');
+      toast.error('Please enter a repository name.');
       return;
     }
 
     setIsLoading(true);
-    setError(null);
 
     try {
       const generationData = {
@@ -121,6 +123,8 @@ export const ReadmeGenerator: React.FC<ReadmeGeneratorProps> = ({
       const apiResult = await apiClient.generateReadme(generationData);
       setGeneratedReadme(apiResult);
 
+      toast.success(`README generated successfully for ${repositoryName}!`);
+
       // Call the callback if provided
       if (onGenerate) {
         await onGenerate(generationData);
@@ -131,7 +135,7 @@ export const ReadmeGenerator: React.FC<ReadmeGeneratorProps> = ({
       }
     } catch (err: unknown) {
       const errorInfo = handleApiError(err);
-      setError(errorInfo.message);
+      toast.error(errorInfo.message || 'Failed to generate README. Please try again.');
       console.error('README generation failed:', err);
     } finally {
       setIsLoading(false);
@@ -152,6 +156,8 @@ export const ReadmeGenerator: React.FC<ReadmeGeneratorProps> = ({
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+
+    toast.success('README.md downloaded successfully!');
   };
 
   return (
@@ -251,12 +257,7 @@ export const ReadmeGenerator: React.FC<ReadmeGeneratorProps> = ({
             )}
           </div>
 
-          {/* Error Display */}
-          {error && (
-            <Alert variant='destructive'>
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+
 
           <Button
             onClick={handleGenerate}
@@ -315,7 +316,7 @@ export const ReadmeGenerator: React.FC<ReadmeGeneratorProps> = ({
                         </h3>
                         <div className='prose prose-sm max-w-none'>
                           <pre className='whitespace-pre-wrap font-sans text-sm'>
-                            {content}
+                            {String(content)}
                           </pre>
                         </div>
                       </div>
