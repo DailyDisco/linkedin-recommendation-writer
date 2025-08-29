@@ -7,7 +7,6 @@ export const PleaseSignInOrRegister = () => {
     <div className='flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 p-4'>
       <div className='bg-white p-8 rounded-xl shadow-xl text-center max-w-2xl w-full border border-gray-100'>
         <div className='relative mb-6'>
-          <LogIn className='w-20 h-20 text-blue-500 mx-auto mb-4' />
           <Sparkles className='w-6 h-6 text-yellow-400 absolute -top-2 -right-8 animate-pulse' />
           <Sparkles className='w-4 h-4 text-pink-400 absolute -bottom-2 -left-8 animate-bounce' />
         </div>
@@ -15,11 +14,6 @@ export const PleaseSignInOrRegister = () => {
         <h1 className='text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-4'>
           🚀 Supercharge Your LinkedIn Game!
         </h1>
-
-        <p className='text-gray-600 mb-8 text-lg'>
-          Join dozens of professionals who&apos;ve already unlocked their
-          recommendation superpowers! ✨
-        </p>
 
         {/* Features Grid */}
         <div className='grid grid-cols-1 md:grid-cols-2 gap-4 mb-8'>
@@ -75,7 +69,7 @@ export const PleaseSignInOrRegister = () => {
 
         <div className='bg-gradient-to-r from-yellow-50 to-orange-50 p-6 rounded-lg mb-8 border border-yellow-200'>
           <p className='text-yellow-800 font-medium'>
-            🎯 <strong>Pro Tip:</strong> Your first 3 recommendations are FREE!
+            🎯 <strong>Pro Tip:</strong> You get 3 free recommendations a day!
             Upgrade anytime to unlock unlimited access.
           </p>
         </div>
@@ -97,7 +91,7 @@ export const PleaseSignInOrRegister = () => {
         </div>
 
         <p className='text-sm text-gray-500 mt-6'>
-          Join 10,000+ professionals who&apos;ve boosted their LinkedIn
+          Join dozens of professionals who&apos;ve boosted their LinkedIn
           profiles! ⭐
         </p>
       </div>
