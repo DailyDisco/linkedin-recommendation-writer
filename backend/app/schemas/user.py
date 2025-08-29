@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, ConfigDict
 
 
 class UserBase(BaseModel):
@@ -32,15 +32,14 @@ class UserLogin(BaseModel):
 class UserResponse(UserBase):
     """User response schema."""
 
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     is_active: bool
     recommendation_count: int
     last_recommendation_date: Optional[datetime] = None
     daily_limit: int
     role: str
-
-    class Config:
-        orm_mode = True
 
 
 class Token(BaseModel):
