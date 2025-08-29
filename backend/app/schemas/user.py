@@ -54,3 +54,4 @@ class TokenData(BaseModel):
     """Token data schema."""
 
     username: Optional[str] = None
+    id: Optional[str] = None

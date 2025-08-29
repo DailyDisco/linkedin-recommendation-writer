@@ -13,6 +13,7 @@ from loguru import logger
 
 from app.core.config import settings
 from app.core.redis_client import get_cache, set_cache
+from app.schemas.github import LanguageStats
 
 
 # Define a TypedDict for the repository content analysis result
@@ -1249,8 +1250,10 @@ class GitHubService:
             result["description"] = match.group("description").strip()
 
             # Map to category
-            if result["type"] and result["type"] in commit_types:
-                result["category"] = commit_types[result["type"]]["category"]
+            if result["type"]:
+                assert isinstance(result["type"], str)
+                if result["type"] in commit_types:
+                    result["category"] = commit_types[result["type"]]["category"]
 
             # Determine impact level based on type
             if result["type"] in ["feat", "perf"]:
@@ -1392,9 +1395,7 @@ class GitHubService:
 
         # Calculate percentages
         conventional_stats["conventional_percentage"] = (
-            round((conventional_stats["conventional_commits"] / conventional_stats["total_commits"]) * 100, 1)
-            if conventional_stats["total_commits"] > 0
-            else 0
+            round((conventional_stats["conventional_commits"] / conventional_stats["total_commits"]) * 100, 1) if conventional_stats["total_commits"] > 0 else 0
         )
 
         # Sort types and categories by frequency
@@ -1583,9 +1584,7 @@ class GitHubService:
                     if excellence_category in pattern_counts:
                         # Boost existing category
                         pattern_counts[excellence_category]["count"] += conv_count * 0.5  # Partial boost
-                        pattern_counts[excellence_category]["percentage"] = round(
-                            (pattern_counts[excellence_category]["count"] / total_commits) * 100, 1
-                        )
+                        pattern_counts[excellence_category]["percentage"] = round((pattern_counts[excellence_category]["count"] / total_commits) * 100, 1)
                     else:
                         # Add new category based on conventional commits
                         pattern_counts[excellence_category] = {
@@ -1956,6 +1955,39 @@ class GitHubService:
             },
         }
 
+    async def get_repository_contributors(self, repository_full_name: str, max_contributors: int = 10, force_refresh: bool = False) -> Optional[Dict[str, Any]]:
+        """Get repository contributors (placeholder implementation)."""
+        try:
+            # Parse repository name
+            if "/" not in repository_full_name:
+                return None
+
+            owner, repo_name = repository_full_name.split("/", 1)
+
+            if not self.github_client:
+                return None
+
+            # Get repository
+            repo = self.github_client.get_repo(repository_full_name)
+
+            # Get contributors
+            contributors = []
+            for contributor in repo.get_contributors()[:max_contributors]:  # type: ignore
+                contributors.append(
+                    {
+                        "username": contributor.login,
+                        "id": contributor.id,
+                        "contributions": contributor.contributions,
+                        "avatar_url": contributor.avatar_url,
+                    }
+                )
+
+            return {"contributors": contributors}
+
+        except Exception as e:
+            logger.error(f"Error getting repository contributors for {repository_full_name}: {e}")
+            return None
+
     async def analyze_repository(self, repository_full_name: str, force_refresh: bool = False) -> Optional[Dict[str, Any]]:
         """Analyze a specific GitHub repository and return comprehensive data."""
         import time
@@ -2117,7 +2149,7 @@ class GitHubService:
             logger.error(f"Error fetching repository info for {owner}/{repo_name}: {e}")
             return None
 
-    async def _get_repository_languages(self, owner: str, repo_name: str) -> List[Dict[str, Any]]:
+    async def _get_repository_languages(self, owner: str, repo_name: str) -> List[LanguageStats]:
         """Get programming languages used in the repository."""
         try:
             if not self.github_client:
@@ -2126,23 +2158,22 @@ class GitHubService:
             repo = self.github_client.get_repo(f"{owner}/{repo_name}")
             languages = repo.get_languages()
 
-            # Convert to our format
             total_bytes = sum(languages.values())
-            language_stats = []
+            language_stats: List[LanguageStats] = []
 
             for language, bytes_count in languages.items():
                 percentage = (bytes_count / total_bytes * 100) if total_bytes > 0 else 0
                 language_stats.append(
-                    {
-                        "language": language,
-                        "percentage": round(percentage, 2),
-                        "lines_of_code": bytes_count,
-                        "repository_count": 1,  # Since we're analyzing a single repo
-                    }
+                    LanguageStats(
+                        language=language,
+                        percentage=round(percentage, 2),
+                        lines_of_code=bytes_count,
+                        repository_count=1,
+                    )
                 )
 
             # Sort by percentage
-            language_stats.sort(key=lambda x: float(cast(float, x["percentage"])), reverse=True)
+            language_stats.sort(key=lambda x: x.percentage, reverse=True)
 
             return language_stats
         except Exception as e:
@@ -2209,13 +2240,13 @@ class GitHubService:
     async def _extract_repository_skills(
         self,
         repo_info: Dict[str, Any],
-        languages: List[Dict[str, Any]],
+        languages: List[LanguageStats],
         commits: List[Dict[str, Any]],
     ) -> Dict[str, Any]:
         """Extract skills and technologies from repository data."""
         try:
             # Extract technical skills from languages
-            technical_skills = [lang["language"] for lang in languages[:5]]  # Top 5 languages
+            technical_skills = [lang.language for lang in languages[:5]]  # Top 5 languages
 
             # Extract frameworks and tools from commit messages and file names
             frameworks = []
@@ -2357,7 +2388,7 @@ class GitHubService:
                 "soft_skills": [],
             }
 
-    async def _analyze_repository_commit_patterns(self, commits: List[Dict[str, Any]], languages: List[Dict[str, Any]]) -> Dict[str, Any]:
+    async def _analyze_repository_commit_patterns(self, commits: List[Dict[str, Any]], languages: List[LanguageStats]) -> Dict[str, Any]:
         """Analyze commit patterns specific to the repository."""
         try:
             if not commits:
@@ -2410,10 +2441,8 @@ class GitHubService:
             # Determine technical focus areas
             tech_focus = {}
             if languages:
-                primary_lang = languages[0]["language"]
-                tech_focus[f"{primary_lang} Development"] = len(
-                    [c for c in commits if any(primary_lang.lower() in str(c).lower() for c in c.get("files", []))]
-                )
+                primary_lang = languages[0].language  # Access .language attribute
+                tech_focus[f"{primary_lang} Development"] = len([c for c in commits if any(primary_lang.lower() in str(c).lower() for c in c.get("files", []))])
 
             return {
                 "total_commits_analyzed": total_commits,
@@ -2549,9 +2578,7 @@ class GitHubService:
                 "max": max(impact_scores) if impact_scores else 0,
                 "median": sorted(impact_scores)[len(impact_scores) // 2] if impact_scores else 0,
             },
-            "quality_distribution": {
-                level: round((count / total_commits) * 100, 1) if total_commits > 0 else 0 for level, count in impact_distribution.items()
-            },
+            "quality_distribution": {level: round((count / total_commits) * 100, 1) if total_commits > 0 else 0 for level, count in impact_distribution.items()},
         }
 
     def _analyze_repository_content_for_readme(self, repo_data: Dict[str, Any], repository: GithubRepository) -> RepoAnalysisResult:
@@ -2586,7 +2613,12 @@ class GitHubService:
 
             # Get repository structure (limited to avoid rate limits)
             try:
-                contents = repository.get_contents("")
+                contents_response = repository.get_contents("")
+                if not isinstance(contents_response, list):
+                    contents = [contents_response]
+                else:
+                    contents = contents_response
+
                 max_items = 50  # Limit to avoid processing too many files
 
                 for item in contents[:max_items]:
@@ -2594,19 +2626,19 @@ class GitHubService:
                         filename = item.name.lower()
 
                         # Main application files
-                        if any(filename.endswith(ext) for ext in [".py", ".js", ".ts", ".java", ".cpp", ".c", ".go", ".rs", ".php", ".rb"]):
+                        if any(ext for ext in [".py", ".js", ".ts", ".java", ".cpp", ".c", ".go", ".rs", ".php", ".rb"] if filename.endswith(ext)):
                             analysis["main_files"].append(item.name)
 
                         # Documentation files
-                        elif any(filename.endswith(ext) for ext in [".md", ".rst", ".txt"]) or "doc" in filename:
+                        elif any(ext for ext in [".md", ".rst", ".txt"] if filename.endswith(ext)) or "doc" in filename:
                             analysis["documentation_files"].append(item.name)
 
                         # Configuration files
-                        elif any(filename in ["package.json", "setup.py", "requirements.txt", "cargo.toml", "pom.xml", "build.gradle"]):
+                        elif any(conf_file for conf_file in ["package.json", "setup.py", "requirements.txt", "cargo.toml", "pom.xml", "build.gradle"] if filename == conf_file):
                             analysis["configuration_files"].append(item.name)
 
                         # CI/CD files
-                        elif any(term in filename for term in [".yml", ".yaml", "ci", "cd", "github", "actions"]):
+                        elif any(term in filename for term in ["yml", "yaml", "ci", "cd", "github", "actions"]):
                             analysis["has_ci_cd"] = True
 
                         # Docker files
@@ -2633,7 +2665,7 @@ class GitHubService:
                 if license_info:
                     analysis["license_info"] = {
                         "name": license_info.license.name if license_info.license else "Unknown",
-                        "key": license_info.license.key if license_info.license else None,
+                        "key": license_info.license.key if license_info.license else "",  # Ensure key is always a string
                     }
             except Exception:
                 pass

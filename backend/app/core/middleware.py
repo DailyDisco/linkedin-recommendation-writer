@@ -36,10 +36,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         request_id = getattr(request.state, "request_id", "unknown")
 
         # Log request
-        logger.info(
-            f"Request started - ID: {request_id}, Method: {request.method}, "
-            f"URL: {request.url}, Client: {request.client.host if request.client else 'unknown'}"
-        )
+        logger.info(f"Request started - ID: {request_id}, Method: {request.method}, " f"URL: {request.url}, Client: {request.client.host if request.client else 'unknown'}")
 
         try:
             response = await call_next(request)

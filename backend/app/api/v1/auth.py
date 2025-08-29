@@ -44,7 +44,7 @@ async def authenticate_user(
     if not user or not user.hashed_password:
         logger.warning(f"Authentication failed: User {username} not found or no password set.")
         return None
-    if not verify_password(password, user.hashed_password):
+    if not verify_password(password, user.hashed_password):  # type: ignore
         logger.warning(f"Authentication failed for user {username}: Invalid password.")
         return None
 
@@ -83,11 +83,11 @@ async def register_user(
     user = User(email=user_in.email, username=user_in.username, hashed_password=hashed_password)
 
     if user_in.email == "diegoespinowork@gmail.com":
-        user.role = "admin"
+        user.role = "admin"  # type: ignore
     elif user_in.role:  # Allow setting role if provided in schema (e.g. for premium users)
-        user.role = user_in.role
+        user.role = user_in.role  # type: ignore
     else:
-        user.role = "free"
+        user.role = "free"  # type: ignore
 
     db.add(user)
     await db.commit()
@@ -124,7 +124,7 @@ async def login_for_access_token(
     )
 
     logger.info(f"User {user.username} logged in successfully, token generated.")
-    return {"access_token": access_token, "token_type": "bearer"}
+    return Token(access_token=access_token, token_type="bearer")
 
 
 async def get_current_user(

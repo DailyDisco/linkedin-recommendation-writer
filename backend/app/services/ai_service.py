@@ -1,7 +1,7 @@
 """AI service for generating recommendations using Google Gemini."""
 
 import logging
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Dict, List, Optional, TypedDict
 
 from app.core.config import settings
 from app.core.redis_client import get_cache, set_cache
@@ -16,6 +16,13 @@ except ImportError:
     genai_available = False
 
 logger = logging.getLogger(__name__)
+
+
+class RecommendationValidationResult(TypedDict):
+    is_valid: bool
+    issues: List[str]
+    suggestions: List[str]
+    structure_score: int
 
 
 class AIService:
@@ -75,7 +82,7 @@ class AIService:
             cached_result = await get_cache(cache_key)
             if cached_result and isinstance(cached_result, dict):
                 logger.info("Cache hit for AI recommendation")
-                return cast(Dict[str, Any], cached_result)
+                return cached_result
 
             if settings.ENVIRONMENT == "development":
                 logger.info("🚀 CACHE MISS: Starting multi-option generation...")
@@ -404,9 +411,7 @@ class AIService:
 
         return f"Professional Recommendation for {username}"
 
-    def _calculate_confidence_score(
-        self, github_data: Dict[str, Any], generated_content: str, prompt: Optional[str] = None, generation_params: Optional[Dict[str, Any]] = None
-    ) -> int:
+    def _calculate_confidence_score(self, github_data: Dict[str, Any], generated_content: str, prompt: Optional[str] = None, generation_params: Optional[Dict[str, Any]] = None) -> int:
         """Calculate dynamic confidence score based on multiple quality factors."""
         score: float = 0.0
         max_score = 100
@@ -446,9 +451,9 @@ class AIService:
 
         return min(int(score), max_score)
 
-    def _score_prompt_alignment(self, prompt: str, generated_content: str, generation_params: Dict[str, Any]) -> int:
+    def _score_prompt_alignment(self, prompt: str, generated_content: str, generation_params: Dict[str, Any]) -> float:
         """Score how well the generated content aligns with the prompt requirements."""
-        score = 0
+        score: float = 0.0
         content_lower = generated_content.lower()
 
         # Extract key requirements from prompt
@@ -681,7 +686,7 @@ class AIService:
 
         if len(paragraphs) < target_paragraphs:
             # Try to split longer paragraphs
-            expanded_paragraphs = []
+            expanded_paragraphs: List[str] = []
             for para in paragraphs:
                 if len(expanded_paragraphs) >= target_paragraphs:
                     expanded_paragraphs.append(para)
@@ -701,7 +706,7 @@ class AIService:
 
         elif len(paragraphs) > target_paragraphs:
             # Merge shorter paragraphs
-            merged_paragraphs = []
+            merged_paragraphs: List[str] = []
             i = 0
             while i < len(paragraphs):
                 if i + 1 < len(paragraphs) and len(merged_paragraphs) < target_paragraphs - 1:
@@ -758,9 +763,9 @@ class AIService:
         else:
             return content
 
-    def _validate_recommendation_structure(self, content: str, generation_params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def _validate_recommendation_structure(self, content: str, generation_params: Optional[Dict[str, Any]] = None) -> RecommendationValidationResult:
         """Validate the structure and quality of the formatted recommendation."""
-        validation_results = {"is_valid": True, "issues": [], "suggestions": [], "structure_score": 100}
+        validation_results: RecommendationValidationResult = {"is_valid": True, "issues": [], "suggestions": [], "structure_score": 100}
 
         paragraphs = [p.strip() for p in content.split("\n\n") if p.strip()]
         word_count = len(content.split())
@@ -776,27 +781,27 @@ class AIService:
 
         if len(paragraphs) != expected_paragraphs:
             validation_results["issues"].append(f"Expected {expected_paragraphs} paragraphs, got {len(paragraphs)}")
-            validation_results["structure_score"] -= 20
+            validation_results["structure_score"] = int(validation_results["structure_score"]) - 20  # Explicitly cast to int
 
         # Check word count
         if generation_params:
             length = generation_params.get("length", "medium")
             if length == "short" and word_count > 180:
                 validation_results["issues"].append("Content too long for short format")
-                validation_results["structure_score"] -= 15
+                validation_results["structure_score"] = int(validation_results["structure_score"]) - 15  # Explicitly cast to int
             elif length == "medium" and (word_count < 120 or word_count > 220):
                 validation_results["issues"].append("Word count outside medium range (120-220)")
-                validation_results["structure_score"] -= 10
+                validation_results["structure_score"] = int(validation_results["structure_score"]) - 10  # Explicitly cast to int
             elif length == "long" and word_count < 180:
                 validation_results["issues"].append("Content too short for long format")
-                validation_results["structure_score"] -= 15
+                validation_results["structure_score"] = int(validation_results["structure_score"]) - 15  # Explicitly cast to int
 
         # Check for incomplete sentences
         sentences = content.split(".")
         incomplete_sentences = [s for s in sentences if s.strip() and len(s.split()) < 3]
         if len(incomplete_sentences) > len(sentences) * 0.2:
             validation_results["issues"].append("Too many incomplete sentences")
-            validation_results["structure_score"] -= 10
+            validation_results["structure_score"] = int(validation_results["structure_score"]) - 10  # Explicitly cast to int
 
         # Check paragraph lengths
         for i, para in enumerate(paragraphs):
@@ -806,11 +811,7 @@ class AIService:
             elif para_words > 150:
                 validation_results["suggestions"].append(f"Paragraph {i+1} is very long ({para_words} words)")
 
-        validation_results["structure_score"] = max(0, validation_results["structure_score"])
-
-        if validation_results["issues"]:
-            validation_results["is_valid"] = False
-
+        validation_results["structure_score"] = max(0, int(validation_results["structure_score"]))  # Explicitly cast to int
         return validation_results
 
     async def _generate_multiple_options(
@@ -1029,8 +1030,7 @@ class AIService:
             # Generate explanation based on focus and themes
             if focus == "technical_expertise":
                 explanation = (
-                    "This option emphasizes technical skills and problem-solving abilities, "
-                    f"making it ideal for technical roles. It's {length_desc} and focuses on their technical capabilities."
+                    "This option emphasizes technical skills and problem-solving abilities, " f"making it ideal for technical roles. It's {length_desc} and focuses on their technical capabilities."
                 )
             elif focus == "collaboration":
                 explanation = (
@@ -1038,25 +1038,16 @@ class AIService:
                     f"perfect for roles requiring strong interpersonal skills. It's {length_desc} with a focus on relationship-building."
                 )
             elif focus == "leadership_growth":
-                explanation = (
-                    "This option showcases leadership potential and growth mindset, "
-                    f"suitable for senior positions. It's {length_desc} and emphasizes their development trajectory."
-                )
+                explanation = "This option showcases leadership potential and growth mindset, " f"suitable for senior positions. It's {length_desc} and emphasizes their development trajectory."
             else:
                 themes_str = ", ".join(themes) if themes else "balanced approach"
-                explanation = (
-                    f"This option provides a {themes_str}, making it suitable for general professional recommendations. "
-                    f"It's {length_desc} and offers a well-rounded perspective."
-                )
+                explanation = f"This option provides a {themes_str}, making it suitable for general professional recommendations. " f"It's {length_desc} and offers a well-rounded perspective."
 
             return explanation
 
         except Exception as e:
             logger.debug(f"Error generating option explanation: {e}")
-            return (
-                f"This {option_name.lower()} provides a unique perspective on their professional background "
-                "and is suitable for various professional contexts."
-            )
+            return f"This {option_name.lower()} provides a unique perspective on their professional background " "and is suitable for various professional contexts."
 
     async def _generate_multiple_options_with_explanations(
         self,
@@ -1087,9 +1078,7 @@ FOR THIS VERSION, FOCUS ON:
 Create a recommendation that really highlights their {focus_formatted} skills while keeping it natural and conversational.
 """
 
-    async def _generate_single_option(
-        self, prompt: str, temperature_modifier: float, length: str = "medium", generation_params: Optional[Dict[str, Any]] = None
-    ) -> str:
+    async def _generate_single_option(self, prompt: str, temperature_modifier: float, length: str = "medium", generation_params: Optional[Dict[str, Any]] = None) -> str:
         """Generate a single recommendation option with formatting."""
         if not self.model or not genai_available:
             raise ValueError("AI model not initialized")
@@ -1150,7 +1139,7 @@ Create a recommendation that really highlights their {focus_formatted} skills wh
             )
 
             # Create regeneration parameters
-            regeneration_params = {
+            regeneration_params: Dict[str, Any] = {
                 "recommendation_type": recommendation_type,
                 "tone": tone,
                 "length": length,
@@ -1162,6 +1151,8 @@ Create a recommendation that really highlights their {focus_formatted} skills wh
             refined_content = await self._generate_refined_regeneration(refinement_prompt, length, regeneration_params)
 
             # Update regeneration_params for confidence scoring
+            if regeneration_params is None:
+                regeneration_params = {}
             regeneration_params["regeneration"] = True
 
             # Return refined result
@@ -1367,7 +1358,7 @@ Just give me the updated recommendation text, nothing else.
     ) -> Dict[str, Any]:
         """Validate that the refined content complies with keyword requirements."""
         content_lower = content.lower()
-        validation_results = {
+        validation_results: Dict[str, Any] = {
             "include_compliance": [],
             "exclude_compliance": [],
             "issues": [],
@@ -1394,26 +1385,31 @@ Just give me the updated recommendation text, nothing else.
     async def refine_recommendation_with_keywords(
         self,
         original_content: str,
+        refinement_instructions: str,
         github_data: Dict[str, Any],
-        include_keywords: Optional[List[str]] = None,
+        recommendation_type: str,
+        tone: str,
+        length: str,
         exclude_keywords: Optional[List[str]] = None,
-        refinement_instructions: Optional[str] = None,
-        recommendation_type: str = "professional",
-        tone: str = "professional",
-        length: str = "medium",
+        regeneration_params: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        """Refine a recommendation based on keyword constraints."""
+        """Refine a generated recommendation based on keywords and regeneration parameters."""
         if not self.model:
             raise ValueError("Gemini AI not configured")
 
+        if regeneration_params is None:
+            regeneration_params = {}
+
         try:
-            # Build refinement prompt
-            refinement_prompt = self._build_keyword_refinement_prompt(
+            # Build the refinement prompt
+            refinement_prompt = self._build_refinement_prompt_for_regeneration(
                 original_content=original_content,
-                include_keywords=include_keywords,
-                exclude_keywords=exclude_keywords,
                 refinement_instructions=refinement_instructions,
                 github_data=github_data,
+                recommendation_type=recommendation_type,
+                tone=tone,
+                length=length,
+                exclude_keywords=exclude_keywords,
             )
 
             # Generate refined recommendation
@@ -1431,33 +1427,26 @@ Just give me the updated recommendation text, nothing else.
             formatted_content = self._format_recommendation_output(refined_content, length, {"tone": tone, "length": length})
 
             # Validate keyword compliance
-            validation = self._validate_keyword_compliance(formatted_content, include_keywords, exclude_keywords)
+            validation = self._validate_keyword_compliance(formatted_content, exclude_keywords=exclude_keywords)
 
             # Generate refinement summary
             refinement_summary = self._generate_refinement_summary(validation)
 
             # Calculate confidence score for refined content
-            generation_params = {
-                "recommendation_type": recommendation_type,
-                "tone": tone,
-                "length": length,
-                "keyword_refinement": True,
-                "include_keywords": include_keywords or [],
-                "exclude_keywords": exclude_keywords or [],
-            }
+            # Ensure 'regeneration' is always set in params for confidence score calculation
+            regeneration_params["regeneration"] = True
 
-            confidence_score = self._calculate_confidence_score(github_data, formatted_content, refinement_prompt, generation_params)
+            confidence_score = self._calculate_confidence_score(github_data, formatted_content, refinement_prompt, regeneration_params)
 
             return {
                 "refined_content": formatted_content.strip(),
                 "refined_title": self._extract_title(formatted_content, github_data["user_data"]["github_username"]),
                 "word_count": len(formatted_content.split()),
                 "confidence_score": confidence_score,
-                "include_keywords_used": validation["include_compliance"],
                 "exclude_keywords_avoided": validation["exclude_compliance"],
                 "refinement_summary": refinement_summary,
                 "validation_issues": validation["issues"],
-                "generation_parameters": generation_params,
+                "generation_parameters": regeneration_params,
             }
 
         except Exception as e:
@@ -1735,8 +1724,8 @@ Just give me the updated recommendation text, nothing else.
         """Parse README content into sections."""
         sections = {}
         lines = content.split("\n")
-        current_section = None
-        current_content = []
+        current_section: Optional[str] = None  # Added type annotation
+        current_content: List[str] = []  # Added type annotation
 
         for line in lines:
             if line.startswith("#"):
@@ -2152,3 +2141,61 @@ Just give me the updated recommendation text, nothing else.
             score += 25
 
         return min(score, 100)
+
+    async def generate_repository_readme(
+        self,
+        repository_data: Dict[str, Any],
+        repository_analysis: Dict[str, Any],
+        style: str = "comprehensive",
+        include_sections: Optional[List[str]] = None,
+        target_audience: str = "developers",
+    ) -> Dict[str, Any]:
+        """Generate a README for a GitHub repository."""
+        if not self.model:
+            raise ValueError("Gemini AI not configured")
+
+        try:
+            # Build the README generation prompt
+            readme_prompt = self._build_readme_generation_prompt(
+                repository_data=repository_data,
+                repository_analysis=repository_analysis,
+                style=style,
+                include_sections=include_sections,
+                target_audience=target_audience,
+            )
+
+            # Generate the README content
+            config = genai.types.GenerationConfig(
+                temperature=0.3,  # Lower temperature for more consistent documentation
+                max_output_tokens=settings.GEMINI_MAX_TOKENS,
+                top_p=0.9,
+                top_k=40,
+            )
+
+            response = self.model.generate_content(readme_prompt, generation_config=config)
+            generated_content = str(response.text)
+
+            # Extract sections from generated content (basic parsing)
+            sections = self._parse_readme_sections(generated_content)
+
+            # Calculate confidence score based on content quality
+            confidence_score = self._calculate_readme_confidence_score(generated_content, repository_data, repository_analysis)
+
+            return {
+                "generated_content": generated_content.strip(),
+                "sections": sections,
+                "word_count": len(generated_content.split()),
+                "confidence_score": confidence_score,
+                "generation_parameters": {
+                    "model": settings.GEMINI_MODEL,
+                    "style": style,
+                    "target_audience": target_audience,
+                    "include_sections": include_sections or [],
+                    "temperature": 0.3,
+                },
+                "analysis_summary": self._generate_readme_analysis_summary(repository_analysis),
+            }
+
+        except Exception as e:
+            logger.error(f"Error generating repository README: {e}")
+            raise

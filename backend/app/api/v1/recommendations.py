@@ -45,8 +45,8 @@ async def check_and_update_recommendation_limit(
 
     # If last recommendation was not today, reset count and date
     if not user.last_recommendation_date or user.last_recommendation_date.date() < today:
-        user.recommendation_count = 0
-        user.last_recommendation_date = today
+        user.recommendation_count = 0  # type: ignore
+        user.last_recommendation_date = today  # type: ignore
 
     if user.recommendation_count >= RECOMMENDATION_DAILY_LIMIT:
         raise HTTPException(
@@ -54,7 +54,7 @@ async def check_and_update_recommendation_limit(
             detail=f"Daily recommendation limit ({RECOMMENDATION_DAILY_LIMIT}) exceeded. Please try again tomorrow.",
         )
 
-    user.recommendation_count += 1
+    user.recommendation_count += 1  # type: ignore
     await db.commit()
     await db.refresh(user)
     logger.info(f"User {user.username} (ID: {user.id}) has used {user.recommendation_count}/{RECOMMENDATION_DAILY_LIMIT} recommendations today.")
@@ -87,7 +87,7 @@ async def generate_recommendation(
         logger.info("🎯 Starting recommendation creation process...")
         recommendation = await recommendation_service.create_recommendation(
             db=db,
-            user_id=current_user.id,  # Associate with user
+            user_id=current_user.id,  # type: ignore # Associate with user
             github_username=request.github_username,
             recommendation_type=request.recommendation_type,
             tone=request.tone,
@@ -145,7 +145,7 @@ async def generate_recommendation_options(
         logger.info("🎯 Starting multiple options generation process...")
         options_response = await recommendation_service.create_recommendation_options(
             db=db,
-            user_id=current_user.id,  # Associate with user
+            user_id=current_user.id,  # type: ignore # Associate with user
             github_username=request.github_username,
             recommendation_type=request.recommendation_type,
             tone=request.tone,
@@ -234,7 +234,7 @@ async def generate_repository_readme(
             repository_full_name=request.repository_full_name,
             style=request.style,
             include_sections=request.include_sections,
-            target_audience=request.target_audience,
+            target_audience=request.target_audience or "developers",
         )
 
         logger.info("✅ README GENERATION API COMPLETED SUCCESSFULLY")
@@ -451,7 +451,7 @@ async def create_recommendation_from_option(
         logger.info("🎯 Starting recommendation creation from selected option...")
         recommendation = await recommendation_service.create_recommendation_from_option(
             db=db,
-            user_id=current_user.id,  # Associate with user
+            user_id=current_user.id,  # type: ignore # Associate with user
             github_username=request.github_username,
             selected_option=request.selected_option.model_dump(),
             all_options=[option.model_dump() for option in request.all_options],
@@ -516,7 +516,7 @@ async def regenerate_recommendation(
 
         recommendation = await recommendation_service.regenerate_recommendation(
             db=db,
-            user_id=current_user.id,  # Associate with user
+            user_id=current_user.id,  # type: ignore # Associate with user
             original_content=original_content,
             refinement_instructions=refinement_instructions,
             github_username=github_username,
@@ -558,7 +558,7 @@ async def list_recommendations(
     try:
         recommendations = await recommendation_service.get_recommendations(
             db=db,
-            user_id=current_user.id,  # Filter by user ID
+            user_id=current_user.id,  # type: ignore # Filter by user ID
             github_username=github_username,
             recommendation_type=recommendation_type,
             limit=pagination.limit,
@@ -590,7 +590,7 @@ async def get_recommendation(
     """Get a specific recommendation by ID."""
 
     try:
-        recommendation = await recommendation_service.get_recommendation_by_id(db=db, recommendation_id=recommendation_id, user_id=current_user.id)
+        recommendation = await recommendation_service.get_recommendation_by_id(db=db, recommendation_id=recommendation_id, user_id=current_user.id)  # type: ignore
 
         if not recommendation:
             raise HTTPException(

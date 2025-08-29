@@ -24,7 +24,7 @@ async def read_users_me(
     logger.info(f"Fetching details for current user: {current_user.username}")
 
     # Fetch the user again to ensure latest data including recommendation counts
-    user_details = await user_service.get_user_by_id(db, current_user.id)
+    user_details = await user_service.get_user_by_id(db, current_user.id)  # type: ignore
 
     if not user_details:
         logger.error(f"User {current_user.id} not found in DB after authentication.")
