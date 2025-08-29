@@ -225,9 +225,9 @@ export default function GeneratorPage() {
             last_name:
               userData.full_name || userData.name
                 ? (userData.full_name || userData.name)
-                    .split(' ')
-                    .slice(1)
-                    .join(' ')
+                  .split(' ')
+                  .slice(1)
+                  .join(' ')
                 : '',
             email: userData.email,
             bio: userData.bio,
@@ -286,7 +286,7 @@ export default function GeneratorPage() {
         // Add diagnostic suggestion if it looks like a configuration issue
         const enhancedMessage =
           errorMessage.includes('GitHub token') ||
-          errorMessage.includes('not configured')
+            errorMessage.includes('not configured')
             ? `${errorMessage} Please check the Service Diagnostics section below for configuration issues.`
             : errorMessage;
 
@@ -300,22 +300,6 @@ export default function GeneratorPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     await handleGetUsers();
-  };
-
-  const handleRunDiagnostics = async () => {
-    try {
-      const result = await githubApi.checkHealth();
-      setDiagnostics(result);
-      setShowDiagnostics(true);
-    } catch (err: unknown) {
-      const error = err as HttpError;
-      setDiagnostics({
-        status: 'error',
-        message: `Failed to check GitHub service: ${error.response?.data?.detail || error.message}`,
-        github_token_configured: false,
-      });
-      setShowDiagnostics(true);
-    }
   };
 
   const handleWriteRecommendation = useCallback(
@@ -374,11 +358,10 @@ export default function GeneratorPage() {
                   <button
                     type='button'
                     onClick={() => setMode('repository')}
-                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                      mode === 'repository'
-                        ? 'bg-blue-600 text-white'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
+                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${mode === 'repository'
+                      ? 'bg-blue-600 text-white'
+                      : 'text-gray-600 hover:text-gray-900'
+                      }`}
                   >
                     <Users className='w-4 h-4' />
                     <span>Repository Mode</span>
@@ -386,11 +369,10 @@ export default function GeneratorPage() {
                   <button
                     type='button'
                     onClick={() => setMode('user')}
-                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                      mode === 'user'
-                        ? 'bg-blue-600 text-white'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
+                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${mode === 'user'
+                      ? 'bg-blue-600 text-white'
+                      : 'text-gray-600 hover:text-gray-900'
+                      }`}
                   >
                     <User className='w-4 h-4' />
                     <span>Single User</span>
@@ -481,142 +463,6 @@ export default function GeneratorPage() {
                 </button>
               </form>
             </div>
-          </div>
-
-          {/* Diagnostics Section */}
-          <div className='rounded-lg border border-gray-200 bg-white shadow-sm'>
-            <div className='flex items-center justify-between p-6 pb-4'>
-              <h2 className='text-lg font-semibold leading-none tracking-tight'>
-                Service Diagnostics
-              </h2>
-              <button
-                onClick={() => setShowDiagnostics(!showDiagnostics)}
-                className='flex items-center space-x-2 px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-md transition-colors'
-              >
-                <span>GitHub API Status</span>
-                {showDiagnostics ? (
-                  <ChevronUp className='w-4 h-4' />
-                ) : (
-                  <ChevronDown className='w-4 h-4' />
-                )}
-              </button>
-            </div>
-
-            {showDiagnostics && (
-              <div className='p-6 pt-0'>
-                {diagnostics ? (
-                  <div className='space-y-4'>
-                    <div className='flex items-center space-x-2'>
-                      {diagnostics.status === 'healthy' && (
-                        <CheckCircle className='w-5 h-5 text-green-600' />
-                      )}
-                      {diagnostics.status === 'degraded' && (
-                        <AlertTriangle className='w-5 h-5 text-yellow-600' />
-                      )}
-                      {(diagnostics.status === 'unhealthy' ||
-                        diagnostics.status === 'error') && (
-                        <XCircle className='w-5 h-5 text-red-600' />
-                      )}
-                      <span
-                        className={`font-medium ${
-                          diagnostics.status === 'healthy'
-                            ? 'text-green-600'
-                            : diagnostics.status === 'degraded'
-                              ? 'text-yellow-600'
-                              : 'text-red-600'
-                        }`}
-                      >
-                        {diagnostics.status.toUpperCase()}
-                      </span>
-                    </div>
-
-                    <p className='text-gray-700'>{diagnostics.message}</p>
-
-                    <div className='grid grid-cols-1 md:grid-cols-2 gap-4 text-sm'>
-                      <div>
-                        <span className='font-medium text-gray-600'>
-                          GitHub Token:
-                        </span>
-                        <span
-                          className={`ml-2 ${
-                            diagnostics.github_token_configured
-                              ? 'text-green-600'
-                              : 'text-red-600'
-                          }`}
-                        >
-                          {diagnostics.github_token_configured
-                            ? '✓ Configured'
-                            : '✗ Not Configured'}
-                        </span>
-                      </div>
-
-                      {diagnostics.rate_limit_remaining !== undefined && (
-                        <div>
-                          <span className='font-medium text-gray-600'>
-                            API Quota Remaining:
-                          </span>
-                          <span
-                            className={`ml-2 ${
-                              diagnostics.rate_limit_remaining > 100
-                                ? 'text-green-600'
-                                : diagnostics.rate_limit_remaining > 0
-                                  ? 'text-yellow-600'
-                                  : 'text-red-600'
-                            }`}
-                          >
-                            {diagnostics.rate_limit_remaining.toLocaleString()}{' '}
-                            requests
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    {!diagnostics.github_token_configured && (
-                      <div className='bg-red-50 border border-red-200 rounded-md p-4'>
-                        <h4 className='font-medium text-red-800 mb-2'>
-                          How to Fix:
-                        </h4>
-                        <ul className='text-sm text-red-700 space-y-1'>
-                          <li>
-                            • Set the{' '}
-                            <code className='bg-red-100 px-1 rounded'>
-                              GITHUB_TOKEN
-                            </code>{' '}
-                            environment variable
-                          </li>
-                          <li>
-                            • Token should start with{' '}
-                            <code className='bg-red-100 px-1 rounded'>
-                              ghp_
-                            </code>{' '}
-                            or{' '}
-                            <code className='bg-red-100 px-1 rounded'>
-                              github_pat_
-                            </code>
-                          </li>
-                          <li>
-                            • Check your{' '}
-                            <code className='bg-red-100 px-1 rounded'>
-                              .env
-                            </code>{' '}
-                            file or server configuration
-                          </li>
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className='text-center py-8'>
-                    <button
-                      onClick={handleRunDiagnostics}
-                      className='px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors'
-                    >
-                      Check GitHub Service Status
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
 
           {/* Contributors List */}
