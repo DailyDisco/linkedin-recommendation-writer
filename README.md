@@ -11,30 +11,9 @@ Generate professional LinkedIn recommendations using GitHub data and AI.
 - [🌐 Live Demo](#-live-demo)
 - [✨ Features](#-features)
 - [💻 Technology Stack](#-technology-stack)
-- [🚀 Railway Deployment (Recommended)](#-railway-deployment-recommended)
-  - [Option 1: Full-Stack Deployment (Easiest)](#option-1-full-stack-deployment-easiest)
-  - [Option 2: Separate Frontend/Backend (Advanced)](#option-2-separate-frontendbackend-advanced)
-  - [Railway Environment Setup](#railway-environment-setup)
-  - [Local Development](#local-development)
-- [📋 Prerequisites](#-prerequisites)
-  - [Accounts & API Keys](#accounts--api-keys)
-  - [API Keys Setup](#api-keys-setup)
-  - [Development Tools](#development-tools)
-  - [Deployment Platforms](#deployment-platforms)
-  - [Quick Start Checklist](#quick-start-checklist)
-- [🛠️ Installation](#️-installation)
-- [⚙️ Configuration](#️-configuration)
-  - [Environment Variables](#environment-variables)
-  - [Getting API Keys](#getting-api-keys)
-  - [Security Notes](#security-notes)
-- [🚀 Deployment Options](#-deployment-options)
-  - [Option A: Railway Full-Stack (Recommended)](#option-a-railway-full-stack-recommended)
-  - [Option B: Vercel + Railway (Scalable)](#option-b-vercel--railway-scalable)
-  - [Option C: Docker Production](#option-c-docker-production)
-  - [Deployment Comparison](#deployment-comparison)
-  - [Troubleshooting Deployment](#troubleshooting-deployment)
-- [🔧 Development](#-development)
-- [📚 API Documentation](#-api-documentation)
+- [🚀 Deployment](#-deployment)
+- [🛠️ Installation & Local Development](#️-installation--local-development)
+- [⚙️ Configuration & API Keys](#️-configuration--api-keys)
 - [🤝 Contributing](#-contributing)
 - [📄 License](#-license)
 - [📞 Support](#-support)
@@ -81,377 +60,93 @@ This project leverages a modern full-stack architecture with the following key t
 **Deployment & Containerization:**
 
 - **Docker**: For containerizing the application and its services.
-- **Docker Compose**: For defining and running multi-container Docker applications.
 - **Railway**: Recommended platform for full-stack deployment.
 - **Vercel**: Optional platform for frontend deployment.
 
-## 🚀 Railway Deployment (Recommended)
+## 🚀 Deployment
 
-### Option 1: Full-Stack Deployment (Easiest)
+The application can be deployed using a full-stack approach on Railway or with separate frontend/backend deployments using Vercel and Railway, respectively. Docker Compose is also available for self-hosted production environments.
 
-**Deploy everything to Railway in 5 minutes:**
+### Railway Full-Stack (Recommended)
 
-1. **Go to Railway Dashboard**: [https://railway.app/dashboard](https://railway.app/dashboard)
-2. **Click "New Project"**
-3. **Choose "Deploy from GitHub repo"**
-4. **Select your repository**
-5. **Railway auto-detects Dockerfile and deploys**
+Deploy the entire application to Railway directly from your GitHub repository. Railway automatically detects the Dockerfile, sets up PostgreSQL and Redis plugins, and handles environment variables.
 
-**That's it!** Your app will be live with:
+1.  **Go to Railway Dashboard**: [https://railway.app/dashboard](https://railway.app/dashboard)
+2.  **Click "New Project"** and choose "Deploy from GitHub repo".
+3.  **Select your repository** and Railway will auto-deploy.
+4.  **Add PostgreSQL and Redis plugins** in your Railway project to auto-configure `DATABASE_URL` and `REDIS_URL`.
+5.  **Set environment variables** in the Railway dashboard, including `GITHUB_TOKEN`, `GEMINI_API_KEY`, and `POSTGRES_PASSWORD`.
 
-- ✅ **Frontend served automatically**
-- ✅ **Backend API running**
-- ✅ **PostgreSQL database**
-- ✅ **Redis cache**
+### Vercel + Railway (Scalable)
 
-### Option 2: Separate Frontend/Backend (Advanced)
+For independent scaling, deploy the backend to Railway and the frontend to Vercel.
 
-For better performance and scalability, deploy frontend and backend separately.
+**Backend (Railway):**
+Follow steps 1-5 from "Railway Full-Stack" for your backend service. Copy the Railway app URL (e.g., `https://your-backend.up.railway.app`) as your API base URL.
 
-#### Deploy Backend to Railway
+**Frontend (Vercel):**
 
-1. **Create Railway Project**:
+1.  **Go to Vercel Dashboard**: [https://vercel.com/dashboard](https://vercel.com/dashboard)
+2.  **Click "New Project"** and import your GitHub repository.
+3.  **Configure Build Settings**: Framework Preset: `Vite`, Build Command: `npm run build`, Output Directory: `dist`.
+4.  **Set Environment Variables**: `VITE_API_URL` (your Railway backend URL) and `VITE_APP_ENV=production`.
 
-   - Go to [https://railway.app/dashboard](https://railway.app/dashboard)
-   - Click "New Project" → "Deploy from GitHub repo"
-   - Select your repository
+### Docker Production
 
-2. **Configure Environment Variables**:
+For self-hosted deployments, use `docker-compose -f docker-compose.prod.yml up -d`. Ensure you set `GITHUB_TOKEN`, `GEMINI_API_KEY`, `DATABASE_URL`, and `REDIS_URL` environment variables.
 
-   - In Railway dashboard, go to your project → Variables
-   - Add these variables:
+### Troubleshooting
 
-     ```bash
-     GITHUB_TOKEN=your_github_token_here
-     GEMINI_API_KEY=your_gemini_api_key_here
-     POSTGRES_PASSWORD=your_secure_password_here
-     ```
+- **Check Logs**: Review logs on Railway/Vercel dashboards for deployment issues.
+- **Environment Variables**: Verify all required environment variables (`GITHUB_TOKEN`, `GEMINI_API_KEY`, `POSTGRES_PASSWORD`, `VITE_API_URL`) are correctly set for your chosen deployment method.
+- **CORS Issues**: Ensure your frontend URL is added to backend CORS settings.
+- **Database**: Confirm PostgreSQL and Redis plugins are active on Railway, or that `DATABASE_URL` and `REDIS_URL` are correctly configured for Docker deployments.
 
-3. **Add Database Services**:
+## 🛠️ Installation & Local Development
 
-   - In your Railway project, click "Add Plugin"
-   - Add PostgreSQL and Redis plugins
-   - Railway will automatically set `DATABASE_URL` and `REDIS_URL`
-
-4. **Get Backend URL**:
-   - After deployment, copy your Railway app URL (e.g., `https://your-app.up.railway.app`)
-   - This will be your API base URL
-
-#### Deploy Frontend to Vercel
-
-1. **Connect Repository**:
-
-   - Go to [https://vercel.com/dashboard](https://vercel.com/dashboard)
-   - Click "New Project"
-   - Import your GitHub repository
-
-2. **Configure Build Settings**:
-
-   - **Framework Preset**: Vite
-   - **Root Directory**: Leave empty (root)
-   - **Build Command**: `npm run build`
-   - **Output Directory**: `dist`
-
-3. **Set Environment Variables**:
-
-   - Add these environment variables in Vercel:
-
-     ```bash
-     VITE_API_URL=https://your-railway-backend.up.railway.app
-     VITE_APP_ENV=production
-     ```
-
-4. **Deploy**:
-   - Vercel will automatically build and deploy
-   - Get your frontend URL (e.g., `https://your-app.vercel.app`)
-
-### Railway Environment Setup
-
-After deployment, configure these environment variables in Railway:
-
-| Variable            | Description                           | Required |
-| ------------------- | ------------------------------------- | -------- |
-| `GITHUB_TOKEN`      | GitHub Personal Access Token          | ✅       |
-| `GEMINI_API_KEY`    | Google Gemini API Key                 | ✅       |
-| `POSTGRES_PASSWORD` | Database password                     | ✅       |
-| `DATABASE_URL`      | Auto-set by Railway PostgreSQL plugin | 🔄       |
-| `REDIS_URL`         | Auto-set by Railway Redis plugin      | 🔄       |
-
-**Note**: `DATABASE_URL` and `REDIS_URL` are automatically configured when you add the PostgreSQL and Redis plugins to your Railway project.
-
-### Local Development
-
-**Get everything running locally:**
+Clone the repository and set up your local environment:
 
 ```bash
 git clone https://github.com/day0009/linkedin-recommendation-writer-app
 cd linkedin-recommendation-writer-app
 cp env.example .env
-# Edit .env with your API keys
+# Edit .env with your GITHUB_TOKEN and GEMINI_API_KEY
 make setup
 ```
 
-Access your local app at:
+Access your local app:
 
 - **Frontend**: [http://localhost:5173](http://localhost:5173)
 - **Backend**: [http://localhost:8000](http://localhost:8000)
-- **API Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
 
-## 📋 Prerequisites
-
-### Accounts & API Keys
-
-- **GitHub Account** - For repository access and API token
-- **Google AI Account** - For Gemini API access
-- **Railway Account** (Recommended) - For backend deployment
-- **Vercel Account** (Optional) - For frontend deployment
-
-### API Keys Setup
-
-- **GitHub Personal Access Token**:
-  - Go to [GitHub Settings > Developer settings > Personal access tokens](https://github.com/settings/tokens)
-  - Generate token with `repo`, `read:user`, `read:org` scopes
-- **Google Gemini API Key**:
-  - Visit [Google AI Studio](https://makersuite.google.com/app/apikey)
-  - Create and copy your API key
-
-### Development Tools
-
-- **Docker & Docker Compose** (v20.10+) - For containerized development
-- **Git** (v2.30+) - For version control
-- **Node.js** (v18+) - For frontend development
-- **Python** (v3.9+) - For backend development (optional)
-
-### Deployment Platforms
-
-- **Railway** - Backend, database, and full-stack deployment
-- **Vercel** - Frontend deployment (optional)
-- **GitHub** - Repository hosting
-
-### Quick Start Checklist
-
-- ✅ Create GitHub Personal Access Token
-- ✅ Get Google Gemini API Key
-- ✅ Set up Railway account
-- ✅ Fork/clone this repository
-- ✅ Choose your deployment method (Railway recommended)
-
-## 🛠️ Installation
-
-```bash
-# Clone repository
-git clone https://github.com/day0009/linkedin-recommendation-writer-app
-cd linkedin-recommendation-writer-app
-
-# Configure environment
-cp env.example .env
-# Edit .env with your API keys (GITHUB_TOKEN, GEMINI_API_KEY)
-
-# Quick setup (builds and starts everything)
-make setup
-```
-
-## ⚙️ Configuration
+## ⚙️ Configuration & API Keys
 
 ### Environment Variables
 
-Configure these environment variables based on your deployment method:
+Create a `.env` file from `env.example` for local development. For production, configure environment variables directly in your deployment platform (Railway, Vercel, or Docker).
 
-#### Required Variables (All Deployments)
+**Required:**
 
 ```bash
-# GitHub API Access
 GITHUB_TOKEN=your_github_personal_access_token
-
-# AI Service
 GEMINI_API_KEY=your_google_gemini_api_key
+POSTGRES_PASSWORD=your_secure_database_password # Only for Railway full-stack or Docker
 ```
 
-#### Railway Deployment (Auto-configured)
+**Railway Auto-configured (for Railway deployments):**
 
-```bash
-# These are automatically set by Railway plugins:
-DATABASE_URL=postgresql://user:pass@containers-us-west-xxx.railway.app:xxxx/railway
-REDIS_URL=redis://default:pass@containers-us-west-xxx.railway.app:xxxx
+`DATABASE_URL`, `REDIS_URL`
 
-# Set this manually in Railway dashboard:
-POSTGRES_PASSWORD=your_secure_database_password
-```
+**Vercel Frontend (for Vercel deployments):**
 
-#### Vercel Frontend Deployment
-
-```bash
-# Frontend environment variables
-VITE_API_URL=https://your-railway-backend.up.railway.app
-VITE_APP_ENV=production
-```
-
-#### Local Development (.env file)
-
-```bash
-# Create .env file in project root
-GITHUB_TOKEN=your_github_token
-GEMINI_API_KEY=your_gemini_key
-
-# Database (optional - will use defaults if not set)
-POSTGRES_PASSWORD=your_secure_password
-DATABASE_URL=postgresql://postgres:your_password@localhost:5432/linkedin_recommendations
-
-# Redis (optional - will use defaults if not set)
-REDIS_URL=redis://localhost:6379/0
-```
-
-#### Docker Production
-
-```bash
-# Docker environment variables
-GITHUB_TOKEN=your_github_token
-GEMINI_API_KEY=your_gemini_key
-DATABASE_URL=postgresql://postgres:your_password@db:5432/linkedin_recommendations
-REDIS_URL=redis://redis:6379/0
-```
+`VITE_API_URL`, `VITE_APP_ENV`
 
 ### Getting API Keys
 
-#### GitHub Personal Access Token
+1.  **GitHub Personal Access Token**: Go to [GitHub Settings > Developer settings > Personal access tokens](https://github.com/settings/tokens), generate a new token with `repo`, `read:user`, `read:org` scopes.
+2.  **Google Gemini API Key**: Visit [Google AI Studio](https://makersuite.google.com/app/apikey) and create an API key.
 
-1. Go to [GitHub Settings > Developer settings > Personal access tokens](https://github.com/settings/tokens)
-2. Click "Generate new token (classic)"
-3. Select scopes: `repo`, `read:user`, `read:org`
-4. Copy the token (keep it secure!)
-
-#### Google Gemini API Key
-
-1. Go to [Google AI Studio](https://makersuite.google.com/app/apikey)
-2. Click "Create API Key"
-3. Copy the API key
-4. Enable billing if needed for production use
-
-### Security Notes
-
-- 🔐 **Never commit API keys** to version control
-- 🔐 **Use Railway/Vercel environment variables** for production
-- 🔐 **Rotate keys regularly** and update deployments
-- 🔐 **Monitor API usage** to avoid unexpected charges
-
-## 🚀 Deployment Options
-
-### Option A: Railway Full-Stack (Recommended)
-
-**Best for simplicity and performance:**
-
-1. **Push code to GitHub**
-2. **Railway Dashboard** → New Project → Deploy from GitHub → Select repo
-3. **Railway auto-detects** Dockerfile and deploys automatically
-4. **Add plugins**: PostgreSQL and Redis (one-click in Railway)
-5. **Set environment variables** in Railway dashboard
-
-**Result:** Single URL with everything deployed together!
-
-**Pros:** ✅ Simple, ✅ Fast setup, ✅ Everything managed together
-**Cons:** ⚠️ Less flexible for scaling individual components
-
-### Option B: Vercel + Railway (Scalable)
-
-**Best for performance and custom domains:**
-
-#### Backend (Railway)
-
-```bash
-# Deploy to Railway with database plugins
-# URL: https://your-backend.up.railway.app
-```
-
-#### Frontend (Vercel)
-
-```bash
-# Deploy to Vercel with VITE_API_URL pointing to Railway
-# URL: https://your-frontend.vercel.app
-```
-
-**Pros:** ✅ Better performance, ✅ Custom domains, ✅ Independent scaling
-**Cons:** ⚠️ More complex setup, ⚠️ Multiple services to manage
-
-### Option C: Docker Production
-
-**For self-hosted deployments:**
-
-```bash
-# Build and run production containers
-make setup-prod
-
-# Or manually:
-docker-compose -f docker-compose.prod.yml up -d
-```
-
-**Environment variables needed:**
-
-```bash
-GITHUB_TOKEN=your_token
-GEMINI_API_KEY=your_key
-DATABASE_URL=postgresql://...
-REDIS_URL=redis://...
-```
-
-### Deployment Comparison
-
-| Feature       | Railway Full-Stack | Vercel + Railway | Docker      |
-| ------------- | ------------------ | ---------------- | ----------- |
-| Setup Time    | 5 minutes          | 15 minutes       | 30+ minutes |
-| Cost          | Low                | Medium           | Variable    |
-| Scalability   | Good               | Excellent        | Excellent   |
-| Custom Domain | ✅                 | ✅               | ✅          |
-| Database      | ✅                 | ✅               | Manual      |
-| Cache         | ✅                 | ✅               | Manual      |
-
-### Troubleshooting Deployment
-
-**Railway Issues:**
-
-- Check Railway logs in dashboard
-- Verify environment variables are set
-- Ensure Dockerfile is in root directory
-
-**Vercel Issues:**
-
-- Check build logs in Vercel dashboard
-- Verify `VITE_API_URL` is set correctly
-- Ensure build commands match your setup
-
-**CORS Issues:**
-
-- Add your frontend URL to backend CORS settings
-- Check that `VITE_API_URL` matches your backend URL exactly
-
-**Database Connection:**
-
-- Verify PostgreSQL plugin is added to Railway project
-- Check `DATABASE_URL` is accessible
-- Run database migrations if needed
-
-## 🔧 Development
-
-```bash
-# Start development environment
-make setup
-
-# Run tests
-make test
-
-# View logs
-make logs
-
-# Access containers
-make shell-backend  # Backend container
-make shell-frontend # Frontend container
-```
-
-## 📚 API Documentation
-
-Once running, visit:
-
-- **API Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
-- **Frontend**: [http://localhost:5173](http://localhost:5173)
+**Security Notes**: Never commit API keys to version control. Use environment variables for production and rotate keys regularly.
 
 ## 🤝 Contributing
 
@@ -509,7 +204,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## 📞 Support
 
-- 📖 **Documentation**: Check the API docs at `/docs`
+- 📖 **API Docs**: `/docs` (when running locally or deployed)
 - 🐛 **Bug Reports**: [Create GitHub issues](https://github.com/day0009/linkedin-recommendation-writer-app/issues)
 - 💬 **Discussions**: [Start GitHub discussions](https://github.com/day0009/linkedin-recommendation-writer-app/discussions)
 
