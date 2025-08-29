@@ -3,7 +3,7 @@
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Form
 from pydantic import BaseModel
 
 from app.core.dependencies import get_github_service, get_repository_service, validate_github_username
@@ -58,8 +58,8 @@ async def get_github_service_health(
 
 @router.post("/analyze", response_model=ProfileAnalysisResponse)
 async def analyze_github_profile(
-    username: str,
-    force_refresh: bool = False,
+    username: str = Form(...),
+    force_refresh: bool = Form(False),
     github_user_service: GitHubUserService = Depends(get_github_service),
 ) -> Optional[ProfileAnalysisResponse]:
     """Analyze a GitHub profile and return comprehensive data."""
@@ -98,8 +98,8 @@ async def get_github_profile(
 
 @router.post("/repository/analyze", response_model=RepositoryAnalysisResponse)
 async def analyze_repository(
-    repository_full_name: str,
-    force_refresh: bool = False,
+    repository_full_name: str = Form(...),
+    force_refresh: bool = Form(False),
     github_repository_service: GitHubRepositoryService = Depends(get_repository_service),
 ) -> Optional[RepositoryAnalysisResponse]:
     """Analyze a specific GitHub repository and return comprehensive data."""
@@ -136,9 +136,9 @@ async def get_repository_analysis_by_path(
 
 @router.post("/repository/contributors", response_model=RepositoryContributorsResponse)
 async def get_repository_contributors(
-    repository_full_name: str,
-    max_contributors: int = 50,
-    force_refresh: bool = False,
+    repository_full_name: str = Form(...),
+    max_contributors: int = Form(50),
+    force_refresh: bool = Form(False),
     github_repository_service: GitHubRepositoryService = Depends(get_repository_service),
 ) -> Optional[RepositoryContributorsResponse]:
     """Get contributors from a GitHub repository with their real names."""

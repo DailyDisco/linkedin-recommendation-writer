@@ -138,8 +138,9 @@ async def validate_github_username(username: str) -> str:
             detail="GitHub username must be between 1 and 39 characters",
         )
 
-    # Basic validation for allowed characters
-    if not re.match(r"^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$", username):
+    # Basic validation for allowed characters (GitHub username rules)
+    # Must start and end with alphanumeric, can contain hyphens in middle
+    if not re.match(r"^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$|^[a-zA-Z0-9]$", username):
         raise HTTPException(status_code=400, detail="Invalid GitHub username format")
 
     return username
