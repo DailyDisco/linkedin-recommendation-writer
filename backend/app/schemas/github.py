@@ -30,6 +30,15 @@ class RepositoryInfo(BaseModel):
     url: str
 
 
+class ContributorInfo(BaseModel):
+    """Contributor information schema."""
+
+    login: str
+    id: int
+    contributions: int
+    avatar_url: Optional[str] = None
+
+
 class LanguageStats(BaseModel):
     """Programming language statistics schema."""
 

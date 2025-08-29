@@ -1,19 +1,47 @@
 """GitHub API service for fetching and analyzing GitHub data."""
 
 import asyncio
-import logging
 import re
 from collections import Counter
 from datetime import datetime
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Dict, List, Optional, TypedDict
 
 from github import Github
 from github.GithubException import GithubException
+from github.Repository import Repository as GithubRepository
+from loguru import logger
 
 from app.core.config import settings
 from app.core.redis_client import get_cache, set_cache
 
-logger = logging.getLogger(__name__)
+
+# Define a TypedDict for the repository content analysis result
+class RepoAnalysisResult(TypedDict):
+    existing_readme: bool
+    readme_content: Optional[str]
+    main_files: List[str]
+    documentation_files: List[str]
+    configuration_files: List[str]
+    source_directories: List[str]
+    license_info: Optional[Dict[str, str]]
+    has_tests: bool
+    has_ci_cd: bool
+    has_docker: bool
+    api_endpoints: List[str]
+    key_features: List[str]
+
+
+class ConventionalStats(TypedDict):
+    total_commits: int
+    conventional_commits: int
+    breaking_changes: int
+    types: Dict[str, int]
+    scopes: Dict[str, int]
+    categories: Dict[str, int]
+    conventional_percentage: float
+    top_types: Dict[str, int]
+    top_categories: Dict[str, int]
+    top_scopes: Dict[str, int]
 
 
 class GitHubService:
@@ -60,7 +88,7 @@ class GitHubService:
                 logger.info("💨 CACHE HIT! Returning cached GitHub data")
                 logger.info(f"   • Cached repositories: {len(cached_data.get('repositories', []))}")
                 logger.info(f"   • Cached commits: {cached_data.get('commit_analysis', {}).get('total_commits_analyzed', 0)}")
-                return cast(Dict[str, Any], cached_data)
+                return cached_data
             logger.info("🚀 CACHE MISS: Proceeding with fresh analysis")
 
         try:
@@ -324,9 +352,9 @@ class GitHubService:
             }
 
         # Count languages
-        language_counts = {}
-        topic_counts = {}
-        technology_focus = {}
+        language_counts: Dict[str, int] = {}
+        topic_counts: Dict[str, int] = {}
+        technology_focus: Dict[str, int] = {}
 
         for repo in starred_repositories:
             # Count languages
@@ -519,7 +547,7 @@ class GitHubService:
                 # If we can't access the repo, skip dependency analysis
                 return []
 
-            dependencies = []
+            dependencies: List[str] = []
             max_files_to_check = 3  # Limit to avoid rate limits
 
             for filename, language in dependency_files.items():
@@ -1221,7 +1249,7 @@ class GitHubService:
             result["description"] = match.group("description").strip()
 
             # Map to category
-            if result["type"] in commit_types:
+            if result["type"] and result["type"] in commit_types:
                 result["category"] = commit_types[result["type"]]["category"]
 
             # Determine impact level based on type
@@ -1317,14 +1345,18 @@ class GitHubService:
 
     def _analyze_conventional_commits(self, commits: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Analyze conventional commit patterns across all commits."""
-        conventional_commits = []
-        conventional_stats = {
+        conventional_commits: List[Dict[str, Any]] = []
+        conventional_stats: ConventionalStats = {
             "total_commits": len(commits),
             "conventional_commits": 0,
             "breaking_changes": 0,
             "types": {},
             "scopes": {},
             "categories": {},
+            "conventional_percentage": 0.0,  # Initialize with default value
+            "top_types": {},
+            "top_categories": {},
+            "top_scopes": {},
         }
 
         for commit in commits:
@@ -1376,252 +1408,38 @@ class GitHubService:
             "quality_score": self._calculate_conventional_quality_score(conventional_stats),
         }
 
-    def _analyze_repository_content_for_readme(self, repo_data: Dict[str, Any], repository) -> Dict[str, Any]:
-        """Analyze repository content specifically for README generation."""
-        analysis = {
-            "existing_readme": False,
-            "readme_content": None,
-            "main_files": [],
-            "documentation_files": [],
-            "configuration_files": [],
-            "source_directories": [],
-            "license_info": None,
-            "has_tests": False,
-            "has_ci_cd": False,
-            "has_docker": False,
-            "api_endpoints": [],
-            "key_features": [],
-        }
+    def _calculate_conventional_quality_score(self, conventional_stats: ConventionalStats) -> float:
+        """Calculate a quality score based on conventional commit adherence."""
+        score = 0.0
 
-        try:
-            # Check for existing README files
-            readme_files = ["README.md", "README.rst", "README.txt", "readme.md", "Readme.md"]
-            for readme_file in readme_files:
-                try:
-                    readme_content = repository.get_contents(readme_file)
-                    if readme_content and hasattr(readme_content, "decoded_content"):
-                        analysis["existing_readme"] = True
-                        analysis["readme_content"] = readme_content.decoded_content.decode("utf-8", errors="ignore")
-                        break
-                except Exception:
-                    continue
-
-            # Get repository structure (limited to avoid rate limits)
-            try:
-                contents = repository.get_contents("")
-                max_items = 50  # Limit to avoid processing too many files
-
-                for item in contents[:max_items]:
-                    if item.type == "file":
-                        filename = item.name.lower()
-
-                        # Main application files
-                        if any(filename.endswith(ext) for ext in [".py", ".js", ".ts", ".java", ".cpp", ".c", ".go", ".rs", ".php", ".rb"]):
-                            analysis["main_files"].append(item.name)
-
-                        # Documentation files
-                        elif any(filename.endswith(ext) for ext in [".md", ".rst", ".txt"]) or "doc" in filename:
-                            analysis["documentation_files"].append(item.name)
-
-                        # Configuration files
-                        elif any(filename in ["package.json", "setup.py", "requirements.txt", "cargo.toml", "pom.xml", "build.gradle"]):
-                            analysis["configuration_files"].append(item.name)
-
-                        # CI/CD files
-                        elif any(term in filename for term in [".yml", ".yaml", "ci", "cd", "github", "actions"]):
-                            analysis["has_ci_cd"] = True
-
-                        # Docker files
-                        elif "docker" in filename:
-                            analysis["has_docker"] = True
-
-                        # Test files
-                        elif "test" in filename or "spec" in filename:
-                            analysis["has_tests"] = True
-
-                    elif item.type == "dir":
-                        dirname = item.name.lower()
-
-                        # Source directories
-                        if any(term in dirname for term in ["src", "source", "lib", "core", "main"]):
-                            analysis["source_directories"].append(item.name)
-
-            except Exception as e:
-                logger.debug(f"Error analyzing repository structure: {e}")
-
-            # Extract license information
-            try:
-                license_info = repository.get_license()
-                if license_info:
-                    analysis["license_info"] = {
-                        "name": license_info.license.name if license_info.license else "Unknown",
-                        "key": license_info.license.key if license_info.license else None,
-                    }
-            except Exception:
-                pass
-
-            # Extract key features from description and topics
-            description = repo_data.get("description", "")
-            topics = repo_data.get("topics", [])
-
-            if description:
-                # Simple feature extraction from description
-                sentences = [s.strip() for s in description.split(".") if s.strip()]
-                analysis["key_features"] = sentences[:3]  # First 3 sentences as features
-
-            # Add topics as features
-            for topic in topics[:5]:  # Top 5 topics
-                if len(analysis["key_features"]) < 5:
-                    analysis["key_features"].append(f"Built with {topic}")
-
-        except Exception as e:
-            logger.debug(f"Error analyzing repository content for README: {e}")
-
-        return analysis
-
-    def _extract_api_endpoints_from_code(self, repository, main_files: List[str]) -> List[str]:
-        """Extract API endpoints from source code files (basic implementation)."""
-        endpoints = []
-
-        try:
-            max_files_to_check = 5  # Limit to avoid rate limits
-
-            for filename in main_files[:max_files_to_check]:
-                try:
-                    file_content = repository.get_contents(filename)
-                    if hasattr(file_content, "decoded_content"):
-                        content = file_content.decoded_content.decode("utf-8", errors="ignore")
-
-                        # Simple regex patterns for common API endpoints
-                        import re
-
-                        # Flask/Django patterns
-                        flask_patterns = [
-                            r'@app\.route\([\'"]([^\'"]*)[\'"]',
-                            r'@api\.route\([\'"]([^\'"]*)[\'"]',
-                            r'path\([\'"]([^\'"]*)[\'"]',
-                        ]
-
-                        # Express.js patterns
-                        express_patterns = [
-                            r'app\.(get|post|put|delete|patch)\([\'"]([^\'"]*)[\'"]',
-                            r'router\.(get|post|put|delete|patch)\([\'"]([^\'"]*)[\'"]',
-                        ]
-
-                        # Spring patterns
-                        spring_patterns = [
-                            r'@RequestMapping\([\'"]([^\'"]*)[\'"]',
-                            r'@GetMapping\([\'"]([^\'"]*)[\'"]',
-                            r'@PostMapping\([\'"]([^\'"]*)[\'"]',
-                        ]
-
-                        all_patterns = flask_patterns + express_patterns + spring_patterns
-
-                        for pattern in all_patterns:
-                            matches = re.findall(pattern, content, re.IGNORECASE)
-                            if isinstance(matches[0], tuple) if matches else False:
-                                # Handle patterns with method prefix
-                                endpoints.extend([match[1] for match in matches if len(match) > 1])
-                            else:
-                                endpoints.extend(matches)
-
-                except Exception:
-                    continue
-
-            # Remove duplicates and clean endpoints
-            endpoints = list(set(endpoints))
-            endpoints = [ep for ep in endpoints if ep and not ep.startswith("http")][:10]  # Limit to 10 endpoints
-
-        except Exception as e:
-            logger.debug(f"Error extracting API endpoints: {e}")
-
-        return endpoints
-
-    def _analyze_commit_impacts(self, commits: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Analyze the impact distribution across all commits."""
-        impact_distribution = {
-            "high": 0,
-            "moderate": 0,
-            "low": 0,
-            "minimal": 0,
-        }
-
-        impact_scores = []
-        high_impact_commits = []
-        conventional_high_impact = []
-
-        for commit in commits:
-            impact_analysis = self._analyze_commit_impact(commit)
-            impact_level = impact_analysis["impact_level"]
-            impact_score = impact_analysis["impact_score"]
-
-            impact_distribution[impact_level] += 1
-            impact_scores.append(impact_score)
-
-            # Track high impact commits
-            if impact_level in ["high", "moderate"]:
-                high_impact_commits.append(
-                    {
-                        "commit": commit,
-                        "impact_analysis": impact_analysis,
-                    }
-                )
-
-                # Track conventional commits that are high impact
-                if impact_analysis["conventional_info"]["is_conventional"]:
-                    conventional_high_impact.append(
-                        {
-                            "commit": commit,
-                            "impact_analysis": impact_analysis,
-                        }
-                    )
-
-        # Calculate statistics
-        total_commits = len(commits)
-        avg_impact_score = sum(impact_scores) / len(impact_scores) if impact_scores else 0
-
-        return {
-            "distribution": impact_distribution,
-            "average_impact_score": round(avg_impact_score, 1),
-            "high_impact_commits": high_impact_commits[:10],  # Top 10
-            "conventional_high_impact": conventional_high_impact[:5],  # Top 5
-            "impact_score_range": {
-                "min": min(impact_scores) if impact_scores else 0,
-                "max": max(impact_scores) if impact_scores else 0,
-                "median": sorted(impact_scores)[len(impact_scores) // 2] if impact_scores else 0,
-            },
-            "quality_distribution": {
-                level: round((count / total_commits) * 100, 1) if total_commits > 0 else 0 for level, count in impact_distribution.items()
-            },
-        }
-
-    def _calculate_conventional_quality_score(self, conventional_stats: Dict[str, Any]) -> int:
-        """Calculate a quality score based on conventional commit usage."""
-        score = 0
+        total_commits = conventional_stats["total_commits"]
+        conventional_commits_count = conventional_stats["conventional_commits"]
+        breaking_changes_count = conventional_stats["breaking_changes"]
+        types = conventional_stats["types"]
+        scopes = conventional_stats["scopes"]
 
         # Conventional commit adoption (40 points max)
-        conventional_percentage = conventional_stats["conventional_percentage"]
-        score += min(conventional_percentage * 0.4, 40)
+        if total_commits > 0:
+            conventional_percentage = (conventional_commits_count / total_commits) * 100
+            score += min(conventional_percentage * 0.4, 40)
 
         # Type diversity (30 points max)
-        unique_types = len(conventional_stats["types"])
-        type_diversity_score = min(unique_types * 10, 30)
-        score += type_diversity_score
+        unique_types = len(types)
+        score += min(unique_types * 10, 30)
 
         # Scope usage (20 points max)
-        scope_usage = len(conventional_stats["scopes"])
-        scope_score = min(scope_usage * 5, 20)
-        score += scope_score
+        scope_usage = len(scopes)
+        score += min(scope_usage * 5, 20)
 
-        # Breaking changes (10 points max)
-        if conventional_stats["breaking_changes"] > 0:
-            breaking_score = min(conventional_stats["breaking_changes"] * 2, 10)
-            score += breaking_score
+        # Breaking changes (10 points max, penalize if too many, reward if handled well)
+        # For simplicity, we'll give points for having breaking changes as it implies significant work,
+        # but ideally, this would be more nuanced.
+        score += min(breaking_changes_count * 2, 10)
 
-        return int(score)
+        return round(score, 1)
 
     def _perform_commit_analysis(self, commits: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Perform detailed analysis on commit messages and patterns."""
+        """Perform comprehensive analysis of commits."""
         if not commits:
             return self._empty_commit_analysis()
 
@@ -2158,7 +1976,7 @@ class GitHubService:
                 logger.info("💨 CACHE HIT! Returning cached repository data")
                 logger.info(f"   • Repository: {cached_data.get('repository_info', {}).get('name', 'N/A')}")
                 logger.info(f"   • Language: {cached_data.get('repository_info', {}).get('language', 'N/A')}")
-                return cast(Dict[str, Any], cached_data)
+                return cached_data
             logger.info("🚀 CACHE MISS: Proceeding with fresh repository analysis")
 
         try:
@@ -2619,3 +2437,222 @@ class GitHubService:
         except Exception as e:
             logger.error(f"Error analyzing repository commit patterns: {e}")
             return self._empty_commit_analysis()
+
+    def _extract_api_endpoints_from_code(self, repository, main_files: List[str]) -> List[str]:
+        """Extract API endpoints from source code files (basic implementation)."""
+        endpoints = []
+
+        try:
+            max_files_to_check = 5  # Limit to avoid rate limits
+
+            for filename in main_files[:max_files_to_check]:
+                try:
+                    file_content = repository.get_contents(filename)
+                    if hasattr(file_content, "decoded_content"):
+                        content = file_content.decoded_content.decode("utf-8", errors="ignore")
+
+                        # Simple regex patterns for common API endpoints
+                        import re
+
+                        # Flask/Django patterns
+                        flask_patterns = [
+                            r'@app\.route\([\'"]([^\'"]*)[\'"]',
+                            r'@api\.route\([\'"]([^\'"]*)[\'"]',
+                            r'path\([\'"]([^\'"]*)[\'"]',
+                        ]
+
+                        # Express.js patterns
+                        express_patterns = [
+                            r'app\.(get|post|put|delete|patch)\([\'"]([^\'"]*)[\'"]',
+                            r'router\.(get|post|put|delete|patch)\([\'"]([^\'"]*)[\'"]',
+                        ]
+
+                        # Spring patterns
+                        spring_patterns = [
+                            r'@RequestMapping\([\'"]([^\'"]*)[\'"]',
+                            r'@GetMapping\([\'"]([^\'"]*)[\'"]',
+                            r'@PostMapping\([\'"]([^\'"]*)[\'"]',
+                        ]
+
+                        all_patterns = flask_patterns + express_patterns + spring_patterns
+
+                        for pattern in all_patterns:
+                            matches = re.findall(pattern, content, re.IGNORECASE)
+                            if isinstance(matches[0], tuple) if matches else False:
+                                # Handle patterns with method prefix
+                                endpoints.extend([match[1] for match in matches if len(match) > 1])
+                            else:
+                                endpoints.extend(matches)
+
+                except Exception:
+                    continue
+
+            # Remove duplicates and clean endpoints
+            endpoints = list(set(endpoints))
+            endpoints = [ep for ep in endpoints if ep and not ep.startswith("http")][:10]  # Limit to 10 endpoints
+
+        except Exception as e:
+            logger.debug(f"Error extracting API endpoints: {e}")
+
+        return endpoints
+
+    def _analyze_commit_impacts(self, commits: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Analyze the impact distribution across all commits."""
+        impact_distribution = {
+            "high": 0,
+            "moderate": 0,
+            "low": 0,
+            "minimal": 0,
+        }
+
+        impact_scores = []
+        high_impact_commits = []
+        conventional_high_impact = []
+
+        for commit in commits:
+            impact_analysis = self._analyze_commit_impact(commit)
+            impact_level = impact_analysis["impact_level"]
+            impact_score = impact_analysis["impact_score"]
+
+            impact_distribution[impact_level] += 1
+            impact_scores.append(impact_score)
+
+            # Track high impact commits
+            if impact_level in ["high", "moderate"]:
+                high_impact_commits.append(
+                    {
+                        "commit": commit,
+                        "impact_analysis": impact_analysis,
+                    }
+                )
+
+                # Track conventional commits that are high impact
+                if impact_analysis["conventional_info"]["is_conventional"]:
+                    conventional_high_impact.append(
+                        {
+                            "commit": commit,
+                            "impact_analysis": impact_analysis,
+                        }
+                    )
+
+        # Calculate statistics
+        total_commits = len(commits)
+        avg_impact_score = sum(impact_scores) / len(impact_scores) if impact_scores else 0
+
+        return {
+            "distribution": impact_distribution,
+            "average_impact_score": round(avg_impact_score, 1),
+            "high_impact_commits": high_impact_commits[:10],  # Top 10
+            "conventional_high_impact": conventional_high_impact[:5],  # Top 5
+            "impact_score_range": {
+                "min": min(impact_scores) if impact_scores else 0,
+                "max": max(impact_scores) if impact_scores else 0,
+                "median": sorted(impact_scores)[len(impact_scores) // 2] if impact_scores else 0,
+            },
+            "quality_distribution": {
+                level: round((count / total_commits) * 100, 1) if total_commits > 0 else 0 for level, count in impact_distribution.items()
+            },
+        }
+
+    def _analyze_repository_content_for_readme(self, repo_data: Dict[str, Any], repository: GithubRepository) -> RepoAnalysisResult:
+        """Analyze repository content specifically for README generation."""
+        analysis: RepoAnalysisResult = {
+            "existing_readme": False,
+            "readme_content": None,
+            "main_files": [],
+            "documentation_files": [],
+            "configuration_files": [],
+            "source_directories": [],
+            "license_info": None,
+            "has_tests": False,
+            "has_ci_cd": False,
+            "has_docker": False,
+            "api_endpoints": [],
+            "key_features": [],
+        }
+
+        try:
+            # Check for existing README files
+            readme_files = ["README.md", "README.rst", "README.txt", "readme.md", "Readme.md"]
+            for readme_file in readme_files:
+                try:
+                    readme_content = repository.get_contents(readme_file)
+                    if readme_content and hasattr(readme_content, "decoded_content"):
+                        analysis["existing_readme"] = True
+                        analysis["readme_content"] = readme_content.decoded_content.decode("utf-8", errors="ignore")
+                        break
+                except Exception:
+                    continue
+
+            # Get repository structure (limited to avoid rate limits)
+            try:
+                contents = repository.get_contents("")
+                max_items = 50  # Limit to avoid processing too many files
+
+                for item in contents[:max_items]:
+                    if item.type == "file":
+                        filename = item.name.lower()
+
+                        # Main application files
+                        if any(filename.endswith(ext) for ext in [".py", ".js", ".ts", ".java", ".cpp", ".c", ".go", ".rs", ".php", ".rb"]):
+                            analysis["main_files"].append(item.name)
+
+                        # Documentation files
+                        elif any(filename.endswith(ext) for ext in [".md", ".rst", ".txt"]) or "doc" in filename:
+                            analysis["documentation_files"].append(item.name)
+
+                        # Configuration files
+                        elif any(filename in ["package.json", "setup.py", "requirements.txt", "cargo.toml", "pom.xml", "build.gradle"]):
+                            analysis["configuration_files"].append(item.name)
+
+                        # CI/CD files
+                        elif any(term in filename for term in [".yml", ".yaml", "ci", "cd", "github", "actions"]):
+                            analysis["has_ci_cd"] = True
+
+                        # Docker files
+                        elif "docker" in filename:
+                            analysis["has_docker"] = True
+
+                        # Test files
+                        elif "test" in filename or "spec" in filename:
+                            analysis["has_tests"] = True
+
+                    elif item.type == "dir":
+                        dirname = item.name.lower()
+
+                        # Source directories
+                        if any(term in dirname for term in ["src", "source", "lib", "core", "main"]):
+                            analysis["source_directories"].append(item.name)
+
+            except Exception as e:
+                logger.debug(f"Error analyzing repository structure: {e}")
+
+            # Extract license information
+            try:
+                license_info = repository.get_license()
+                if license_info:
+                    analysis["license_info"] = {
+                        "name": license_info.license.name if license_info.license else "Unknown",
+                        "key": license_info.license.key if license_info.license else None,
+                    }
+            except Exception:
+                pass
+
+            # Extract key features from description and topics
+            description = repo_data.get("description", "")
+            topics = repo_data.get("topics", [])
+
+            if description:
+                # Simple feature extraction from description
+                sentences = [s.strip() for s in description.split(".") if s.strip()]
+                analysis["key_features"] = sentences[:3]  # First 3 sentences as features
+
+            # Add topics as features
+            for topic in topics[:5]:  # Top 5 topics
+                if len(analysis["key_features"]) < 5:
+                    analysis["key_features"].append(f"Built with {topic}")
+
+        except Exception as e:
+            logger.debug(f"Error analyzing repository content for README: {e}")
+
+        return analysis

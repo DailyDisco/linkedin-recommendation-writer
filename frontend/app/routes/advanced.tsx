@@ -1,9 +1,8 @@
 import { AdvancedFeatures } from '@/components/AdvancedFeatures';
-import { Link } from 'react-router';
 import { useAuth } from '../hooks/useAuth';
-import { Button } from '../components/ui/button';
 import type { MultiContributorData } from '../types';
 import { apiClient } from '@/services/api';
+import { PleaseSignInOrRegister } from '../components/PleaseSignInOrRegister';
 
 interface KeywordRefineData {
   keywords: string[];
@@ -30,19 +29,7 @@ export default function AdvancedPage() {
   const { isLoggedIn } = useAuth();
 
   if (!isLoggedIn) {
-    return (
-      <div className='max-w-4xl mx-auto space-y-8 text-center py-12'>
-        <h1 className='text-3xl font-bold text-gray-900'>Access Denied</h1>
-        <p className='text-lg text-gray-700'>
-          You need to be logged in to view advanced features.
-        </p>
-        <Link to='/login'>
-          <Button className='mt-4 bg-blue-600 hover:bg-blue-700 text-white'>
-            Login or Sign Up
-          </Button>
-        </Link>
-      </div>
-    );
+    return <PleaseSignInOrRegister />;
   }
 
   // API integration functions

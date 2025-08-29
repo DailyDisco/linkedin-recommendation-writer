@@ -30,6 +30,8 @@ class RecommendationRequest(BaseModel):
     target_role: Optional[str] = Field(None, description="Target role or industry for the recommendation")
     include_keywords: Optional[List[str]] = Field(None, description="Keywords/phrases that must be included in the recommendation")
     exclude_keywords: Optional[List[str]] = Field(None, description="Keywords/phrases that must NOT be included in the recommendation")
+    analysis_context_type: Optional[str] = Field("profile", description="Type of analysis performed: 'profile' or 'repo_only'")
+    repository_url: Optional[str] = Field(None, description="Repository URL if repo-specific analysis")
 
 
 class RecommendationOption(BaseModel):

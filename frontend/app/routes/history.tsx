@@ -3,10 +3,10 @@ import { FileText, Loader2, AlertCircle } from 'lucide-react';
 import { recommendationApi } from '../services/api';
 import type { Recommendation } from '../types';
 import { formatDate } from '../utils/formatDate';
-import { Button } from '../components/ui/button';
 import ErrorBoundary from '../components/ui/error-boundary';
 import { useAuth } from '../hooks/useAuth';
 import { Link } from 'react-router';
+import { PleaseSignInOrRegister } from '../components/PleaseSignInOrRegister';
 
 const RecommendationsHistory = () => {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
@@ -38,19 +38,7 @@ const RecommendationsHistory = () => {
   }, [isLoggedIn]);
 
   if (!isLoggedIn) {
-    return (
-      <div className='max-w-4xl mx-auto space-y-8 text-center py-12'>
-        <h1 className='text-3xl font-bold text-gray-900'>Access Denied</h1>
-        <p className='text-lg text-gray-700'>
-          You need to be logged in to view your recommendation history.
-        </p>
-        <Link to='/login'>
-          <Button className='mt-4 bg-blue-600 hover:bg-blue-700 text-white'>
-            Login or Sign Up
-          </Button>
-        </Link>
-      </div>
-    );
+    return <PleaseSignInOrRegister />;
   }
 
   return (

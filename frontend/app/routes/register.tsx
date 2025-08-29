@@ -13,7 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from '../components/ui/card';
-import { recommendationApi } from '../services/api';
+import { apiClient } from '../services/api';
 import { Link, useNavigate } from 'react-router';
 
 const signupSchema = z
@@ -51,11 +51,11 @@ export default function RegisterPage() {
     setError(null);
     setSuccess(null);
     try {
-      await recommendationApi.register(
-        values.username,
-        values.email,
-        values.password
-      );
+      await apiClient.register({
+        username: values.username,
+        email: values.email,
+        password: values.password,
+      });
       setSuccess('Registration successful! Please log in.');
       setTimeout(() => {
         navigate('/login');
