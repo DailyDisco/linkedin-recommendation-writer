@@ -4,22 +4,24 @@ Test script to debug JWT token creation and verification.
 Tests JWT persistence across multiple application instances.
 """
 
-import sys
-import os
 import json
+import os
+import sys
 import time
 
 # Add the backend directory to the Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'app'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "app"))
+
+import logging
 
 from app.core.config import settings
 from app.core.token import token_helper
 from app.schemas.user import TokenData
-import logging
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+
 
 def test_jwt_persistence():
     """Test JWT token persistence across multiple settings instances."""
@@ -39,10 +41,7 @@ def test_jwt_persistence():
     print()
 
     # Create a test token
-    test_data = {
-        "sub": "testuser",
-        "id": "123"
-    }
+    test_data = {"sub": "testuser", "id": "123"}
 
     print("Creating test token...")
     try:
@@ -76,7 +75,7 @@ def test_jwt_persistence():
 
     # Save the token for testing
     test_token_file = "/tmp/test_jwt_token.txt"
-    with open(test_token_file, 'w') as f:
+    with open(test_token_file, "w") as f:
         f.write(token)
 
     print(f"Saved token to: {test_token_file}")
@@ -86,10 +85,12 @@ def test_jwt_persistence():
 
     # Force reload settings (this would happen on app restart in production)
     from app.core.config import get_settings
+
     new_settings = get_settings()
 
     # Override SECRET_KEY to simulate what happens without persistent key
     import secrets
+
     new_secret_key = secrets.token_urlsafe(32)
     print(f"New random SECRET_KEY generated: {new_secret_key[:10]}...")
 
@@ -142,6 +143,7 @@ def test_jwt_persistence():
         os.remove(test_token_file)
 
     return True
+
 
 if __name__ == "__main__":
     success = test_jwt_persistence()

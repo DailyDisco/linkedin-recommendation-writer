@@ -1945,7 +1945,7 @@ class RecommendationService:
                 selected_option_id=selected_option.get("id"),
                 selected_option_name=selected_option.get("name"),
                 selected_option_focus=selected_option.get("focus"),
-                generated_options=[option.model_dump() for option in all_options],  # Store all options for reference
+                generated_options=all_options,  # Store all options for reference
             )
             logger.debug(f"➡️ RecommendationCreate data: {recommendation_data.dict()}")
 

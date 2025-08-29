@@ -108,6 +108,8 @@ class RecommendationFromOptionRequest(BaseModel):
 class RecommendationResponse(BaseModel):
     """Response schema for recommendations."""
 
+    model_config = {"from_attributes": True}
+
     id: int
     title: str
     content: str

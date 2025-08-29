@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Lock, Mail, Loader2, AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import ErrorBoundary from '../../components/ui/error-boundary';
@@ -27,7 +28,6 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const { login } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -39,13 +39,13 @@ export default function LoginPage() {
 
   const onSubmit = async (values: LoginFormValues) => {
     setLoading(true);
-    setError(null);
     try {
       const response = await apiClient.login({
         username: values.username,
         password: values.password,
       });
       await login(response.access_token);
+      toast.success('Welcome back! You have been logged in successfully.');
       navigate('/generate'); // Redirect to generate page after successful login
     } catch (err: unknown) {
       console.error('Login failed:', err);
@@ -54,7 +54,10 @@ export default function LoginPage() {
           ? (err as { response?: { data?: { detail?: string } } }).response
               ?.data?.detail
           : 'Invalid username or password';
-      setError(errorMessage || 'Invalid username or password');
+      toast.error(
+        errorMessage ||
+          'Login failed. Please check your credentials and try again.'
+      );
     } finally {
       setLoading(false);
     }
@@ -133,26 +136,7 @@ export default function LoginPage() {
                   )}
                 </div>
 
-                {error && (
-                  <div className='rounded-md bg-red-50 p-4'>
-                    <div className='flex'>
-                      <div className='flex-shrink-0'>
-                        <AlertCircle
-                          className='h-5 w-5 text-red-400'
-                          aria-hidden='true'
-                        />
-                      </div>
-                      <div className='ml-3'>
-                        <h3 className='text-sm font-medium text-red-800'>
-                          Login failed
-                        </h3>
-                        <div className='mt-2 text-sm text-red-700'>
-                          <p>{error}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
+
 
                 <div>
                   <Button

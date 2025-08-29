@@ -1,5 +1,6 @@
 import { Links, Meta, Scripts, ScrollRestoration } from 'react-router';
 import React from 'react';
+import { Toaster } from '@/components/ui/sonner';
 
 export function RootHtmlDocument({ children }: { children: React.ReactNode }) {
   return (
@@ -49,6 +50,7 @@ export function RootHtmlDocument({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         {children}
+        <Toaster />
         <ScrollRestoration />
         <Scripts />
       </body>

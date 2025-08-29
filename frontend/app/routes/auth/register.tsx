@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { User, Mail, Lock, Loader2, AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import ErrorBoundary from '../../components/ui/error-boundary';
@@ -35,8 +36,6 @@ export default function RegisterPage() {
   const navigate = useNavigate();
   const { login } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
 
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
@@ -50,8 +49,6 @@ export default function RegisterPage() {
 
   const onSubmit = async (values: SignupFormValues) => {
     setLoading(true);
-    setError(null);
-    setSuccess(null);
     try {
       const response = await apiClient.register({
         username: values.username,
@@ -60,7 +57,7 @@ export default function RegisterPage() {
       });
 
       await login(response.access_token);
-      setSuccess('Registration successful! Redirecting to home page...');
+      toast.success('Account created successfully! Welcome to LinkedIn Recommendation Writer.');
       navigate('/generate');
     } catch (err: unknown) {
       console.error('Registration failed:', err);
@@ -69,7 +66,7 @@ export default function RegisterPage() {
           ? (err as { response?: { data?: { detail?: string } } }).response
               ?.data?.detail
           : 'Registration failed. Please try again.';
-      setError(errorMessage || 'Registration failed. Please try again.');
+      toast.error(errorMessage || 'Registration failed. An account with that email may already exist.');
     } finally {
       setLoading(false);
     }
@@ -206,47 +203,7 @@ export default function RegisterPage() {
                   )}
                 </div>
 
-                {error && (
-                  <div className='rounded-md bg-red-50 p-4'>
-                    <div className='flex'>
-                      <div className='flex-shrink-0'>
-                        <AlertCircle
-                          className='h-5 w-5 text-red-400'
-                          aria-hidden='true'
-                        />
-                      </div>
-                      <div className='ml-3'>
-                        <h3 className='text-sm font-medium text-red-800'>
-                          Registration failed
-                        </h3>
-                        <div className='mt-2 text-sm text-red-700'>
-                          <p>{error}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
 
-                {success && (
-                  <div className='rounded-md bg-green-50 p-4'>
-                    <div className='flex'>
-                      <div className='flex-shrink-0'>
-                        <AlertCircle
-                          className='h-5 w-5 text-green-400'
-                          aria-hidden='true'
-                        />
-                      </div>
-                      <div className='ml-3'>
-                        <h3 className='text-sm font-medium text-green-800'>
-                          Success!
-                        </h3>
-                        <div className='mt-2 text-sm text-green-700'>
-                          <p>{success}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
 
                 <div>
                   <Button

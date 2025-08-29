@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { Github, Loader2, Users, User, AlertCircle } from 'lucide-react';
+import { Github, Loader2, Users, User } from 'lucide-react';
+import { toast } from 'sonner';
 import { githubApi } from '../services/api';
 import type { ContributorInfo, HttpError, RepositoryInfo } from '../types';
 
@@ -23,7 +24,6 @@ export default function GeneratorPage() {
   const [repositoryInfo, setRepositoryInfo] = useState<RepositoryInfo | null>(
     null
   );
-  const [error, setError] = useState<string>('');
   const [selectedContributor, setSelectedContributor] =
     useState<ContributorInfo | null>(null);
   const [showRecommendationModal, setShowRecommendationModal] = useState(false);
@@ -104,7 +104,7 @@ export default function GeneratorPage() {
 
   const handleGetUsers = async () => {
     if (!formData.input_value.trim()) {
-      setError(
+      toast.error(
         mode === 'repository'
           ? 'Please enter a repository name (e.g., facebook/react) or GitHub URL'
           : 'Please enter a GitHub username'
@@ -113,7 +113,6 @@ export default function GeneratorPage() {
     }
 
     setIsLoading(true);
-    setError('');
     setContributors([]);
     setRepositoryInfo(null);
 
@@ -134,7 +133,7 @@ export default function GeneratorPage() {
           const error =
             'Please enter a valid repository name (e.g., facebook/react) or GitHub URL (e.g., https://github.com/facebook/react)';
           console.log('❌ FRONTEND: Validation failed:', error);
-          setError(error);
+          toast.error(error);
           return;
         }
 
@@ -146,7 +145,7 @@ export default function GeneratorPage() {
             owner,
             repo,
           });
-          setError(error);
+          toast.error(error);
           return;
         }
 
@@ -188,6 +187,7 @@ export default function GeneratorPage() {
               }, // Default owner if not present
         };
         setRepositoryInfo(repoInfo);
+        toast.success(`Found ${result.contributors.length} contributors for ${result.repository.full_name}!`);
       } else {
         // Handle user mode
         const username = formData.input_value.trim();
@@ -222,6 +222,7 @@ export default function GeneratorPage() {
             public_repos: userData.public_repos || 0,
           },
         ]);
+        toast.success(`Found GitHub profile for ${userData.github_username || userData.login || 'user'}!`);
       }
     } catch (err: unknown) {
       const error = err as HttpError;
@@ -254,7 +255,7 @@ export default function GeneratorPage() {
         }
 
         console.log('🚨 FRONTEND: Setting error message:', errorMessage);
-        setError(errorMessage);
+        toast.error(errorMessage);
       } else {
         // Ensure error message is always a string
         const rawErrorMessage =
@@ -284,7 +285,7 @@ export default function GeneratorPage() {
           enhancedMessage = `${errorMessage}\n\n💡 Authentication failed. Please contact support if this persists.`;
         }
 
-        setError(enhancedMessage);
+        toast.error(enhancedMessage);
       }
     } finally {
       setIsLoading(false);
@@ -408,10 +409,9 @@ export default function GeneratorPage() {
                           ? 'Repository Name or URL'
                           : 'GitHub Username'
                       }
-                      aria-describedby={error ? 'input-error' : undefined}
                     />
                   </div>
-                  {mode === 'repository' && !error && (
+                  {mode === 'repository' && (
                     <div>
                       <p className='mt-1 text-sm text-gray-500'>
                         Enter either a repository name (owner/repo) or a full
@@ -427,15 +427,7 @@ export default function GeneratorPage() {
                       </div>
                     </div>
                   )}
-                  {error && (
-                    <div
-                      id='input-error'
-                      className='mt-2 flex items-center space-x-2 text-sm text-red-600'
-                    >
-                      <AlertCircle className='w-4 h-4 flex-shrink-0' />
-                      <p>{error}</p>
-                    </div>
-                  )}
+
                 </div>
 
                 <button

@@ -8,6 +8,7 @@ import {
   Eye,
   EyeOff,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { recommendationApi } from '../services/api';
 import type {
   ContributorInfo,
