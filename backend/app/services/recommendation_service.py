@@ -1925,7 +1925,7 @@ class RecommendationService:
                 "length": length or "medium",
             }
             logger.debug(f"➡️ Generated Parameters: {generation_parameters}")
-            logger.debug(f"➡️ Selected Option Content Length: {len(selected_option.get("content", ""))}")
+            logger.debug(f"➡️ Selected Option Content Length: {len(selected_option.get('content', ''))}")
 
             recommendation_data = RecommendationCreate(
                 github_profile_id=int(github_profile.id),

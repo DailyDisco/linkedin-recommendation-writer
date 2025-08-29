@@ -197,23 +197,20 @@ export default function GeneratorPage() {
         // Convert single user to contributor format for consistency
         setContributors([
           {
-            username: userData.github_username || userData.login,
+            username: userData.github_username || userData.login || '',
             full_name:
               userData.full_name ||
               userData.name ||
               userData.github_username ||
-              userData.login,
+              userData.login ||
+              '',
             first_name:
-              userData.full_name || userData.name
-                ? (userData.full_name || userData.name).split(' ')[0]
-                : '',
+              (userData.full_name || userData.name)?.split(' ')[0] || '',
             last_name:
-              userData.full_name || userData.name
-                ? (userData.full_name || userData.name)
-                    .split(' ')
-                    .slice(1)
-                    .join(' ')
-                : '',
+              (userData.full_name || userData.name)
+                ?.split(' ')
+                .slice(1)
+                .join(' ') || '',
             email: userData.email,
             bio: userData.bio,
             company: userData.company,
