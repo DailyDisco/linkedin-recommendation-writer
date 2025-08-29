@@ -12,7 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from '../../components/ui/card';
-import { recommendationApi } from '../../services/api'; // Assuming auth endpoints are here
+import { apiClient } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 import { Link, useNavigate } from 'react-router';
 
@@ -41,10 +41,10 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
     try {
-      const response = await recommendationApi.login(
-        values.username,
-        values.password
-      );
+      const response = await apiClient.login({
+        username: values.username,
+        password: values.password
+      });
       await login(response.access_token);
       navigate('/generate'); // Redirect to generate page after successful login
     } catch (err: unknown) {
@@ -52,7 +52,7 @@ export default function LoginPage() {
       const errorMessage =
         err && typeof err === 'object' && 'response' in err
           ? (err as { response?: { data?: { detail?: string } } }).response
-              ?.data?.detail
+            ?.data?.detail
           : 'Invalid username or password';
       setError(errorMessage || 'Invalid username or password');
     } finally {
@@ -171,7 +171,7 @@ export default function LoginPage() {
               <p className='mt-10 text-center text-sm text-gray-500'>
                 Not a member?{' '}
                 <Link
-                  to='/signup'
+                  to='/register'
                   className='font-semibold leading-6 text-blue-600 hover:text-blue-500'
                 >
                   Sign up for free
