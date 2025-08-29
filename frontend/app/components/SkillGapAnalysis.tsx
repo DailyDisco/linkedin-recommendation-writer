@@ -17,10 +17,11 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Target, TrendingUp, BookOpen, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { apiClient, handleApiError } from '@/services/api';
 
 interface Skill {
@@ -134,20 +135,18 @@ export const SkillGapAnalysis: React.FC<SkillGapAnalysisProps> = ({
     analysis_summary: string;
   } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const handleAnalyze = async () => {
     if (!githubUsername.trim()) {
-      setError('Please enter a GitHub username.');
+      toast.error('Please enter a GitHub username.');
       return;
     }
     if (!targetRole.trim()) {
-      setError('Please select a target role.');
+      toast.error('Please select a target role.');
       return;
     }
 
     setIsLoading(true);
-    setError(null);
 
     try {
       const analysisData = {
@@ -161,6 +160,8 @@ export const SkillGapAnalysis: React.FC<SkillGapAnalysisProps> = ({
       const apiResult = await apiClient.analyzeSkillGaps(analysisData);
       setAnalysisResult(apiResult);
 
+      toast.success(`Skill gap analysis completed for ${githubUsername}!`);
+
       // Call the callback if provided
       if (onAnalyze) {
         await onAnalyze(analysisData);
@@ -171,7 +172,10 @@ export const SkillGapAnalysis: React.FC<SkillGapAnalysisProps> = ({
       }
     } catch (err: unknown) {
       const errorInfo = handleApiError(err);
-      setError(errorInfo.message);
+      toast.error(
+        errorInfo.message ||
+          'Failed to perform skill gap analysis. Please try again.'
+      );
       console.error('Skill gap analysis failed:', err);
     } finally {
       setIsLoading(false);
@@ -253,13 +257,6 @@ export const SkillGapAnalysis: React.FC<SkillGapAnalysisProps> = ({
               </SelectContent>
             </Select>
           </div>
-
-          {/* Error Display */}
-          {error && (
-            <Alert variant='destructive'>
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
 
           <Button
             onClick={handleAnalyze}

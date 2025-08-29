@@ -135,7 +135,9 @@ export const ReadmeGenerator: React.FC<ReadmeGeneratorProps> = ({
       }
     } catch (err: unknown) {
       const errorInfo = handleApiError(err);
-      toast.error(errorInfo.message || 'Failed to generate README. Please try again.');
+      toast.error(
+        errorInfo.message || 'Failed to generate README. Please try again.'
+      );
       console.error('README generation failed:', err);
     } finally {
       setIsLoading(false);
@@ -256,8 +258,6 @@ export const ReadmeGenerator: React.FC<ReadmeGeneratorProps> = ({
               </div>
             )}
           </div>
-
-
 
           <Button
             onClick={handleGenerate}

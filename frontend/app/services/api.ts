@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { toast } from 'sonner';
 import type {
   GitHubProfileAnalysis,
   RepositoryContributorsResponse,
@@ -44,27 +45,49 @@ api.interceptors.response.use(
     return response;
   },
   error => {
-    // Only redirect to login if the error is 401 and it's not from the login endpoint itself
-    if (
-      error.response?.status === 401 &&
-      error.config.url &&
-      !error.config.url.endsWith('/auth/login')
+    // Handle specific error types globally
+    if (error.response?.status === 401) {
+      // Only redirect to login if the error is 401 and it's not from the login endpoint itself
+      if (error.config.url && !error.config.url.endsWith('/auth/login')) {
+        console.log(
+          'Global 401 interceptor: Redirecting to login for non-login endpoint.',
+          error.config.url,
+          error.response?.status
+        );
+        // Show toast notification before redirecting
+        toast.error('Your session has expired. Please log in again.');
+        // Handle unauthorized access
+        localStorage.removeItem('accessToken'); // Standardizing on 'accessToken'
+        window.location.href = '/login';
+      } else {
+        console.log(
+          'Global 401 interceptor: NOT redirecting for login endpoint.',
+          error.config.url,
+          error.response?.status
+        );
+      }
+    } else if (
+      error.response?.status === 503 ||
+      error.response?.status === 502 ||
+      error.response?.status === 504
     ) {
-      console.log(
-        'Global 401 interceptor: Redirecting to login for non-login endpoint.',
-        error.config.url,
-        error.response?.status
+      // Show toast for service unavailable errors
+      toast.error('Service temporarily unavailable. Please try again later.');
+    } else if (
+      error.code === 'ECONNABORTED' ||
+      error.message?.includes('timeout')
+    ) {
+      // Show toast for timeout errors
+      toast.error(
+        'Request timed out. The server is taking longer than expected to respond.'
       );
-      // Handle unauthorized access
-      localStorage.removeItem('accessToken'); // Standardizing on 'accessToken'
-      window.location.href = '/login';
-    } else if (error.response?.status === 401) {
-      console.log(
-        'Global 401 interceptor: NOT redirecting for login endpoint.',
-        error.config.url,
-        error.response?.status
+    } else if (!error.response && error.request) {
+      // Show toast for network errors
+      toast.error(
+        'Network error. Please check your internet connection and try again.'
       );
     }
+
     return Promise.reject(error);
   }
 );
@@ -346,28 +369,85 @@ export const apiClient = {
   },
 };
 
-export const handleApiError = (error: unknown) => {
+export const handleApiError = (error: unknown, showToast: boolean = true) => {
+  let errorMessage = 'An unexpected error occurred';
+  let status = -1;
+
   if ((error as HttpError).response) {
     // Server responded with error status
     const httpError = error as HttpError;
-    const { status, data } = httpError.response!;
+    const { status: responseStatus, data } = httpError.response!;
+    status = responseStatus;
+
+    // Customize error messages based on status codes
+    switch (status) {
+      case 400:
+        errorMessage =
+          data?.detail ||
+          data?.message ||
+          'Invalid request. Please check your input.';
+        break;
+      case 401:
+        errorMessage = 'Authentication required. Please log in again.';
+        break;
+      case 403:
+        errorMessage =
+          'Access denied. You may not have permission for this action.';
+        break;
+      case 404:
+        errorMessage = 'The requested resource was not found.';
+        break;
+      case 429:
+        errorMessage = 'Too many requests. Please wait a moment and try again.';
+        break;
+      case 500:
+        errorMessage = 'Server error. Please try again later.';
+        break;
+      case 502:
+      case 503:
+      case 504:
+        errorMessage =
+          'Service temporarily unavailable. Please try again later.';
+        break;
+      default:
+        errorMessage = data?.detail || data?.message || 'An error occurred';
+    }
+
+    if (showToast) {
+      toast.error(errorMessage);
+    }
+
     return {
       status,
-      message: data?.detail || data?.message || 'An error occurred',
+      message: errorMessage,
       data: data,
     };
   } else if ((error as HttpError).request) {
     // Network error
+    status = 0;
+    errorMessage = 'Network error - please check your connection';
+
+    if (showToast) {
+      toast.error(errorMessage);
+    }
+
     return {
-      status: 0,
-      message: 'Network error - please check your connection',
+      status,
+      message: errorMessage,
       data: null,
     };
   } else {
     // Other error
+    status = -1;
+    errorMessage = (error as Error).message || 'An unexpected error occurred';
+
+    if (showToast) {
+      toast.error(errorMessage);
+    }
+
     return {
-      status: -1,
-      message: (error as Error).message || 'An unexpected error occurred',
+      status,
+      message: errorMessage,
       data: null,
     };
   }
