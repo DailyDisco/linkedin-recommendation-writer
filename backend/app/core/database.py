@@ -115,5 +115,69 @@ async def check_database_health() -> str:
             result.fetchone()
             return "ok"
     except Exception as e:
-        logger.error(f"Database health check failed: {e}")
-        return "error"
+        logger.error(f"Database health check failed: {type(e).__name__}: {e}")
+        logger.error(f"Error details: {repr(e)}")
+        # Log more context for debugging
+        import traceback
+
+        logger.error(f"Database health check traceback: {traceback.format_exc()}")
+        return f"error: {type(e).__name__}"
+
+
+async def test_database_connection() -> dict:
+    """Test database connection with detailed diagnostics."""
+    from app.core.config import settings
+
+    result = {
+        "database_url_configured": bool(settings.DATABASE_URL),
+        "database_url_preview": None,
+        "connection_test": "not_attempted",
+        "error_type": None,
+        "error_message": None,
+        "recommendations": [],
+    }
+
+    if settings.DATABASE_URL:
+        # Show partial URL for debugging (hide credentials)
+        try:
+            from urllib.parse import urlparse
+
+            parsed = urlparse(settings.DATABASE_URL)
+            result["database_url_preview"] = f"{parsed.scheme}://{parsed.hostname}:{parsed.port}/{parsed.path}"
+        except Exception:
+            result["database_url_preview"] = "Could not parse URL"
+
+        # Test connection
+        try:
+            logger.info("Testing database connection...")
+            async with AsyncSessionLocal() as session:
+                # Try a simple query
+                db_result = await session.execute(text("SELECT version()"))
+                version = db_result.scalar()
+                result["connection_test"] = "success"
+                result["database_version"] = version
+                logger.info(f"Database connection successful: {version}")
+        except Exception as e:
+            result["connection_test"] = "failed"
+            result["error_type"] = type(e).__name__
+            result["error_message"] = str(e)
+            logger.error(f"Database connection failed: {type(e).__name__}: {e}")
+
+            # Provide specific recommendations based on error type
+            if "authentication" in str(e).lower() or "401" in str(e):
+                result["recommendations"].append("Check database username and password in DATABASE_URL")
+                result["recommendations"].append("Verify database user has proper permissions")
+            elif "connection" in str(e).lower():
+                result["recommendations"].append("Check database server is running and accessible")
+                result["recommendations"].append("Verify database host and port in DATABASE_URL")
+            elif "timeout" in str(e).lower():
+                result["recommendations"].append("Check network connectivity to database server")
+                result["recommendations"].append("Verify firewall settings allow database connections")
+            else:
+                result["recommendations"].append("Check DATABASE_URL format and credentials")
+                result["recommendations"].append("Verify database exists and is accessible")
+
+    else:
+        result["recommendations"].append("Set DATABASE_URL environment variable")
+
+    return result

@@ -34,7 +34,12 @@ async def get_database_session() -> AsyncGenerator[AsyncSession, None]:
         await session.commit()
     except Exception as e:
         await session.rollback()
-        logger.error(f"Database session error: {e}")
+        logger.error(f"Database session error: {type(e).__name__}: {e}")
+        logger.error(f"Error details: {repr(e)}")
+        # Log more context for debugging
+        import traceback
+
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise DatabaseError("transaction", str(e))
     finally:
         await session.close()

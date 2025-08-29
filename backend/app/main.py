@@ -229,6 +229,26 @@ async def health_check() -> Union[Dict[str, Any], JSONResponse]:
     return response_data
 
 
+@app.get("/db-test", response_model=None)
+async def database_connection_test():
+    """Test database connection with detailed diagnostics."""
+    logger.info("🔍 Database connection test requested")
+
+    try:
+        from app.core.database import test_database_connection
+
+        result = await test_database_connection()
+
+        status_code = 200 if result["connection_test"] == "success" else 500
+
+        return JSONResponse(
+            status_code=status_code, content={"status": "success" if result["connection_test"] == "success" else "error", "message": "Database connection test completed", "diagnostics": result}
+        )
+    except Exception as e:
+        logger.error(f"❌ Database test endpoint failed: {e}")
+        return JSONResponse(status_code=500, content={"status": "error", "message": "Database test endpoint failed", "error": str(e)})
+
+
 # Include API routes (AFTER health check, BEFORE static files)
 app.include_router(api_router, prefix="/api/v1")
 
