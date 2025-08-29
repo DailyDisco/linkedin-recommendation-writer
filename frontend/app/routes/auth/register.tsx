@@ -14,6 +14,7 @@ import {
   CardTitle,
 } from '../../components/ui/card';
 import { apiClient } from '../../services/api';
+import { useAuth } from '../../hooks/useAuth';
 import { Link, useNavigate } from 'react-router';
 
 const signupSchema = z
@@ -32,6 +33,7 @@ type SignupFormValues = z.infer<typeof signupSchema>;
 
 export default function RegisterPage() {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -51,15 +53,26 @@ export default function RegisterPage() {
     setError(null);
     setSuccess(null);
     try {
-      await apiClient.register({
+      const response = await apiClient.register({
         username: values.username,
         email: values.email,
         password: values.password,
       });
-      setSuccess('Registration successful! Please log in.');
-      setTimeout(() => {
-        navigate('/login');
-      }, 2000);
+
+      // Check if registration returns an access token for auto-login
+      if (response.access_token) {
+        await login(response.access_token);
+        setSuccess('Registration successful! Redirecting to home page...');
+        setTimeout(() => {
+          navigate('/');
+        }, 1000);
+      } else {
+        // If no token returned, just redirect to home page
+        setSuccess('Registration successful! Redirecting to home page...');
+        setTimeout(() => {
+          navigate('/');
+        }, 1000);
+      }
     } catch (err: unknown) {
       console.error('Registration failed:', err);
       const errorMessage =

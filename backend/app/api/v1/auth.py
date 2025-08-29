@@ -2,7 +2,7 @@ import logging
 from datetime import timedelta
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from passlib.context import CryptContext
 from sqlalchemy import select
@@ -124,6 +124,46 @@ async def login_for_access_token(
     )
 
     logger.info(f"User {user.username} logged in successfully, token generated.")
+    return Token(access_token=access_token, token_type="bearer")
+
+
+@router.post("/login", response_model=Token)
+async def login(
+    credentials: dict = Body(...),  # Accept raw JSON instead of form data
+    db: AsyncSession = Depends(get_database_session),
+) -> Token:
+    """Alternative login endpoint that accepts JSON credentials."""
+    logger.info("Attempting to log in user via /login endpoint")
+
+    # Extract username and password from the request body
+    username = credentials.get("username")
+    password = credentials.get("password")
+
+    if not username or not password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username and password are required",
+        )
+
+    user = await authenticate_user(username, password, db)
+    if not user:
+        logger.warning(f"Login failed for user {username}: Invalid credentials.")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = token_helper.create_access_token(
+        data={
+            "sub": user.username,
+            "id": str(user.id),  # Include user ID in token
+        },
+        expires_delta=access_token_expires,
+    )
+
+    logger.info(f"User {user.username} logged in successfully via /login endpoint, token generated.")
     return Token(access_token=access_token, token_type="bearer")
 
 
