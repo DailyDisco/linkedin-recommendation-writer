@@ -1,6 +1,6 @@
 import axios from 'axios';
 import type {
-  GitHubProfile,
+  GitHubProfileAnalysis,
   RepositoryContributorsResponse,
   Recommendation,
   RecommendationRequest,
@@ -57,7 +57,7 @@ export const githubApi = {
   analyzeProfile: async (
     username: string,
     forceRefresh: boolean = false
-  ): Promise<GitHubProfile> => {
+  ): Promise<GitHubProfileAnalysis> => {
     const response = await api.post('/github/analyze', {
       username,
       force_refresh: forceRefresh,

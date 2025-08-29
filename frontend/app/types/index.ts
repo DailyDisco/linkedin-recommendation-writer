@@ -1,3 +1,34 @@
+export interface GitHubUserData {
+  github_username?: string;
+  login?: string;
+  github_id?: number;
+  id?: number;
+  full_name?: string;
+  name?: string;
+  bio?: string;
+  company?: string;
+  location?: string;
+  email?: string;
+  blog?: string;
+  avatar_url?: string;
+  public_repos?: number;
+  followers?: number;
+  following?: number;
+  public_gists?: number;
+}
+
+export interface GitHubProfileAnalysis {
+  user_data: GitHubUserData;
+  repositories: Repository[];
+  languages: LanguageStats[];
+  skills: SkillAnalysis;
+  commit_analysis: Record<string, unknown>;
+  analyzed_at: string;
+  analysis_context_type: string;
+}
+
+// Keep the old interface for backward compatibility, but mark as deprecated
+/** @deprecated Use GitHubProfileAnalysis instead */
 export interface GitHubProfile {
   github_username: string;
   github_id: number;
