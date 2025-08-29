@@ -21,7 +21,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileText, Download, Loader2 } from 'lucide-react';
-import { apiClient, handleApiError } from '../lib/api';
+import { apiClient, handleApiError } from '../../lib/api';
 
 interface ReadmeGeneratorProps {
   onGenerate?: (data: {

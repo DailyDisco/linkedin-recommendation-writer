@@ -1,4 +1,4 @@
-import { AdvancedFeatures } from 'components/AdvancedFeatures';
+import { AdvancedFeatures } from '@/components/AdvancedFeatures';
 import { apiClient } from 'lib/api';
 import { Link } from 'react-router';
 import { useAuth } from '../hooks/useAuth';

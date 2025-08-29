@@ -1,6 +1,6 @@
 import React from 'react';
 import { AdvancedFeatures } from './AdvancedFeatures';
-import { apiClient } from '../lib/api';
+import { apiClient } from '../../lib/api';
 
 // Example of how to use the AdvancedFeatures component
 export const AdvancedFeaturesExample: React.FC = () => {
