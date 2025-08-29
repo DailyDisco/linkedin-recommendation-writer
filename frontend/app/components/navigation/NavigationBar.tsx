@@ -36,7 +36,11 @@ export const NavigationBar = () => {
           </div>
 
           {/* Desktop navigation */}
-          <DesktopNavigation navigation={navigation} isLoggedIn={isLoggedIn} onLogout={logout} />
+          <DesktopNavigation
+            navigation={navigation}
+            isLoggedIn={isLoggedIn}
+            onLogout={logout}
+          />
 
           {/* Mobile menu button */}
           <MobileMenuButton
