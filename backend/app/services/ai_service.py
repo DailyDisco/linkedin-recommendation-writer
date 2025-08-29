@@ -149,6 +149,7 @@ class AIService:
         recommendation_type: str,
         tone: str,
         length: str,
+        include_keywords: Optional[List[str]] = None,
         exclude_keywords: Optional[List[str]] = None,
         regeneration_params: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
@@ -160,6 +161,7 @@ class AIService:
             recommendation_type=recommendation_type,
             tone=tone,
             length=length,
+            include_keywords=include_keywords,
             exclude_keywords=exclude_keywords,
             regeneration_params=regeneration_params,
         )

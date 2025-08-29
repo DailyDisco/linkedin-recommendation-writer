@@ -652,10 +652,10 @@ class RecommendationService:
             logger.info("✅ Keyword refinement successful:")
             logger.info(f"   • Word count: {ai_result['word_count']}")
             logger.info(f"   • Confidence score: {ai_result['confidence_score']}")
-            if ai_result.get("include_compliance"):
-                logger.info(f"   • Keywords included: {len(ai_result['include_compliance'])}")
-            if ai_result.get("exclude_compliance"):
-                logger.info(f"   • Exclude keywords avoided: {len(ai_result['exclude_compliance'])}")
+            if ai_result.get("include_keywords_used"):
+                logger.info(f"   • Keywords included: {len(ai_result['include_keywords_used'])}")
+            if ai_result.get("exclude_keywords_avoided"):
+                logger.info(f"   • Exclude keywords avoided: {len(ai_result['exclude_keywords_avoided'])}")
 
             # Save the refined recommendation as a new version
             new_recommendation = await self._create_recommendation_version(
@@ -663,8 +663,12 @@ class RecommendationService:
                 recommendation=original_recommendation,
                 change_type="keyword_refinement",
                 change_description=ai_result["refinement_summary"],
-                include_keywords_used=ai_result.get("include_compliance"),
-                exclude_keywords_avoided=ai_result.get("exclude_compliance"),
+                content=ai_result["refined_content"],
+                title=ai_result["refined_title"],
+                confidence_score=ai_result["confidence_score"],
+                word_count=ai_result["word_count"],
+                include_keywords_used=ai_result.get("include_keywords_used"),
+                exclude_keywords_avoided=ai_result.get("exclude_keywords_avoided"),
             )
 
             return {
@@ -674,8 +678,8 @@ class RecommendationService:
                 "refined_title": new_recommendation.title,
                 "word_count": new_recommendation.word_count,
                 "confidence_score": new_recommendation.confidence_score,
-                "exclude_keywords_avoided": ai_result.get("exclude_compliance", []),
-                "include_keywords_used": ai_result.get("include_compliance", []),
+                "exclude_keywords_avoided": new_recommendation.exclude_keywords_avoided or [],
+                "include_keywords_used": new_recommendation.include_keywords_used or [],
                 "refinement_summary": ai_result["refinement_summary"],
                 "validation_issues": ai_result["validation_issues"],
                 "generation_parameters": ai_result["generation_parameters"],
@@ -823,6 +827,10 @@ class RecommendationService:
         recommendation: Recommendation,
         change_type: str,
         change_description: Optional[str] = None,
+        content: Optional[str] = None,
+        title: Optional[str] = None,
+        confidence_score: Optional[int] = None,
+        word_count: Optional[int] = None,
         created_by: str = "system",
         include_keywords_used: Optional[List[str]] = None,
         exclude_keywords_avoided: Optional[List[str]] = None,
@@ -842,11 +850,11 @@ class RecommendationService:
             version_number=next_version_number,
             change_type=change_type,
             change_description=change_description,
-            title=recommendation.title,
-            content=recommendation.content,
+            title=title if title is not None else recommendation.title,
+            content=content if content is not None else recommendation.content,
             generation_parameters=recommendation.generation_parameters,
-            confidence_score=recommendation.confidence_score,
-            word_count=recommendation.word_count,
+            confidence_score=confidence_score if confidence_score is not None else recommendation.confidence_score,
+            word_count=word_count if word_count is not None else recommendation.word_count,
             created_by=created_by,
             include_keywords_used=include_keywords_used,
             exclude_keywords_avoided=exclude_keywords_avoided,

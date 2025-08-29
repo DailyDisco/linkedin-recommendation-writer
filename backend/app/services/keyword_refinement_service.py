@@ -1,9 +1,12 @@
 """Keyword Refinement Service for refining recommendations with specific keywords."""
 
+import logging
 from typing import Any, Dict, List, Optional
 
 from app.core.config import settings
 from app.services.prompt_service import PromptService
+
+logger = logging.getLogger(__name__)
 
 # Handle optional Google Generative AI import
 try:
@@ -71,7 +74,7 @@ class KeywordRefinementService:
             formatted_content = self._format_refined_content(refined_content, length, {"tone": tone, "length": length})
 
             # Validate keyword compliance
-            validation = self._validate_keyword_compliance(formatted_content, include_keywords=None, exclude_keywords=exclude_keywords)
+            validation = self._validate_keyword_compliance(formatted_content, include_keywords=include_keywords, exclude_keywords=exclude_keywords)
 
             # Generate refinement summary
             refinement_summary = self._generate_refinement_summary(validation)

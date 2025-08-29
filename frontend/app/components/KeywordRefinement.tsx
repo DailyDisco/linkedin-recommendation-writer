@@ -65,8 +65,14 @@ export const KeywordRefinement: React.FC<KeywordRefinementProps> = ({
   };
 
   const handleRefine = async () => {
-    if (includeKeywords.length === 0 && excludeKeywords.length === 0) {
-      toast.error('Please add at least one keyword to include or exclude.');
+    if (
+      includeKeywords.length === 0 &&
+      excludeKeywords.length === 0 &&
+      !refinementInstructions.trim()
+    ) {
+      toast.error(
+        'Please add at least one keyword to include, exclude, or provide refinement instructions.'
+      );
       return;
     }
 
