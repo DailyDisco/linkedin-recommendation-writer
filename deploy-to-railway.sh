@@ -45,10 +45,15 @@ deploy_backend() {
     echo "⚙️ Configuring backend environment variables..."
 
     # Set production variables
-    railway variables set ENVIRONMENT=production
-    railway variables set API_DEBUG=false
-    railway variables set API_RELOAD=false
-    railway variables set LOG_LEVEL=INFO
+    railway variables --set "ENVIRONMENT=production"
+    railway variables --set "API_DEBUG=false"
+    railway variables --set "API_RELOAD=false"
+    railway variables --set "LOG_LEVEL=INFO"
+
+    # Generate and set a persistent secret key
+    SECRET_KEY=$(openssl rand -hex 32)
+    railway variables --set "SECRET_KEY=$SECRET_KEY"
+    echo "🔐 Generated and set persistent SECRET_KEY for JWT tokens"
 
     # Get API keys from user
     echo ""
@@ -61,8 +66,8 @@ deploy_backend() {
         exit 1
     fi
 
-    railway variables set GITHUB_TOKEN="$GITHUB_TOKEN"
-    railway variables set GEMINI_API_KEY="$GEMINI_API_KEY"
+    railway variables --set "GITHUB_TOKEN=$GITHUB_TOKEN"
+    railway variables --set "GEMINI_API_KEY=$GEMINI_API_KEY"
 
     echo "🚀 Deploying backend..."
     railway up
@@ -94,9 +99,9 @@ deploy_frontend() {
     if [[ -f "../.backend_url" ]]; then
         BACKEND_URL=$(cat ../.backend_url)
         echo "🔗 Using backend URL: $BACKEND_URL"
-        railway variables set VITE_API_BASE_URL="$BACKEND_URL"
-        railway variables set VITE_API_TIMEOUT=30000
-        railway variables set NODE_ENV=production
+        railway variables --set "VITE_API_BASE_URL=$BACKEND_URL"
+        railway variables --set "VITE_API_TIMEOUT=30000"
+        railway variables --set "NODE_ENV=production"
     else
         echo "⚠️ Backend URL not found. Please set VITE_API_BASE_URL manually after deployment."
     fi
@@ -165,7 +170,7 @@ echo "=============="
 echo "1. Test your application by visiting the frontend URL"
 echo "2. Check API documentation at backend/docs"
 echo "3. Monitor logs: railway logs"
-echo "4. If needed, update CORS: railway variables set ALLOWED_ORIGINS=$FRONTEND_URL"
+echo "4. If needed, update CORS: railway variables --set \"ALLOWED_ORIGINS=$FRONTEND_URL\""
 
 echo ""
 echo "✅ Deployment completed successfully!"
