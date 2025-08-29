@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect, useCallback } from 'react';
 import { recommendationApi } from '../services/api';
+import { useLocalStorage } from '../hooks/useLocalStorage';
 
 export interface AuthContextType {
   isLoggedIn: boolean;
@@ -18,12 +19,11 @@ export const AuthContext = createContext<AuthContextType | undefined>(
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('accessToken') ? true : false;
-    }
-    return false;
-  });
+  const [accessToken, setAccessToken] = useLocalStorage<string | null>(
+    'accessToken',
+    null
+  );
+  const isLoggedIn = !!accessToken;
   const [userRecommendationCount, setUserRecommendationCount] = useState<
     number | null
   >(null);
@@ -38,13 +38,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       } catch (error) {
         console.error('Failed to fetch user details:', error);
         // Optionally log out if fetching details fails (e.g., token expired)
-        // logout();
+        logout();
       }
     } else {
       setUserRecommendationCount(null);
       setUserDailyLimit(null);
     }
-  }, [isLoggedIn]);
+  }, [isLoggedIn, logout]);
 
   useEffect(() => {
     fetchUserDetails();
@@ -52,35 +52,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const login = useCallback(
     async (token: string) => {
-      localStorage.setItem('accessToken', token);
-      setIsLoggedIn(true);
+      setAccessToken(token);
       await fetchUserDetails(); // Fetch user details immediately after login
     },
-    [fetchUserDetails]
+    [setAccessToken, fetchUserDetails]
   );
 
   const logout = useCallback(() => {
-    localStorage.removeItem('accessToken');
-    setIsLoggedIn(false);
+    setAccessToken(null);
     setUserRecommendationCount(null);
     setUserDailyLimit(null);
-  }, []);
-
-  useEffect(() => {
-    const handleStorageChange = () => {
-      const newLoggedInStatus = localStorage.getItem('accessToken')
-        ? true
-        : false;
-      if (newLoggedInStatus !== isLoggedIn) {
-        setIsLoggedIn(newLoggedInStatus);
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-    };
-  }, [isLoggedIn]);
+  }, [setAccessToken]);
 
   return (
     <AuthContext.Provider
