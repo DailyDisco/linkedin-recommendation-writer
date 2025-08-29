@@ -1,9 +1,9 @@
 import { AdvancedFeatures } from '@/components/AdvancedFeatures';
-import { apiClient } from 'lib/api';
 import { Link } from 'react-router';
 import { useAuth } from '../hooks/useAuth';
 import { Button } from '../components/ui/button';
 import type { MultiContributorData } from '../types';
+import { apiClient } from '@/services/api';
 
 interface KeywordRefineData {
   keywords: string[];

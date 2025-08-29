@@ -21,7 +21,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Target, TrendingUp, BookOpen, Loader2 } from 'lucide-react';
-import { apiClient, handleApiError } from '../../lib/api';
+import { apiClient, handleApiError } from '@/services/api';
 
 interface SkillGapAnalysisProps {
   onAnalyze?: (data: {
