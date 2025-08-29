@@ -1,4 +1,4 @@
-import { Github, Sparkles, Database, Shield } from 'lucide-react';
+import { Github, Sparkles, Database, Shield, Globe, Workflow } from 'lucide-react';
 
 export default function AboutPage() {
   return (
@@ -126,6 +126,41 @@ export default function AboutPage() {
                 </ul>
               </div>
             </div>
+
+            <h2 className='text-2xl font-bold text-gray-900'>
+              Deployment & Infrastructure
+            </h2>
+            <div className='grid sm:grid-cols-2 gap-4'>
+              <div className='flex items-start space-x-3'>
+                <Globe className='w-6 h-6 text-purple-600 mt-1' />
+                <div>
+                  <h3 className='font-semibold'>Containerization</h3>
+                  <p className='text-gray-600'>
+                    The application is containerized using Docker, ensuring consistent
+                    environments across development and production.
+                  </p>
+                </div>
+              </div>
+              <div className='flex items-start space-x-3'>
+                <Workflow className='w-6 h-6 text-purple-600 mt-1' />
+                <div>
+                  <h3 className='font-semibold'>Cloud Deployment</h3>
+                  <p className='text-gray-600'>
+                    Deployed on Railway, leveraging its robust infrastructure for
+                    scalability and reliability.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <h2 className='text-2xl font-bold text-gray-900'>Roadmap</h2>
+            <ul className='list-disc list-inside space-y-2 text-gray-700'>
+              <li>Implement user authentication and personalized dashboards</li>
+              <li>Expand AI models for more nuanced recommendation styles</li>
+              <li>Integrate with other professional networking platforms</li>
+              <li>Offer advanced customization options for generated recommendations</li>
+              <li>Improve GitHub analysis with deeper insights into project contributions</li>
+            </ul>
 
             <h2 className='text-2xl font-bold text-gray-900'>Open Source</h2>
             <p className='text-gray-700'>
