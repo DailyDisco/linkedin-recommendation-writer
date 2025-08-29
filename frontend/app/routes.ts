@@ -27,8 +27,8 @@ export default [
     route('register', 'routes/auth/register.tsx'), // renders at "/register"
   ]),
 
-  route('advanced', 'routes/auth/advanced.tsx'), // renders at "/advanced"
-  route('history', 'routes/auth/history.tsx'), // renders at "/history"
+  route('advanced', 'routes/advanced.tsx'), // renders at "/advanced"
+  route('history', 'routes/history.tsx'), // renders at "/history"
 
   // Protected routes - require authentication
   // Using prefix to group related functionality under "/app"
