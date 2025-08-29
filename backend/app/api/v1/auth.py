@@ -167,6 +167,22 @@ async def login(
     return Token(access_token=access_token, token_type="bearer")
 
 
+@router.post("/debug-token", response_model=dict)
+async def debug_token(token: str = Body(..., embed=True)) -> dict:
+    """Debug endpoint to check token validity."""
+    logger.info("Debug token endpoint called")
+
+    try:
+        payload = token_helper.verify_token(token)
+        if payload:
+            return {"valid": True, "username": payload.username, "user_id": payload.id, "message": "Token is valid"}
+        else:
+            return {"valid": False, "message": "Token verification failed"}
+    except Exception as e:
+        logger.error(f"Error debugging token: {e}")
+        return {"valid": False, "message": f"Error during token verification: {str(e)}"}
+
+
 async def get_current_user(
     db: AsyncSession = Depends(get_database_session),
     token: str = Depends(oauth2_scheme),

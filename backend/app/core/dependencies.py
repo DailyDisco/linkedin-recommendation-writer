@@ -34,6 +34,14 @@ async def get_database_session() -> AsyncGenerator[AsyncSession, None]:
         await session.commit()
     except Exception as e:
         await session.rollback()
+
+        # Don't wrap HTTPException (401 auth errors) in DatabaseError
+        from fastapi import HTTPException
+
+        if isinstance(e, HTTPException):
+            logger.warning(f"HTTP exception in database session: {e.status_code}: {e.detail}")
+            raise e
+
         logger.error(f"Database session error: {type(e).__name__}: {e}")
         logger.error(f"Error details: {repr(e)}")
         # Log more context for debugging
