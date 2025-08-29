@@ -21,6 +21,17 @@ import { Label } from '@/components/ui/label';
 import { Clock, RotateCcw, Eye, GitBranch } from 'lucide-react';
 import { format } from 'date-fns';
 
+interface Version {
+  id: number;
+  version_number: number;
+  change_type: string;
+  change_description: string | null;
+  confidence_score: number;
+  word_count: number;
+  created_at: string;
+  created_by: string | null;
+}
+
 interface VersionHistoryProps {
   recommendationId: number;
   onGetHistory: (id: number) => Promise<{
@@ -43,9 +54,9 @@ interface VersionHistoryProps {
     versionA: number,
     versionB: number
   ) => Promise<{
-    version_a: any;
-    version_b: any;
-    differences: Record<string, any>;
+    version_a: Record<string, unknown>;
+    version_b: Record<string, unknown>;
+    differences: Record<string, unknown>;
   }>;
   onRevertToVersion: (
     recId: number,
@@ -207,7 +218,7 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
           </div>
 
           <div className='space-y-3'>
-            {history.versions.map((version: any) => (
+            {history.versions.map((version: Version) => (
               <div key={version.id} className='border rounded-lg p-4'>
                 <div className='flex items-center justify-between'>
                   <div className='flex items-center gap-3'>
@@ -292,7 +303,7 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
                             />
                           </div>
                           <div className='flex justify-end gap-2'>
-                            <Button variant='outline' onClick={() => {}}>
+                            <Button variant='outline' onClick={() => { }}>
                               Cancel
                             </Button>
                             <Button

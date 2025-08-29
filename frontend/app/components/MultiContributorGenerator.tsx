@@ -21,6 +21,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { Users, GitFork, Lightbulb, Zap } from 'lucide-react';
 
+interface Contributor {
+  username: string;
+  full_name?: string;
+  contributions: number;
+  contribution_focus: string;
+  primary_languages: string[];
+}
+
 interface MultiContributorGeneratorProps {
   onGenerate: (data: {
     repository_full_name: string;
@@ -358,7 +366,7 @@ export const MultiContributorGenerator: React.FC<
               <TabsContent value='contributors' className='space-y-4'>
                 <div className='grid gap-4'>
                   {result.contributors.map(
-                    (contributor: any, index: number) => (
+                    (contributor: Contributor, index: number) => (
                       <Card key={index}>
                         <CardContent className='p-4'>
                           <div className='flex items-center justify-between mb-2'>

@@ -35,7 +35,7 @@ interface ReadmeGeneratorProps {
     sections: Record<string, string>;
     confidence_score: number;
   }>;
-  onGenerationComplete?: (result: any) => void;
+  onGenerationComplete?: (result: unknown) => void;
 }
 
 const STYLE_OPTIONS = [
@@ -127,7 +127,7 @@ export const ReadmeGenerator: React.FC<ReadmeGeneratorProps> = ({
       if (onGenerationComplete) {
         onGenerationComplete(apiResult);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       const errorInfo = handleApiError(err);
       setError(errorInfo.message);
       console.error('README generation failed:', err);

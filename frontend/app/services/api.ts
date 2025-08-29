@@ -318,7 +318,7 @@ export const apiClient = {
   },
 };
 
-export const handleApiError = (error: any) => {
+export const handleApiError = (error: unknown) => {
   if (error.response) {
     // Server responded with error status
     const { status, data } = error.response;
@@ -345,7 +345,7 @@ export const handleApiError = (error: any) => {
 };
 
 // Types for API responses
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   data: T;
   status: number;
   message?: string;
@@ -376,7 +376,7 @@ export interface RecommendationOptionsResponse {
     confidence_score: number;
     explanation: string;
   }>;
-  generation_parameters: any;
+  generation_parameters: Record<string, unknown>;
 }
 
 export default api;

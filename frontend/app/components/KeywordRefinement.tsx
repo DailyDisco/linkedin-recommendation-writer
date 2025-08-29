@@ -22,7 +22,7 @@ interface KeywordRefinementProps {
     exclude_keywords: string[];
     refinement_instructions?: string;
   }) => Promise<void>;
-  onRefinementComplete?: (result: any) => void;
+  onRefinementComplete?: (result: unknown) => void;
 }
 
 export const KeywordRefinement: React.FC<KeywordRefinementProps> = ({

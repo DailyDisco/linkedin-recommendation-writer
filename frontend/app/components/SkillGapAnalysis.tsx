@@ -23,6 +23,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Target, TrendingUp, BookOpen, Loader2 } from 'lucide-react';
 import { apiClient, handleApiError } from '@/services/api';
 
+interface Skill {
+  skill: string;
+  match_level: number | string;
+  evidence: string[];
+}
+
 interface SkillGapAnalysisProps {
   onAnalyze?: (data: {
     github_username: string;
@@ -43,7 +49,7 @@ interface SkillGapAnalysisProps {
     learning_resources: string[];
     analysis_summary: string;
   }>;
-  onAnalysisComplete?: (result: any) => void;
+  onAnalysisComplete?: (result: unknown) => void;
 }
 
 const ROLE_OPTIONS = [
@@ -150,7 +156,7 @@ export const SkillGapAnalysis: React.FC<SkillGapAnalysisProps> = ({
       if (onAnalysisComplete) {
         onAnalysisComplete(apiResult);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       const errorInfo = handleApiError(err);
       setError(errorInfo.message);
       console.error('Skill gap analysis failed:', err);
@@ -317,7 +323,7 @@ export const SkillGapAnalysis: React.FC<SkillGapAnalysisProps> = ({
 
               <TabsContent value='skills' className='space-y-4'>
                 {analysisResult.skill_analysis.map(
-                  (skill: any, index: number) => (
+                  (skill: Skill, index: number) => (
                     <div key={index} className='border rounded-lg p-4'>
                       <div className='flex items-center justify-between mb-2'>
                         <h3 className='font-semibold'>{skill.skill}</h3>

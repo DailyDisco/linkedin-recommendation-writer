@@ -2,20 +2,52 @@ import React from 'react';
 import { AdvancedFeatures } from './AdvancedFeatures';
 import { apiClient } from '@/services/api';
 
+// Define types for the data structures
+interface KeywordRefineData {
+  keywords: string[];
+  exclude_keywords?: string[];
+  tone?: string;
+  length?: string;
+}
+
+interface ReadmeGenerationData {
+  repository_full_name: string;
+  style: string;
+  include_sections?: string[];
+  target_audience: string;
+}
+
+interface SkillAnalysisData {
+  github_username: string;
+  target_role: string;
+  industry: string;
+  experience_level: string;
+}
+
+interface MultiContributorData {
+  contributors: Array<{
+    github_username: string;
+    contribution_type: string;
+    project_role?: string;
+  }>;
+  project_description: string;
+  recommendation_tone?: string;
+}
+
 // Example of how to use the AdvancedFeatures component
 export const AdvancedFeaturesExample: React.FC = () => {
   // API integration functions
-  const handleKeywordRefine = async (data: any) => {
+  const handleKeywordRefine = async (data: KeywordRefineData) => {
     console.log('Keyword refinement requested:', data);
     // This would be handled by the parent component
   };
 
-  const handleReadmeGeneration = async (data: any) => {
+  const handleReadmeGeneration = async (data: ReadmeGenerationData) => {
     console.log('README generation requested:', data);
     // This would be handled by the parent component
   };
 
-  const handleSkillAnalysis = async (data: any) => {
+  const handleSkillAnalysis = async (data: SkillAnalysisData) => {
     console.log('Skill gap analysis requested:', data);
     // This would be handled by the parent component
   };
@@ -61,7 +93,7 @@ export const AdvancedFeaturesExample: React.FC = () => {
     }
   };
 
-  const handleMultiContributor = async (data: any) => {
+  const handleMultiContributor = async (data: MultiContributorData) => {
     try {
       const result = await apiClient.generateMultiContributor(data);
       return result;
