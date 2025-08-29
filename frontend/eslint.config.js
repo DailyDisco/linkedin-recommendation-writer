@@ -39,5 +39,13 @@ export default tseslint.config(
       'react/react-in-jsx-scope': 'off', // Not needed in React 17+
       'react/jsx-props-no-spreading': 'off', // Allow prop spreading for react-hook-form
     },
+  },
+  // Disable prop-types validation for UI components (TypeScript-based)
+  {
+    files: ['app/components/ui/**/*.{ts,tsx}'],
+    rules: {
+      'react/prop-types': 'off',
+      'react/no-unknown-property': 'off',
+    },
   }
 );

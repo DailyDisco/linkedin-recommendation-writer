@@ -1,5 +1,14 @@
 import { Link } from 'react-router';
-import { Github, Sparkles, FileText, ArrowRight, Users } from 'lucide-react';
+import {
+  Github,
+  Sparkles,
+  FileText,
+  ArrowRight,
+  Users,
+  Settings,
+  Target,
+  History,
+} from 'lucide-react';
 
 export default function HomePage() {
   return (
@@ -26,6 +35,13 @@ export default function HomePage() {
             <Sparkles className='w-5 h-5' />
             <span>Generate Recommendation</span>
             <ArrowRight className='w-4 h-4' />
+          </Link>
+          <Link
+            to='/advanced'
+            className='inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-purple-300 bg-purple-50 text-purple-700 shadow-sm hover:bg-purple-100 active:bg-purple-200 h-10 px-8 space-x-2'
+          >
+            <Settings className='w-5 h-5' />
+            <span>Advanced Features</span>
           </Link>
           <Link
             to='/about'
@@ -169,6 +185,102 @@ export default function HomePage() {
               management
             </p>
           </div>
+        </div>
+      </section>
+
+      {/* Advanced Features */}
+      <section className='bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-8 space-y-8'>
+        <div className='text-center'>
+          <h2 className='text-3xl font-bold text-gray-900 mb-4'>
+            Advanced Features
+          </h2>
+          <p className='text-lg text-gray-600'>
+            Unlock powerful new capabilities for professional recommendation
+            writing
+          </p>
+        </div>
+
+        <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6'>
+          <div className='space-y-3'>
+            <div className='w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center'>
+              <Settings className='w-6 h-6 text-purple-600' />
+            </div>
+            <h3 className='font-semibold text-gray-900'>Keyword Refinement</h3>
+            <p className='text-sm text-gray-600'>
+              Fine-tune recommendations by specifying keywords to include or
+              exclude for precise customization
+            </p>
+          </div>
+
+          <div className='space-y-3'>
+            <div className='w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center'>
+              <FileText className='w-6 h-6 text-green-600' />
+            </div>
+            <h3 className='font-semibold text-gray-900'>README Generation</h3>
+            <p className='text-sm text-gray-600'>
+              Automatically generate professional README files for GitHub
+              repositories using AI analysis
+            </p>
+          </div>
+
+          <div className='space-y-3'>
+            <div className='w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center'>
+              <Target className='w-6 h-6 text-orange-600' />
+            </div>
+            <h3 className='font-semibold text-gray-900'>Skill Gap Analysis</h3>
+            <p className='text-sm text-gray-600'>
+              Analyze GitHub profiles against job requirements to identify
+              strengths and skill gaps
+            </p>
+          </div>
+
+          <div className='space-y-3'>
+            <div className='w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center'>
+              <History className='w-6 h-6 text-blue-600' />
+            </div>
+            <h3 className='font-semibold text-gray-900'>Version History</h3>
+            <p className='text-sm text-gray-600'>
+              Track changes, compare versions, and revert recommendations with
+              full history management
+            </p>
+          </div>
+
+          <div className='space-y-3'>
+            <div className='w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center'>
+              <Users className='w-6 h-6 text-red-600' />
+            </div>
+            <h3 className='font-semibold text-gray-900'>
+              Team Recommendations
+            </h3>
+            <p className='text-sm text-gray-600'>
+              Generate collaborative recommendations for multiple contributors
+              working on the same project
+            </p>
+          </div>
+
+          <div className='space-y-3'>
+            <div className='w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center'>
+              <Sparkles className='w-6 h-6 text-indigo-600' />
+            </div>
+            <h3 className='font-semibold text-gray-900'>
+              Enhanced AI Analysis
+            </h3>
+            <p className='text-sm text-gray-600'>
+              Advanced AI with conventional commit parsing, dependency analysis,
+              and improved confidence scoring
+            </p>
+          </div>
+        </div>
+
+        <div className='text-center pt-4'>
+          <Link
+            to='/advanced'
+            className='inline-flex items-center space-x-2 bg-purple-600 text-white px-6 py-3 rounded-md font-medium hover:bg-purple-700 transition-colors'
+          >
+            <Settings className='w-5 h-5' />
+            <span>Explore Advanced Features</span>
+            <ArrowRight className='w-4 h-4' />
+          </Link>
         </div>
       </section>
 
