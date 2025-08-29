@@ -50,8 +50,10 @@ RUN npm ci --only=production
 # =================================================================================================
 FROM base as frontend-builder
 WORKDIR /app/frontend
+COPY frontend/package.json frontend/package-lock.json* ./
+# Install all dependencies (including dev dependencies) needed for building
+RUN npm ci --include=dev
 COPY frontend ./
-COPY --from=frontend-deps /app/frontend/node_modules ./node_modules
 RUN npm run build
 
 # =================================================================================================
@@ -105,5 +107,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
 
-# Start the application using Gunicorn for better performance and worker management
-CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "-w", "4", "-b", "0.0.0.0:8000", "app.main:app"]
+# Start the application using Uvicorn directly
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
