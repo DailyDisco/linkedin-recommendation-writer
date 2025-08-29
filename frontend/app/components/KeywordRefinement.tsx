@@ -220,8 +220,6 @@ export const KeywordRefinement: React.FC<KeywordRefinementProps> = ({
             />
           </div>
 
-
-
           {/* Action Button */}
           <Button
             onClick={handleRefine}
