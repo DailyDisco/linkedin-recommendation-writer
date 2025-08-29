@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { FileText, Loader2, AlertCircle, History } from 'lucide-react';
 import { toast } from 'sonner';
 import { recommendationApi, apiClient } from '../services/api';
@@ -23,6 +23,14 @@ const RecommendationsHistory = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedRecId, setSelectedRecId] = useState<number | null>(null);
   const { isLoggedIn } = useAuth(); // Get authentication status from context
+  const hasShownToastRef = useRef<boolean>(false); // Track if toast has been shown
+
+  // Reset toast flag when user logs out
+  useEffect(() => {
+    if (!isLoggedIn) {
+      hasShownToastRef.current = false;
+    }
+  }, [isLoggedIn]);
 
   useEffect(() => {
     const fetchRecommendations = async () => {
@@ -35,10 +43,11 @@ const RecommendationsHistory = () => {
         setIsLoading(true);
         const data = await recommendationApi.getAll();
         setRecommendations(data);
-        if (data.length > 0) {
+        if (data.length > 0 && !hasShownToastRef.current) {
           toast.success(
             `Loaded ${data.length} recommendation${data.length === 1 ? '' : 's'} from your history!`
           );
+          hasShownToastRef.current = true;
         }
       } catch (err) {
         console.error('Failed to fetch recommendations:', err);
