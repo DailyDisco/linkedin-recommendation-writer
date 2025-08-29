@@ -3,11 +3,11 @@
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Form, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.core.dependencies import get_github_service, get_repository_service, validate_github_username
-from app.schemas.github import ProfileAnalysisResponse, RepositoryAnalysisResponse
+from app.schemas.github import GitHubAnalysisRequest, ProfileAnalysisResponse, RepositoryAnalysisRequest, RepositoryAnalysisResponse, RepositoryContributorsRequest
 from app.schemas.repository import RepositoryContributorsResponse
 from app.services.github_repository_service import GitHubRepositoryService
 from app.services.github_user_service import GitHubUserService
@@ -58,23 +58,22 @@ async def get_github_service_health(
 
 @router.post("/analyze", response_model=ProfileAnalysisResponse)
 async def analyze_github_profile(
-    username: str = Form(...),
-    force_refresh: bool = Form(False),
+    request: GitHubAnalysisRequest,
     github_user_service: GitHubUserService = Depends(get_github_service),
 ) -> Optional[ProfileAnalysisResponse]:
     """Analyze a GitHub profile and return comprehensive data."""
 
     try:
         analysis = await github_user_service.analyze_github_profile(
-            username=username,
-            force_refresh=force_refresh,
+            username=request.username,
+            force_refresh=request.force_refresh,
             max_repositories=10,  # Assuming a default max_repositories for this endpoint
         )
 
         if not analysis:
             raise HTTPException(
                 status_code=404,
-                detail=f"GitHub user '{username}' not found or could not be analyzed",
+                detail=f"GitHub user '{request.username}' not found or could not be analyzed",
             )
 
         return ProfileAnalysisResponse(**analysis)
@@ -93,27 +92,28 @@ async def get_github_profile(
 ) -> Optional[ProfileAnalysisResponse]:
     """Get a GitHub profile analysis (convenience endpoint)."""
 
-    return await analyze_github_profile(username, force_refresh, github_user_service)
+    # Create a request object for the main endpoint
+    request = GitHubAnalysisRequest(username=username, force_refresh=force_refresh)
+    return await analyze_github_profile(request, github_user_service)
 
 
 @router.post("/repository/analyze", response_model=RepositoryAnalysisResponse)
 async def analyze_repository(
-    repository_full_name: str = Form(...),
-    force_refresh: bool = Form(False),
+    request: RepositoryAnalysisRequest,
     github_repository_service: GitHubRepositoryService = Depends(get_repository_service),
 ) -> Optional[RepositoryAnalysisResponse]:
     """Analyze a specific GitHub repository and return comprehensive data."""
 
     try:
         analysis = await github_repository_service.analyze_repository(
-            repository_full_name=repository_full_name,
-            force_refresh=force_refresh,
+            repository_full_name=request.repository_full_name,
+            force_refresh=request.force_refresh,
         )
 
         if not analysis:
             raise HTTPException(
                 status_code=404,
-                detail=f"Repository '{repository_full_name}' not found or could not be analyzed",
+                detail=f"Repository '{request.repository_full_name}' not found or could not be analyzed",
             )
         return RepositoryAnalysisResponse(**analysis)
 
@@ -131,29 +131,30 @@ async def get_repository_analysis_by_path(
     github_repository_service: GitHubRepositoryService = Depends(get_repository_service),
 ) -> Optional[RepositoryAnalysisResponse]:
     """Get a GitHub repository analysis (convenience endpoint)."""
-    return await analyze_repository(f"{owner}/{repo}", force_refresh, github_repository_service)
+
+    # Create a request object for the main endpoint
+    request = RepositoryAnalysisRequest(repository_full_name=f"{owner}/{repo}", force_refresh=force_refresh)
+    return await analyze_repository(request, github_repository_service)
 
 
 @router.post("/repository/contributors", response_model=RepositoryContributorsResponse)
 async def get_repository_contributors(
-    repository_full_name: str = Form(...),
-    max_contributors: int = Form(50),
-    force_refresh: bool = Form(False),
+    request: RepositoryContributorsRequest,
     github_repository_service: GitHubRepositoryService = Depends(get_repository_service),
 ) -> Optional[RepositoryContributorsResponse]:
     """Get contributors from a GitHub repository with their real names."""
 
     try:
         result = await github_repository_service.get_repository_contributors(
-            repo_name=repository_full_name,
-            max_contributors=max_contributors,
-            force_refresh=force_refresh,
+            repo_name=request.repository_full_name,
+            max_contributors=request.max_contributors,
+            force_refresh=request.force_refresh,
         )
 
         if not result:
             raise HTTPException(
                 status_code=404,
-                detail=f"Repository '{repository_full_name}' not found or could not be accessed",
+                detail=f"Repository '{request.repository_full_name}' not found or could not be accessed",
             )
 
         return RepositoryContributorsResponse(**result)
@@ -177,4 +178,10 @@ async def get_repository_contributors_by_path(
 ) -> Optional[RepositoryContributorsResponse]:
     """Get contributors from a GitHub repository (convenience endpoint)."""
 
-    return await get_repository_contributors(f"{owner}/{repo}", max_contributors, force_refresh, github_repository_service)
+    # Create a request object for the main endpoint
+    request = RepositoryContributorsRequest(
+        repository_full_name=f"{owner}/{repo}",
+        max_contributors=max_contributors,
+        force_refresh=force_refresh,
+    )
+    return await get_repository_contributors(request, github_repository_service)

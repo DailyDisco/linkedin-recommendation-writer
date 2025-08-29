@@ -54,18 +54,26 @@ api.interceptors.response.use(
 );
 
 export const githubApi = {
-  analyzeProfile: async (username: string): Promise<GitHubProfile> => {
-    const response = await api.post('/github/analyze', { username });
+  analyzeProfile: async (
+    username: string,
+    forceRefresh: boolean = false
+  ): Promise<GitHubProfile> => {
+    const response = await api.post('/github/analyze', {
+      username,
+      force_refresh: forceRefresh,
+    });
     return response.data;
   },
 
   getRepositoryContributors: async (
     repository: string,
-    maxContributors: number = 50
+    maxContributors: number = 50,
+    forceRefresh: boolean = false
   ): Promise<RepositoryContributorsResponse> => {
     const response = await api.post('/github/repository/contributors', {
       repository_full_name: repository,
       max_contributors: maxContributors,
+      force_refresh: forceRefresh,
     });
     return response.data;
   },

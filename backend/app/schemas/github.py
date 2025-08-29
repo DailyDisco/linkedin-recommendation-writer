@@ -9,10 +9,23 @@ from pydantic import BaseModel, Field
 class GitHubAnalysisRequest(BaseModel):
     """Request schema for GitHub profile analysis."""
 
-    github_username: str = Field(..., description="GitHub username to analyze")
+    username: str = Field(..., description="GitHub username to analyze")
     force_refresh: bool = Field(False, description="Force refresh of cached data")
-    analyze_repositories: bool = Field(True, description="Include repository analysis")
-    max_repositories: int = Field(10, ge=1, le=50, description="Maximum repositories to analyze")
+
+
+class RepositoryAnalysisRequest(BaseModel):
+    """Request schema for GitHub repository analysis."""
+
+    repository_full_name: str = Field(..., description="Full name of the repository (owner/repo)")
+    force_refresh: bool = Field(False, description="Force refresh of cached data")
+
+
+class RepositoryContributorsRequest(BaseModel):
+    """Request schema for GitHub repository contributors analysis."""
+
+    repository_full_name: str = Field(..., description="Full name of the repository (owner/repo)")
+    max_contributors: int = Field(50, ge=1, le=100, description="Maximum number of contributors to return")
+    force_refresh: bool = Field(False, description="Force refresh of cached data")
 
 
 class RepositoryInfo(BaseModel):
