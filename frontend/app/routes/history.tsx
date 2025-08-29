@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { FileText, Loader2, AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
 import { recommendationApi } from '../services/api';
 import type { Recommendation } from '../types';
 import { formatDate } from '../utils/formatDate';
@@ -11,7 +12,6 @@ import { PleaseSignInOrRegister } from '../components/PleaseSignInOrRegister';
 const RecommendationsHistory = () => {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const { isLoggedIn } = useAuth(); // Get authentication status from context
 
   useEffect(() => {
@@ -23,12 +23,16 @@ const RecommendationsHistory = () => {
       }
       try {
         setIsLoading(true);
-        setError(null);
         const data = await recommendationApi.getAll();
         setRecommendations(data);
+        if (data.length > 0) {
+          toast.success(
+            `Loaded ${data.length} recommendation${data.length === 1 ? '' : 's'} from your history!`
+          );
+        }
       } catch (err) {
         console.error('Failed to fetch recommendations:', err);
-        setError('Failed to load recommendations. Please try again later.');
+        toast.error('Failed to load recommendations. Please try again later.');
       } finally {
         setIsLoading(false);
       }
@@ -58,11 +62,6 @@ const RecommendationsHistory = () => {
           <div className='text-center py-12'>
             <Loader2 className='w-12 h-12 animate-spin text-blue-600 mx-auto mb-4' />
             <p className='text-gray-600'>Loading your recommendations...</p>
-          </div>
-        ) : error ? (
-          <div className='bg-red-50 border border-red-200 rounded-md p-6 text-center text-red-700 flex items-center justify-center space-x-3'>
-            <AlertCircle className='w-5 h-5' />
-            <p>{error}</p>
           </div>
         ) : recommendations.length === 0 ? (
           <div className='bg-gray-50 rounded-lg p-6 text-center text-gray-500'>
