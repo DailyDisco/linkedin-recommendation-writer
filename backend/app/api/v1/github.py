@@ -3,7 +3,7 @@
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Form
+from fastapi import APIRouter, Depends, Form, HTTPException
 from pydantic import BaseModel
 
 from app.core.dependencies import get_github_service, get_repository_service, validate_github_username
