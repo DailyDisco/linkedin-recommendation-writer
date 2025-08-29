@@ -1,279 +1,80 @@
 # Production Docker Compose for LinkedIn Recommendation Writer
-# This configuration is optimized for production deployment with Nginx reverse proxy
+# Extends the base docker-compose.yml for a DRY configuration.
+version: '3.8'
 
 services:
-  # Nginx Reverse Proxy
+  # Nginx Reverse Proxy (Production Only)
   nginx:
     image: nginx:alpine
     container_name: linkedin-recommender-nginx
     ports:
-      - "80:80"
-      - "443:443"
+      - '80:80'
+      - '443:443'
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro # For SSL certificates
       - ./logs/nginx:/var/log/nginx
     depends_on:
-      - frontend
-      - backend
+      - app
     networks:
       - linkedin-recommender-network
     restart: always
 
-    # Resource limits
-    deploy:
-      resources:
-        limits:
-          cpus: "0.5"
-          memory: 256M
-        reservations:
-          cpus: "0.1"
-          memory: 64M
-
-  # Frontend React Application (Production)
-  frontend:
+  # Main application service (Production Overrides)
+  app:
+    extends:
+      file: docker-compose.yml
+      service: app
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      target: production # Use production build stage
-    container_name: linkedin-recommender-frontend-prod
-    # Internal port only - accessed through nginx
+      target: production # Use the lean production stage
+    container_name: linkedin-recommender-app-prod
+    ports: [] # Unset development ports
     expose:
-      - "3000"
-    environment:
-      # API Configuration (internal URLs)
-      VITE_API_BASE_URL: http://backend:8000
-      VITE_API_TIMEOUT: 30000
-
-      # Environment
-      NODE_ENV: production
-
-    # No volume mounts in production
-    depends_on:
-      backend:
-        condition: service_healthy
-
-    networks:
-      - linkedin-recommender-network
-
+      - '8000' # Expose internally for Nginx
+    volumes: [] # Production should be stateless, no source code mounts
+    command: '' # Unset dev command, use the one from the Dockerfile
     restart: always
-
-    # Enhanced health check for production
-    healthcheck:
-      test:
-        ["CMD", "curl", "-f", "http://localhost:3000/health", "||", "exit", "1"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
-
-    # Resource limits for production
     deploy:
       resources:
         limits:
-          cpus: "1.0"
-          memory: 1G
-        reservations:
-          cpus: "0.3"
-          memory: 256M
-
-    # Production security and performance settings
-    security_opt:
-      - no-new-privileges:true
-    read_only: true
-    tmpfs:
-      - /tmp:noexec,nosuid,size=100m
-    volumes:
-      # Read-only access to logs directory
-      - ./logs/frontend:/app/logs:rw
-
-  # Backend API Service (Production)
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-      target: production # Use production build stage
-    container_name: linkedin-recommender-backend-prod
-    # Internal port only - accessed through nginx
-    expose:
-      - "8000"
-    environment:
-      # Database Configuration
-      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-github_recommender}
-
-      # Redis Configuration
-      REDIS_URL: redis://redis:6379/0
-
-      # API Configuration
-      API_HOST: 0.0.0.0
-      API_PORT: 8000
-      API_DEBUG: false
-      API_RELOAD: false
-
-      # GitHub API (set in .env file)
-      GITHUB_TOKEN: ${GITHUB_TOKEN}
-
-      # Gemini AI API (set in .env file)
-      GEMINI_API_KEY: ${GEMINI_API_KEY}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash-lite}
-
-      # Logging
-      LOG_LEVEL: ${LOG_LEVEL:-warning}
-
-      # Initialization flags
-      INIT_DB: ${INIT_DB:-false} # Don't auto-initialize in production
-      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true} # Run migrations in production
-
-      # CORS Origins (restrict for production)
-      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-https://yourdomain.com}
-
-      # Security
-      SECRET_KEY: ${SECRET_KEY}
-
-    volumes:
-      # Only mount config file in production (no source code)
-      - ./backend/config.yaml:/app/config.yaml:ro
-      # Optional: Mount logs directory
-      - ./logs:/app/logs
-
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-
-    networks:
-      - linkedin-recommender-network
-
-    restart: always
-
-    # Enhanced health check for production
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
-
-    # Resource limits for production
-    deploy:
-      resources:
-        limits:
-          cpus: "2.0"
+          cpus: '2.0'
           memory: 2G
         reservations:
-          cpus: "0.5"
+          cpus: '0.5'
           memory: 512M
 
-  # PostgreSQL Database (Production)
+  # PostgreSQL Database (Production Overrides)
   postgres:
-    image: postgres:15-alpine
+    extends:
+      file: docker-compose.yml
+      service: postgres
     container_name: linkedin-recommender-postgres-prod
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-github_recommender}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
-
-    # Don't expose ports in production (internal only)
-    expose:
-      - "5432"
-
+    ports: [] # Do not expose database to host in production
     volumes:
-      # Persistent database storage
       - postgres_data:/var/lib/postgresql/data
-      # Backup directory
-      - ./backups:/backups
-
-    networks:
-      - linkedin-recommender-network
-
-    restart: always
-
-    # Health check
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-github_recommender}",
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-
-    # Production PostgreSQL tuning
-    command: >
+      - ./backups:/backups # Mount a backups volume
+    command: > # Production-tuned PostgreSQL settings
       postgres
-      -c shared_preload_libraries=pg_stat_statements
-      -c pg_stat_statements.track=all
       -c max_connections=200
       -c shared_buffers=512MB
       -c effective_cache_size=2GB
       -c maintenance_work_mem=128MB
       -c checkpoint_completion_target=0.9
-      -c wal_buffers=32MB
+      -c wal_buffers=16MB
       -c default_statistics_target=100
-      -c random_page_cost=1.1
-      -c effective_io_concurrency=200
-      -c work_mem=8MB
-      -c min_wal_size=1GB
-      -c max_wal_size=4GB
 
-    # Resource limits
-    deploy:
-      resources:
-        limits:
-          cpus: "2.0"
-          memory: 3G
-        reservations:
-          cpus: "0.5"
-          memory: 1G
-
-  # Redis Cache (Production)
+  # Redis Cache (Production Overrides)
   redis:
-    image: redis:7-alpine
+    extends:
+      file: docker-compose.yml
+      service: redis
     container_name: linkedin-recommender-redis-prod
-    command: >
-      redis-server 
-      --appendonly yes 
-      --appendfsync everysec
+    ports: [] # Do not expose redis to host in production
+    command: > # Production-tuned Redis settings
+      redis-server
+      --appendonly yes
       --maxmemory 1gb
       --maxmemory-policy allkeys-lru
-      --tcp-keepalive 60
-      --timeout 300
-      --save 900 1 300 10 60 10000
-
-    # Don't expose ports in production (internal only)
-    expose:
-      - "6379"
-
-    volumes:
-      # Persistent Redis data
-      - redis_data:/data
-
-    networks:
-      - linkedin-recommender-network
-
-    restart: always
-
-    # Health check
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-
-    # Resource limits
-    deploy:
-      resources:
-        limits:
-          cpus: "1.0"
-          memory: 1.5G
-        reservations:
-          cpus: "0.2"
-          memory: 256M
 
 # Named volumes for data persistence
 volumes:

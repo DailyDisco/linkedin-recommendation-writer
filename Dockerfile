@@ -1,61 +1,109 @@
-# Multi-stage Dockerfile for LinkedIn Recommendation Writer
-# Single container deployment - backend serves frontend
+# =================================================================================================
+# Root Dockerfile for LinkedIn Recommendation Writer
+#
+# This single, multi-stage Dockerfile builds the entire application for all environments.
+# - Optimized for build speed with layer caching.
+# - Creates lean, secure production images.
+# - Serves as the single source of truth for building the application.
+# =================================================================================================
 
+# =================================================================================================
+# BASE STAGE
+# Common dependencies for both backend and frontend.
+# =================================================================================================
 FROM python:3.11-slim as base
-
-# Set environment variables
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    NODE_ENV=production
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    NODE_ENV=production \
+    # Path setup for node and npm
+    PATH="/root/.local/bin:$PATH"
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    curl \
-    nodejs \
-    npm \
-    && rm -rf /var/lib/apt/lists/*
+# Install base system dependencies and Node.js for frontend build
+RUN apt-get update && \
+    apt-get install -y curl build-essential nodejs npm && \
+    rm -rf /var/lib/apt/lists/*
 
-# Create app directory
 WORKDIR /app
 
-# Copy backend requirements first for better caching
+# =================================================================================================
+# BACKEND DEPENDENCIES STAGE
+# Installs Python dependencies. This layer is cached as long as requirements.txt doesn't change.
+# =================================================================================================
+FROM base as backend-deps
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy backend code
-COPY backend/ .
-
-# Copy frontend and build it
-COPY frontend/ ./frontend/
+# =================================================================================================
+# FRONTEND DEPENDENCIES STAGE
+# Installs Node.js dependencies. This layer is cached as long as package-lock.json doesn't change.
+# =================================================================================================
+FROM base as frontend-deps
 WORKDIR /app/frontend
+COPY frontend/package.json frontend/package-lock.json* ./
+RUN npm ci --only=production
 
-# Fix path aliases for Docker build - handle different directory levels
-RUN find app/components/ui -name "*.tsx" -o -name "*.ts" | xargs sed -i 's|@/lib/utils|../../lib/utils|g' && \
-    find app/components/navigation -name "*.tsx" -o -name "*.ts" | xargs sed -i 's|@/lib/utils|../../lib/utils|g' && \
-    find app/components -name "*.tsx" -o -name "*.ts" | xargs sed -i 's|@/lib/utils|../lib/utils|g' && \
-    find app -maxdepth 1 -name "*.tsx" -o -name "*.ts" | xargs sed -i 's|@/lib/utils|./lib/utils|g'
+# =================================================================================================
+# FRONTEND BUILDER STAGE
+# Builds the static frontend assets. Re-runs only if frontend source code changes.
+# =================================================================================================
+FROM base as frontend-builder
+WORKDIR /app/frontend
+COPY frontend ./
+COPY --from=frontend-deps /app/frontend/node_modules ./node_modules
+RUN npm run build
 
-# Install dependencies and build
-RUN npm ci --production=false && npm run build
-
-# Copy built frontend to backend static directory
-RUN mkdir -p /app/frontend_static && \
-    if [ -d "build/client" ]; then \
-        cp -r build/client/* /app/frontend_static/ && \
-        echo "Frontend client assets copied successfully"; \
-    else \
-        echo "Client build directory not found" && ls -la build/ && exit 1; \
-    fi
-
-# Set working directory back to app root
+# =================================================================================================
+# DEVELOPMENT STAGE
+# Used for local development with docker-compose.yml. Includes dev dependencies and source code.
+# =================================================================================================
+FROM base as development
 WORKDIR /app
 
-# Expose port (Railway will map this to the PORT env var)
+# Install Python dev dependencies
+COPY backend/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir "uvicorn[standard]" black isort flake8 mypy pytest pytest-asyncio
+
+# Install frontend dev dependencies
+WORKDIR /app/frontend
+COPY frontend/package.json frontend/package-lock.json* ./
+RUN npm ci
+
+# Set back to root app directory
+WORKDIR /app
+
+# The docker-compose.yml will mount the source code.
+# The command will be provided in docker-compose.yml.
+
+# =================================================================================================
+# PRODUCTION STAGE
+# Creates the final, lean production image.
+# =================================================================================================
+FROM backend-deps as production
+
+# Create a non-root user for security
+RUN useradd --create-home --shell /bin/bash app
+WORKDIR /app
+
+# Copy built frontend assets from the builder stage to the backend's static directory
+# The target directory must exist, so we create it inside the backend structure.
+COPY ./backend /app/backend
+RUN mkdir -p /app/backend/app/static
+COPY --from=frontend-builder /app/frontend/build/client /app/backend/app/static
+
+# Adjust ownership and switch to non-root user
+RUN chown -R app:app /app
+USER app
+
+WORKDIR /app/backend
+
 EXPOSE 8000
 
-# Health check using PORT environment variable
+# Healthcheck to ensure the application is running correctly
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
 
-# Start the application using PORT environment variable
-CMD sh -c "python -m uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 4"
+# Start the application using Gunicorn for better performance and worker management
+CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "-w", "4", "-b", "0.0.0.0:8000", "app.main:app"]
