@@ -12,7 +12,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { githubApi } from '../services/api';
-import type { ContributorInfo, RepositoryInfo } from '../types';
+import type { ContributorInfo, HttpError, RepositoryInfo } from '../types';
 
 // Extend window interface for debug utilities
 declare global {
@@ -25,6 +25,7 @@ import { ContributorSkeleton } from '../components/ui/loading-skeleton';
 import ErrorBoundary from '../components/ui/error-boundary';
 import { ContributorCard } from '../components/ui/memo-components';
 import { testRepositoryUrlParsing } from '../utils/debug-url-parser';
+import { useAuth } from '../hooks/useAuth'; // Import useAuth hook
 
 export default function GeneratorPage() {
   const [mode, setMode] = useState<'user' | 'repository'>('repository');
@@ -44,6 +45,12 @@ export default function GeneratorPage() {
     github_token_configured: boolean;
     rate_limit_remaining?: number;
   } | null>(null);
+  const {
+    isLoggedIn,
+    userRecommendationCount,
+    userDailyLimit,
+    fetchUserDetails,
+  } = useAuth(); // Get auth status and user details
 
   const [formData, setFormData] = useState({
     input_value: '', // This will be either username or repository
@@ -63,6 +70,11 @@ export default function GeneratorPage() {
       );
     }
   }, []);
+
+  // Fetch user details when the component mounts or isLoggedIn changes
+  useEffect(() => {
+    fetchUserDetails();
+  }, [fetchUserDetails]);
 
   // Helper function to parse GitHub URL or repository name
   const parseRepositoryInput = (input: string): string => {
@@ -291,6 +303,14 @@ export default function GeneratorPage() {
             Find GitHub contributors and create personalized LinkedIn
             recommendations using AI
           </p>
+          {isLoggedIn &&
+            userRecommendationCount !== null &&
+            userDailyLimit !== null && (
+              <p className='text-sm text-gray-500'>
+                You have {userDailyLimit - userRecommendationCount} of{' '}
+                {userDailyLimit} recommendations remaining today.
+              </p>
+            )}
         </div>
 
         <div className='grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8'>
@@ -602,8 +622,8 @@ export default function GeneratorPage() {
                   <div className='text-center'>
                     <Users className='w-12 h-12 mx-auto mb-4 text-gray-400' />
                     <p>
-                      Enter a repository name or URL and click "Get
-                      Contributors"
+                      Enter a repository name or URL and click &quot;Get
+                      Contributors&quot;
                     </p>
                     <div className='text-sm mt-2 space-y-1'>
                       <p>
@@ -631,6 +651,7 @@ export default function GeneratorPage() {
               setShowRecommendationModal(false);
               setSelectedContributor(null);
             }}
+            isLoggedIn={isLoggedIn} // Pass isLoggedIn prop
           />
         )}
       </div>

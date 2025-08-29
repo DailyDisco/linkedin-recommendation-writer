@@ -182,7 +182,7 @@ export interface ContributorInfo {
   public_repos: number;
 }
 
-export interface RepositoryInfo {
+export interface SimpleRepositoryInfo {
   name: string;
   full_name: string;
   description?: string;
@@ -196,7 +196,7 @@ export interface RepositoryInfo {
 }
 
 export interface RepositoryContributorsResponse {
-  repository: RepositoryInfo;
+  repository: SimpleRepositoryInfo;
   contributors: ContributorInfo[];
   total_contributors: number;
   fetched_at: string;
