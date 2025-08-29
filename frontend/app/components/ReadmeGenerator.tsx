@@ -85,7 +85,9 @@ export const ReadmeGenerator: React.FC<ReadmeGeneratorProps> = ({
   const [style, setStyle] = useState('comprehensive');
   const [targetAudience, setTargetAudience] = useState('developers');
   const [includeSections, setIncludeSections] = useState<string[]>([]);
-  const [generatedReadme, setGeneratedReadme] = useState<any>(null);
+  const [generatedReadme, setGeneratedReadme] = useState<Awaited<
+    ReturnType<ReadmeGeneratorProps['onGenerate']>
+  > | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

@@ -1,16 +1,5 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import {
-  Github,
-  Loader2,
-  Users,
-  User,
-  AlertCircle,
-  ChevronDown,
-  ChevronUp,
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
-} from 'lucide-react';
+import { Github, Loader2, Users, User, AlertCircle } from 'lucide-react';
 import { githubApi } from '../services/api';
 import type { ContributorInfo, HttpError, RepositoryInfo } from '../types';
 
@@ -38,13 +27,6 @@ export default function GeneratorPage() {
   const [selectedContributor, setSelectedContributor] =
     useState<ContributorInfo | null>(null);
   const [showRecommendationModal, setShowRecommendationModal] = useState(false);
-  const [showDiagnostics, setShowDiagnostics] = useState(false);
-  const [diagnostics, setDiagnostics] = useState<{
-    status: string;
-    message: string;
-    github_token_configured: boolean;
-    rate_limit_remaining?: number;
-  } | null>(null);
   const {
     isLoggedIn,
     userRecommendationCount,
@@ -184,23 +166,22 @@ export default function GeneratorPage() {
         const repoInfo: RepositoryInfo = {
           name: result.repository.name,
           full_name: result.repository.full_name,
-          description: result.repository.description || null,
+          description: result.repository.description ?? null,
           html_url: result.repository.url,
-          language: result.repository.language || null,
+          language: result.repository.language ?? null,
           stargazers_count: result.repository.stars,
           forks_count: result.repository.forks,
-          open_issues_count: 0, // Not available in SimpleRepositoryInfo
-          created_at: result.repository.created_at || '',
-          updated_at: result.repository.updated_at || '',
-          topics: result.repository.topics,
-          owner: {
-            login: result.repository.full_name.split('/')[0],
-            avatar_url: '', // Not available in SimpleRepositoryInfo
-            html_url: result.repository.url.replace(
-              '/' + result.repository.name,
-              ''
-            ),
-          },
+          open_issues_count: 0, // Default to 0 if not available
+          created_at: result.repository.created_at ?? '',
+          updated_at: result.repository.updated_at ?? '',
+          topics: result.repository.topics ?? [],
+          owner: result.repository.owner
+            ? {
+              login: result.repository.owner.login,
+              avatar_url: result.repository.owner.avatar_url ?? '',
+              html_url: result.repository.owner.html_url ?? '',
+            }
+            : { login: result.repository.full_name.split('/')[0], avatar_url: '', html_url: '' }, // Default owner if not present
         };
         setRepositoryInfo(repoInfo);
       } else {
@@ -225,9 +206,9 @@ export default function GeneratorPage() {
             last_name:
               userData.full_name || userData.name
                 ? (userData.full_name || userData.name)
-                    .split(' ')
-                    .slice(1)
-                    .join(' ')
+                  .split(' ')
+                  .slice(1)
+                  .join(' ')
                 : '',
             email: userData.email,
             bio: userData.bio,
@@ -370,11 +351,10 @@ export default function GeneratorPage() {
                   <button
                     type='button'
                     onClick={() => setMode('repository')}
-                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                      mode === 'repository'
+                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${mode === 'repository'
                         ? 'bg-blue-600 text-white'
                         : 'text-gray-600 hover:text-gray-900'
-                    }`}
+                      }`}
                   >
                     <Users className='w-4 h-4' />
                     <span>Repository Mode</span>
@@ -382,11 +362,10 @@ export default function GeneratorPage() {
                   <button
                     type='button'
                     onClick={() => setMode('user')}
-                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                      mode === 'user'
+                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${mode === 'user'
                         ? 'bg-blue-600 text-white'
                         : 'text-gray-600 hover:text-gray-900'
-                    }`}
+                      }`}
                   >
                     <User className='w-4 h-4' />
                     <span>Single User</span>

@@ -113,6 +113,12 @@ export interface Recommendation {
   github_username?: string;
 }
 
+export interface KeywordRefinementResult extends Recommendation {
+  refinement_summary?: string;
+  include_keywords_used?: string[];
+  exclude_keywords_avoided?: string[];
+}
+
 // HTTP Error types for axios/fetch error handling
 export interface HttpError {
   response?: {
@@ -224,6 +230,11 @@ export interface SimpleRepositoryInfo {
   topics: string[];
   created_at?: string;
   updated_at?: string;
+  owner?: {
+    login: string;
+    avatar_url?: string;
+    html_url?: string;
+  };
 }
 
 export interface RepositoryContributorsResponse {

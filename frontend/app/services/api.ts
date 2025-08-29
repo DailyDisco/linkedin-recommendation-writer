@@ -8,6 +8,7 @@ import type {
   RegenerateRequest,
   MultiContributorData, // Added for new API functions
 } from '../types';
+import type { AxiosRequestConfig } from 'axios';
 
 const API_BASE_URL =
   import.meta.env.NEXT_PUBLIC_API_URL ||
@@ -346,15 +347,16 @@ export const apiClient = {
 };
 
 export const handleApiError = (error: unknown) => {
-  if (error.response) {
+  if ((error as HttpError).response) {
     // Server responded with error status
-    const { status, data } = (error as HttpError).response!;
+    const httpError = error as HttpError;
+    const { status, data } = httpError.response!;
     return {
       status,
       message: data?.detail || data?.message || 'An error occurred',
       data: data,
     };
-  } else if (error.request) {
+  } else if ((error as HttpError).request) {
     // Network error
     return {
       status: 0,
@@ -376,6 +378,16 @@ export interface ApiResponse<T = unknown> {
   data: T;
   status: number;
   message?: string;
+}
+
+export interface HttpError {
+  response?: {
+    status: number;
+    data?: { detail?: string; message?: string };
+  };
+  request?: AxiosRequestConfig;
+  message?: string;
+  code?: string;
 }
 
 export interface RecommendationResponse {
