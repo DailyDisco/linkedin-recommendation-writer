@@ -1,66 +1,65 @@
 # FastAPI and server
-fastapi==0.116.1
-starlette>=0.47.2  # Security fix for CVE-2025-54121
-uvicorn[standard]==0.32.1
-uvloop
-python-jose[cryptography]
+fastapi==0.116.1  # Web framework for building APIs
+starlette>=0.47.2  # ASGI framework, used by FastAPI, with security fix for CVE-2025-54121
+uvicorn[standard]==0.35.0  # ASGI server for running FastAPI applications
+uvloop  # High-performance drop-in replacement for asyncio event loop
+python-jose[cryptography]>=3.3.0  # JWT (JSON Web Token) implementation for Python
 
 # Database
-asyncpg==0.29.0
-sqlalchemy[asyncio]==2.0.23
-alembic==1.13.0
+asyncpg==0.30.0  # PostgreSQL driver for asyncio
+sqlalchemy[asyncio]==2.0.43  # SQL toolkit and Object-Relational Mapper (ORM) with async support
+alembic==1.16.5  # Database migration tool for SQLAlchemy
 
 # Redis
-redis==5.0.1
+redis==6.4.0  # Python client for Redis key-value store
 
 # HTTP requests
-httpx==0.28.1
-aiohttp==3.12.14
-anyio==4.8.0
+httpx==0.28.1  # Synchronous and asynchronous HTTP client library for API requests
+aiohttp==3.12.15  # Asynchronous HTTP client/server framework for web requests
+anyio==4.10.0  # Cross-platform async I/O library providing unified async/await interface for asyncio and trio
 
 # AI/ML
-google-generativeai==0.3.2
+# google-generativeai==0.8.5  # Google Generative AI API client
+
+google-genai==1.32.0  # Google Generative AI API client
 
 # Environment and configuration
-python-dotenv==1.0.1
-pydantic==2.10.3
-pydantic-settings==2.7.1
+python-dotenv  # Loads environment variables from a .env file
+pydantic==2.11.7  # Data validation and settings management using Python type hints
+pydantic-settings==2.10.1  # Pydantic extension for settings management
 
 # Authentication and security
-passlib[bcrypt]==1.7.4
-bcrypt>=3.2.0,<4.0.0  # Compatible with passlib 1.7.4
-python-multipart==0.0.20
-email-validator
+bcrypt==4.3.0  # Hashing library for passwords
+python-multipart==0.0.20  # Parsing multipart/form-data requests
+email-validator==2.3.0  # Email address validation library
 
 # Date and time
-python-dateutil==2.8.2
+python-dateutil==2.8.2  # Extensions to the standard datetime module
 
 # Testing (development)
-pytest==7.4.3
-pytest-asyncio==0.21.1
+pytest==8.4.1  # Framework for writing tests
+pytest-asyncio==1.1.0  # Pytest plugin for testing asyncio code
 
 # Code formatting (development)
-black==24.10.0
-isort==5.12.0
-flake8==6.1.0
-mypy==1.7.1
+black==25.1.0  # Uncompromising Python code formatter
+isort==6.0.1  # Sorts Python imports alphabetically and separates into sections
+flake8==7.3.0  # Wrapper around PyFlakes, pycodestyle, and McCabe
+mypy==1.17.1  # Optional static type checker for Python
 
 # GitHub API
-PyGithub==1.59.1
+PyGithub==2.7.0  # Python library to access the GitHub API
 
 # Data processing
-pandas==2.1.4
-numpy==1.25.2
+pandas==2.3.2  # Data analysis and manipulation library
+numpy==2.3.2  # Fundamental package for scientific computing with Python
 
 # Logging
-structlog==23.2.0
-loguru==0.7.2
+structlog==25.4.0  # Structured logging library
+loguru==0.7.3  # Opinionated logging library
 
 # Background tasks
-celery==5.3.4
+celery==5.5.3  # Distributed task queue
 
 # Monitoring and metrics (optional)
-prometheus-client==0.19.0
+prometheus-client==0.22.1  # Python client for Prometheus metrics
 
-# CORS (built into FastAPI, this package is not needed)
-# fastapi-cors==0.0.6
