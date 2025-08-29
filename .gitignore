@@ -17,6 +17,7 @@
 # Exception: Keep .env.example for documentation (this should be committed)
 # Note: This must come AFTER the .env.*.local pattern to take precedence
 !.env.example
+todo.md
 
 # ==============================================
 # Python (Backend)
