@@ -9,11 +9,13 @@ from app.services.prompt_service import PromptService
 
 # Handle optional Google Generative AI import
 try:
-    import google.generativeai as genai
+    import google.genai as genai
+    from google.genai import types
 
     genai_available = True
 except ImportError:
     genai = None  # type: ignore
+    types = None  # type: ignore
     genai_available = False
 
 logger = logging.getLogger(__name__)
@@ -25,11 +27,11 @@ class AIRecommendationService:
     def __init__(self, prompt_service: PromptService) -> None:
         """Initialize recommendation service."""
         self.prompt_service = prompt_service
-        self.model = None
+        self.client = None
         if genai and settings.GEMINI_API_KEY:
-            genai.configure(api_key=settings.GEMINI_API_KEY)
-            self.model = genai.GenerativeModel(settings.GEMINI_MODEL)
-            self.generation_config = genai.types.GenerationConfig(
+            # Create client with API key
+            self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
+            self.generation_config = types.GenerateContentConfig(
                 temperature=settings.GEMINI_TEMPERATURE,
                 max_output_tokens=settings.GEMINI_MAX_TOKENS,
                 top_p=0.9,
@@ -49,7 +51,7 @@ class AIRecommendationService:
     ) -> Dict[str, Any]:
         """Generate a LinkedIn recommendation using AI."""
 
-        if not self.model:
+        if not self.client:
             raise ValueError("Gemini AI not configured")
 
         try:
@@ -283,20 +285,20 @@ class AIRecommendationService:
 
     async def _generate_single_option(self, prompt: str, temperature_modifier: float, length: str = "medium", generation_params: Optional[Dict[str, Any]] = None) -> str:
         """Generate a single recommendation option with formatting."""
-        if not self.model or not genai_available:
-            raise ValueError("AI model not initialized")
+        if not self.client or not genai_available:
+            raise ValueError("AI client not initialized")
 
         # Adjust temperature for variety
-        config = genai.types.GenerationConfig(
+        config = types.GenerateContentConfig(
             temperature=min(settings.GEMINI_TEMPERATURE + temperature_modifier, 2.0),
             max_output_tokens=settings.GEMINI_MAX_TOKENS,
             top_p=0.9,
             top_k=40,
         )
-        response = self.model.generate_content(prompt, generation_config=config)
+        response = self.client.models.generate_content(model=settings.GEMINI_MODEL, contents=prompt, config=config)
 
         # Get the raw content
-        raw_content = str(response.text)
+        raw_content = response.candidates[0].content.parts[0].text
 
         # Apply formatting
         formatted_content = self._format_recommendation_output(raw_content, length, generation_params)
@@ -488,7 +490,7 @@ class AIRecommendationService:
     ) -> Dict[str, Any]:
         """Regenerate a recommendation with refinement instructions."""
 
-        if not self.model:
+        if not self.client:
             raise ValueError("Gemini AI not configured")
 
         try:
@@ -543,19 +545,19 @@ class AIRecommendationService:
 
     async def _generate_refined_regeneration(self, prompt: str, length: str = "medium", generation_params: Optional[Dict[str, Any]] = None) -> str:
         """Generate refined recommendation for regeneration with formatting."""
-        if not self.model or not genai_available:
-            raise ValueError("AI model not initialized")
+        if not self.client or not genai_available:
+            raise ValueError("AI client not initialized")
 
-        config = genai.types.GenerationConfig(
+        config = types.GenerateContentConfig(
             temperature=settings.GEMINI_TEMPERATURE + 0.1,  # Slightly higher for refinement
             max_output_tokens=settings.GEMINI_MAX_TOKENS,
             top_p=0.9,
             top_k=40,
         )
-        response = self.model.generate_content(prompt, generation_config=config)
+        response = self.client.models.generate_content(model=settings.GEMINI_MODEL, contents=prompt, config=config)
 
         # Get the raw content
-        raw_content = str(response.text)
+        raw_content = response.candidates[0].content.parts[0].text
 
         # Apply formatting
         formatted_content = self._format_recommendation_output(raw_content, length, generation_params)

@@ -242,6 +242,25 @@ class GitHubUserService:
             logger.error(f"   • Status: {e.status if hasattr(e, 'status') else 'Unknown'}")
             logger.error(f"   • Data: {e.data if hasattr(e, 'data') else 'No data'}")
             logger.error(f"   • Message: {str(e)}")
+
+            # Provide more specific error messages based on the GitHub API response
+            if hasattr(e, "status"):
+                if e.status == 404:
+                    logger.error(f"   💡 User '{username}' was not found on GitHub")
+                    logger.error("   💡 Possible reasons:")
+                    logger.error("      • Username doesn't exist")
+                    logger.error("      • Username has a typo")
+                    logger.error("      • User profile is set to private")
+                    logger.error(f"      • Username is case-sensitive (try: {username.lower()})")
+                elif e.status == 403:
+                    logger.error("   💡 Access forbidden - this could mean:")
+                    logger.error("      • GitHub API rate limit exceeded")
+                    logger.error("      • Repository is private and token lacks access")
+                    logger.error("      • GitHub token needs additional permissions")
+                elif e.status == 401:
+                    logger.error("   💡 Authentication failed:")
+                    logger.error("      • GitHub token is invalid or expired")
+                    logger.error("      • Token doesn't have required permissions")
             return None
         except Exception as e:
             logger.error(f"💥 Unexpected error fetching user data for {username}:")

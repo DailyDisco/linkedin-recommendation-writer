@@ -1,6 +1,5 @@
 """Application configuration using Pydantic Settings."""
 
-import secrets
 from functools import lru_cache
 from typing import List, Literal
 
@@ -52,7 +51,7 @@ class Settings(BaseSettings):
     GEMINI_MAX_TOKENS: int = Field(default=2048, ge=100, le=8192, description="Gemini max tokens")
 
     # Logging
-    LOG_LEVEL: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(default="INFO", description="Logging level")
+    LOG_LEVEL: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(default="DEBUG", description="Logging level")
     LOG_FORMAT: str = Field(
         default="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         description="Log format string",
@@ -70,7 +69,6 @@ class Settings(BaseSettings):
 
     # Security
     SECRET_KEY: str = Field(
-        default_factory=lambda: secrets.token_urlsafe(32),
         description="Secret key for security operations",
     )
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=30, ge=1, description="Access token expiration in minutes")
@@ -78,12 +76,12 @@ class Settings(BaseSettings):
 
     # Rate Limiting
     RATE_LIMIT_REQUESTS_PER_MINUTE: int = Field(
-        default=60,
+        default=120,
         ge=10,
         le=1000,
         description="Rate limit requests per minute",
     )
-    RATE_LIMIT_BURST_SIZE: int = Field(default=10, ge=1, le=100, description="Rate limit burst size")
+    RATE_LIMIT_BURST_SIZE: int = Field(default=30, ge=1, le=100, description="Rate limit burst size")
 
     # Feature Flags
     ENABLE_RATE_LIMITING: bool = Field(default=True, description="Enable API rate limiting")

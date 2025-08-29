@@ -43,7 +43,7 @@ async def get_github_service_health(
         github_user_service.github_client.get_user("octocat")  # Test with a public user
         # Check rate limit
         rate_limit = github_user_service.github_client.get_rate_limit()
-        core_rate_limit = rate_limit.core
+        core_rate_limit = rate_limit.rate
         if core_rate_limit.remaining < 500:
             logger.warning("GitHub API rate limit low: {remaining}/{limit}".format(remaining=core_rate_limit.remaining, limit=core_rate_limit.limit))
             return GitHubServiceHealthResponse(
