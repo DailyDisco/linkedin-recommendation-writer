@@ -225,9 +225,9 @@ export default function GeneratorPage() {
             last_name:
               userData.full_name || userData.name
                 ? (userData.full_name || userData.name)
-                  .split(' ')
-                  .slice(1)
-                  .join(' ')
+                    .split(' ')
+                    .slice(1)
+                    .join(' ')
                 : '',
             email: userData.email,
             bio: userData.bio,
@@ -286,7 +286,7 @@ export default function GeneratorPage() {
         // Add diagnostic suggestion if it looks like a configuration issue
         const enhancedMessage =
           errorMessage.includes('GitHub token') ||
-            errorMessage.includes('not configured')
+          errorMessage.includes('not configured')
             ? `${errorMessage} Please check the Service Diagnostics section below for configuration issues.`
             : errorMessage;
 
@@ -358,10 +358,11 @@ export default function GeneratorPage() {
                   <button
                     type='button'
                     onClick={() => setMode('repository')}
-                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${mode === 'repository'
-                      ? 'bg-blue-600 text-white'
-                      : 'text-gray-600 hover:text-gray-900'
-                      }`}
+                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      mode === 'repository'
+                        ? 'bg-blue-600 text-white'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
                   >
                     <Users className='w-4 h-4' />
                     <span>Repository Mode</span>
@@ -369,10 +370,11 @@ export default function GeneratorPage() {
                   <button
                     type='button'
                     onClick={() => setMode('user')}
-                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${mode === 'user'
-                      ? 'bg-blue-600 text-white'
-                      : 'text-gray-600 hover:text-gray-900'
-                      }`}
+                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      mode === 'user'
+                        ? 'bg-blue-600 text-white'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
                   >
                     <User className='w-4 h-4' />
                     <span>Single User</span>
