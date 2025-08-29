@@ -27,9 +27,10 @@ class TokenHelper:
         try:
             payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
             username: Optional[str] = payload.get("sub")
+            user_id: Optional[str] = payload.get("id")
             if username is None:
                 return None
-            return TokenData(username=username)
+            return TokenData(username=username, id=user_id)
         except JWTError:
             return None
 
