@@ -187,7 +187,9 @@ export default function GeneratorPage() {
               }, // Default owner if not present
         };
         setRepositoryInfo(repoInfo);
-        toast.success(`Found ${result.contributors.length} contributors for ${result.repository.full_name}!`);
+        toast.success(
+          `Found ${result.contributors.length} contributors for ${result.repository.full_name}!`
+        );
       } else {
         // Handle user mode
         const username = formData.input_value.trim();
@@ -222,7 +224,9 @@ export default function GeneratorPage() {
             public_repos: userData.public_repos || 0,
           },
         ]);
-        toast.success(`Found GitHub profile for ${userData.github_username || userData.login || 'user'}!`);
+        toast.success(
+          `Found GitHub profile for ${userData.github_username || userData.login || 'user'}!`
+        );
       }
     } catch (err: unknown) {
       const error = err as HttpError;
@@ -427,7 +431,6 @@ export default function GeneratorPage() {
                       </div>
                     </div>
                   )}
-
                 </div>
 
                 <button

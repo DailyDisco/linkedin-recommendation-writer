@@ -57,7 +57,9 @@ export default function RegisterPage() {
       });
 
       await login(response.access_token);
-      toast.success('Account created successfully! Welcome to LinkedIn Recommendation Writer.');
+      toast.success(
+        'Account created successfully! Welcome to LinkedIn Recommendation Writer.'
+      );
       navigate('/generate');
     } catch (err: unknown) {
       console.error('Registration failed:', err);
@@ -66,7 +68,10 @@ export default function RegisterPage() {
           ? (err as { response?: { data?: { detail?: string } } }).response
               ?.data?.detail
           : 'Registration failed. Please try again.';
-      toast.error(errorMessage || 'Registration failed. An account with that email may already exist.');
+      toast.error(
+        errorMessage ||
+          'Registration failed. An account with that email may already exist.'
+      );
     } finally {
       setLoading(false);
     }
@@ -202,8 +207,6 @@ export default function RegisterPage() {
                     </p>
                   )}
                 </div>
-
-
 
                 <div>
                   <Button

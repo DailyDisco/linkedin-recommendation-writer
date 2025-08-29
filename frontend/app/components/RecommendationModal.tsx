@@ -96,7 +96,7 @@ export default function RecommendationModal({
   const [selectedOption, setSelectedOption] =
     useState<RecommendationOption | null>(null);
   const [isCreatingFromOption, setIsCreatingFromOption] = useState(false);
-  const [error, setError] = useState<string>('');
+
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [regenerateInstructions, setRegenerateInstructions] = useState('');
   const [viewingFullContent, setViewingFullContent] = useState<number | null>(
@@ -232,10 +232,7 @@ export default function RecommendationModal({
     }
 
     setIsGenerating(true);
-    setError('');
     setStep('generating');
-
-    const startTime = Date.now();
 
     try {
       // Create custom prompt from form data
@@ -272,10 +269,9 @@ Key Achievements: ${formData.notableAchievements}
       }
 
       setRecommendationOptions(optionsResponse.options);
+      toast.success('Recommendation options generated successfully!');
       setStep('options');
     } catch (err: unknown) {
-      const endTime = Date.now();
-
       console.error('Recommendation generation failed:', err);
 
       // Provide more specific error messages based on error type
@@ -301,7 +297,7 @@ Key Achievements: ${formData.notableAchievements}
         errorMessage = error.response.data.detail;
       }
 
-      setError(errorMessage);
+      toast.error(errorMessage);
       setStep('form');
     } finally {
       setIsGenerating(false);
@@ -314,7 +310,6 @@ Key Achievements: ${formData.notableAchievements}
       return;
     }
     setIsCreatingFromOption(true);
-    setError('');
 
     try {
       const recommendation = await recommendationApi.createFromOption(
@@ -335,11 +330,12 @@ Key Achievements: ${formData.notableAchievements}
 
       setGeneratedRecommendation(recommendation);
       setSelectedOption(option);
+      toast.success('Recommendation created successfully!');
       setStep('result');
     } catch (err: unknown) {
       console.error('Failed to create recommendation from option:', err);
       const error = err as HttpError; // Type assertion for axios error structure
-      setError(
+      toast.error(
         error.response?.data?.detail ||
           'Failed to create recommendation from selected option'
       );
@@ -384,12 +380,13 @@ Key Achievements: ${formData.notableAchievements}
 
       setGeneratedRecommendation(regeneratedRecommendation);
       setRegenerateInstructions('');
+      toast.success('Recommendation refined successfully!');
       setIsRegenerating(false);
     } catch (err: unknown) {
       console.error('Regeneration failed:', err);
       const error = err as HttpError; // Type assertion for axios error structure
 
-      setError(
+      toast.error(
         error.response?.data?.detail ||
           'Failed to regenerate recommendation. Please try again.'
       );
@@ -402,7 +399,6 @@ Key Achievements: ${formData.notableAchievements}
     setGeneratedRecommendation(null);
     setRecommendationOptions([]);
     setSelectedOption(null);
-    setError('');
     setValidationErrors({});
     setRegenerateInstructions('');
     setParsedGitHubInput(null);
@@ -861,12 +857,6 @@ Key Achievements: ${formData.notableAchievements}
                     </div>
                   </div>
                 </div>
-
-                {error && (
-                  <div className='bg-red-50 border border-red-200 rounded-md p-4'>
-                    <p className='text-red-600 text-sm'>{error}</p>
-                  </div>
-                )}
 
                 <div className='flex justify-end space-x-3'>
                   <button
