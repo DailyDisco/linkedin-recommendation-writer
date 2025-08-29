@@ -12,7 +12,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AppLayout } from './layout';
 import UIErrorBoundary from './components/ui/error-boundary';
 import './styles/index.css';
-import { AuthProvider } from './hooks/useAuth'; // Import AuthProvider
+import { AuthProvider } from './hooks';
+
 
 // Create a client
 const queryClient = new QueryClient({
