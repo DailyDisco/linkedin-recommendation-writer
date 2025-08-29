@@ -10,6 +10,7 @@ class UserBase(BaseModel):
     email: Optional[EmailStr] = None
     username: Optional[str] = None
     full_name: Optional[str] = None
+    role: Optional[str] = None
 
 
 class UserCreate(UserBase):
@@ -18,6 +19,7 @@ class UserCreate(UserBase):
     email: EmailStr
     password: str
     username: str
+    role: Optional[str] = None
 
 
 class UserLogin(BaseModel):
@@ -35,6 +37,7 @@ class UserResponse(UserBase):
     recommendation_count: int
     last_recommendation_date: Optional[datetime] = None
     daily_limit: int
+    role: str
 
     class Config:
         orm_mode = True

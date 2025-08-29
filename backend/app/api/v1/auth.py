@@ -82,6 +82,13 @@ async def register_user(
     hashed_password = get_password_hash(user_in.password)
     user = User(email=user_in.email, username=user_in.username, hashed_password=hashed_password)
 
+    if user_in.email == "diegoespinowork@gmail.com":
+        user.role = "admin"
+    elif user_in.role:  # Allow setting role if provided in schema (e.g. for premium users)
+        user.role = user_in.role
+    else:
+        user.role = "free"
+
     db.add(user)
     await db.commit()
     await db.refresh(user)
