@@ -11,8 +11,8 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { X, Plus, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { apiClient, handleApiError } from '@/services/api';
 import type { HttpError } from '../types';
 import type { KeywordRefinementResult } from '../types';
@@ -38,7 +38,6 @@ export const KeywordRefinement: React.FC<KeywordRefinementProps> = ({
   const [newIncludeKeyword, setNewIncludeKeyword] = useState('');
   const [newExcludeKeyword, setNewExcludeKeyword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<KeywordRefinementResult | null>(null);
 
   const addKeyword = (keyword: string, type: 'include' | 'exclude') => {
@@ -67,12 +66,11 @@ export const KeywordRefinement: React.FC<KeywordRefinementProps> = ({
 
   const handleRefine = async () => {
     if (includeKeywords.length === 0 && excludeKeywords.length === 0) {
-      setError('Please add at least one keyword to include or exclude.');
+      toast.error('Please add at least one keyword to include or exclude.');
       return;
     }
 
     setIsLoading(true);
-    setError(null);
 
     try {
       const refinementData = {
@@ -87,6 +85,8 @@ export const KeywordRefinement: React.FC<KeywordRefinementProps> = ({
       // Call the API
       const apiResult = await apiClient.refineKeywords(refinementData);
       setResult(apiResult);
+
+      toast.success('Recommendation refined successfully!');
 
       // Call the callback if provided
       if (onRefine) {
@@ -103,7 +103,10 @@ export const KeywordRefinement: React.FC<KeywordRefinementProps> = ({
     } catch (err: unknown) {
       const error = err as HttpError;
       const errorInfo = handleApiError(error);
-      setError(errorInfo.message);
+      toast.error(
+        errorInfo.message ||
+          'Failed to refine recommendation. Please try again.'
+      );
       console.error('Keyword refinement failed:', error);
     } finally {
       setIsLoading(false);
@@ -217,12 +220,7 @@ export const KeywordRefinement: React.FC<KeywordRefinementProps> = ({
             />
           </div>
 
-          {/* Error Display */}
-          {error && (
-            <Alert variant='destructive'>
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+
 
           {/* Action Button */}
           <Button

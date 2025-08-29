@@ -4,19 +4,15 @@ Test script to debug JWT token creation and verification.
 Tests JWT persistence across multiple application instances.
 """
 
-import json
+import logging
 import os
 import sys
-import time
-
-# Add the backend directory to the Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "app"))
-
-import logging
 
 from app.core.config import settings
 from app.core.token import token_helper
-from app.schemas.user import TokenData
+
+# Add the backend directory to the Python path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "app"))
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -82,11 +78,6 @@ def test_jwt_persistence():
 
     # Simulate restart by creating new settings instance
     print("Creating new settings instance (simulating app restart)...")
-
-    # Force reload settings (this would happen on app restart in production)
-    from app.core.config import get_settings
-
-    new_settings = get_settings()
 
     # Override SECRET_KEY to simulate what happens without persistent key
     import secrets
