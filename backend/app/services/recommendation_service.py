@@ -33,8 +33,18 @@ logger = logging.getLogger(__name__)
 
 
 def parse_datetime(dt: Any) -> Any:
+    """Parse datetime string or object, ensuring offset-naive result."""
     if isinstance(dt, str):
-        return datetime.fromisoformat(dt)
+        parsed_dt = datetime.fromisoformat(dt)
+        # Remove timezone info to make it offset-naive for PostgreSQL
+        if parsed_dt.tzinfo is not None:
+            parsed_dt = parsed_dt.replace(tzinfo=None)
+        return parsed_dt
+    elif isinstance(dt, datetime):
+        # If it's already a datetime object, ensure it's offset-naive
+        if dt.tzinfo is not None:
+            return dt.replace(tzinfo=None)
+        return dt
     return dt
 
 

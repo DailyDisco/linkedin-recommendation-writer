@@ -7,11 +7,13 @@ from app.services.prompt_service import PromptService
 
 # Handle optional Google Generative AI import
 try:
-    import google.generativeai as genai
+    import google.genai as genai
+    from google.genai import types
 
     genai_available = True
 except ImportError:
     genai = None  # type: ignore
+    types = None  # type: ignore
     genai_available = False
 
 
@@ -21,10 +23,9 @@ class READMEGenerationService:
     def __init__(self, prompt_service: PromptService) -> None:
         """Initialize README generation service."""
         self.prompt_service = prompt_service
-        self.model = None
+        self.client = None
         if genai and settings.GEMINI_API_KEY:
-            genai.configure(api_key=settings.GEMINI_API_KEY)
-            self.model = genai.GenerativeModel(settings.GEMINI_MODEL)
+            self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
     async def generate_repository_readme(
         self,
@@ -35,7 +36,7 @@ class READMEGenerationService:
         target_audience: str = "developers",
     ) -> Dict[str, Any]:
         """Generate a README for a GitHub repository."""
-        if not self.model:
+        if not self.client:
             raise ValueError("Gemini AI not configured")
 
         try:
@@ -49,15 +50,15 @@ class READMEGenerationService:
             )
 
             # Generate the README content
-            config = genai.types.GenerationConfig(
+            config = types.GenerateContentConfig(
                 temperature=0.3,  # Lower temperature for more consistent documentation
                 max_output_tokens=settings.GEMINI_MAX_TOKENS,
                 top_p=0.9,
                 top_k=40,
             )
 
-            response = self.model.generate_content(readme_prompt, generation_config=config)
-            generated_content = str(response.text)
+            response = self.client.models.generate_content(model=settings.GEMINI_MODEL, contents=readme_prompt, config=config)
+            generated_content = response.candidates[0].content.parts[0].text
 
             # Extract sections from generated content (basic parsing)
             sections = self._parse_readme_sections(generated_content)

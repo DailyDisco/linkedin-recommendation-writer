@@ -7,11 +7,13 @@ from app.services.prompt_service import PromptService
 
 # Handle optional Google Generative AI import
 try:
-    import google.generativeai as genai
+    import google.genai as genai
+    from google.genai import types
 
     genai_available = True
 except ImportError:
     genai = None  # type: ignore
+    types = None  # type: ignore
     genai_available = False
 
 
@@ -21,10 +23,9 @@ class MultiContributorService:
     def __init__(self, prompt_service: PromptService) -> None:
         """Initialize multi-contributor service."""
         self.prompt_service = prompt_service
-        self.model = None
+        self.client = None
         if genai and settings.GEMINI_API_KEY:
-            genai.configure(api_key=settings.GEMINI_API_KEY)
-            self.model = genai.GenerativeModel(settings.GEMINI_MODEL)
+            self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
     async def generate_multi_contributor_recommendation(
         self,
@@ -39,7 +40,7 @@ class MultiContributorService:
         focus_areas: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """Generate a recommendation highlighting multiple contributors to a repository."""
-        if not self.model:
+        if not self.client:
             raise ValueError("Gemini AI not configured")
 
         try:
@@ -57,15 +58,15 @@ class MultiContributorService:
             )
 
             # Generate the recommendation
-            config = genai.types.GenerationConfig(
+            config = types.GenerateContentConfig(
                 temperature=0.4,  # Slightly higher for collaborative content
                 max_output_tokens=settings.GEMINI_MAX_TOKENS,
                 top_p=0.9,
                 top_k=40,
             )
 
-            response = self.model.generate_content(prompt, generation_config=config)
-            generated_content = str(response.text)
+            response = self.client.models.generate_content(model=settings.GEMINI_MODEL, contents=prompt, config=config)
+            generated_content = response.candidates[0].content.parts[0].text
 
             # Apply formatting
             formatted_content = self._format_multi_contributor_content(generated_content, length, {"tone": tone, "length": length})

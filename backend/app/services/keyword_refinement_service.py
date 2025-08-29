@@ -7,11 +7,13 @@ from app.services.prompt_service import PromptService
 
 # Handle optional Google Generative AI import
 try:
-    import google.generativeai as genai
+    import google.genai as genai
+    from google.genai import types
 
     genai_available = True
 except ImportError:
     genai = None  # type: ignore
+    types = None  # type: ignore
     genai_available = False
 
 
@@ -21,10 +23,9 @@ class KeywordRefinementService:
     def __init__(self, prompt_service: PromptService) -> None:
         """Initialize keyword refinement service."""
         self.prompt_service = prompt_service
-        self.model = None
+        self.client = None
         if genai and settings.GEMINI_API_KEY:
-            genai.configure(api_key=settings.GEMINI_API_KEY)
-            self.model = genai.GenerativeModel(settings.GEMINI_MODEL)
+            self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
     async def refine_recommendation_with_keywords(
         self,
@@ -38,7 +39,7 @@ class KeywordRefinementService:
         regeneration_params: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Refine a generated recommendation based on keywords and regeneration parameters."""
-        if not self.model:
+        if not self.client:
             raise ValueError("Gemini AI not configured")
 
         if regeneration_params is None:
@@ -55,15 +56,15 @@ class KeywordRefinementService:
             )
 
             # Generate refined recommendation
-            config = genai.types.GenerationConfig(
+            config = types.GenerateContentConfig(
                 temperature=settings.GEMINI_TEMPERATURE + 0.05,  # Slightly higher for refinement
                 max_output_tokens=settings.GEMINI_MAX_TOKENS,
                 top_p=0.9,
                 top_k=40,
             )
 
-            response = self.model.generate_content(refinement_prompt, generation_config=config)
-            refined_content = str(response.text)
+            response = self.client.models.generate_content(model=settings.GEMINI_MODEL, contents=refinement_prompt, config=config)
+            refined_content = response.candidates[0].content.parts[0].text
 
             # Apply formatting
             formatted_content = self._format_refined_content(refined_content, length, {"tone": tone, "length": length})
