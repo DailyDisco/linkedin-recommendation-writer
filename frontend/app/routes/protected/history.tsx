@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { FileText, Loader2, AlertCircle } from 'lucide-react';
-import { recommendationApi } from '../services/api';
-import type { Recommendation } from '../types';
-import { formatDate } from '../utils/formatDate';
-import ErrorBoundary from '../components/ui/error-boundary';
-import { useAuth } from '../hooks/useAuth';
+import { recommendationApi } from '../../services/api';
+import type { Recommendation } from '../../types';
+import { formatDate } from '../../utils/formatDate';
+import ErrorBoundary from '../../components/ui/error-boundary';
+import { useAuth } from '../../hooks/useAuth';
 import { Link } from 'react-router';
-import { PleaseSignInOrRegister } from '../components/PleaseSignInOrRegister';
+import { PleaseSignInOrRegister } from '../../components/PleaseSignInOrRegister';
 
 const RecommendationsHistory = () => {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);

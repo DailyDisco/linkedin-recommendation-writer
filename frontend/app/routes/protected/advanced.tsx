@@ -1,8 +1,8 @@
 import { AdvancedFeatures } from '@/components/AdvancedFeatures';
-import { useAuth } from '../hooks/useAuth';
-import type { MultiContributorData } from '../types';
+import { useAuth } from '../../hooks/useAuth';
+import type { MultiContributorData } from '../../types';
 import { apiClient } from '@/services/api';
-import { PleaseSignInOrRegister } from '../components/PleaseSignInOrRegister';
+import { PleaseSignInOrRegister } from '../../components/PleaseSignInOrRegister';
 
 interface KeywordRefineData {
   keywords: string[];

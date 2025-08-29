@@ -3,17 +3,17 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Lock, Mail, Loader2, AlertCircle } from 'lucide-react';
-import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import ErrorBoundary from '../components/ui/error-boundary';
+import { Button } from '../../components/ui/button';
+import { Input } from '../../components/ui/input';
+import ErrorBoundary from '../../components/ui/error-boundary';
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
-} from '../components/ui/card';
-import { recommendationApi } from '../services/api'; // Assuming auth endpoints are here
-import { useAuth } from '../hooks/useAuth';
+} from '../../components/ui/card';
+import { recommendationApi } from '../../services/api'; // Assuming auth endpoints are here
+import { useAuth } from '../../hooks/useAuth';
 import { Link, useNavigate } from 'react-router';
 
 const loginSchema = z.object({

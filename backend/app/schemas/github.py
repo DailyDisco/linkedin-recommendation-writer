@@ -1,7 +1,7 @@
 """GitHub-related Pydantic schemas."""
 
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -85,6 +85,43 @@ class GitHubProfileResponse(BaseModel):
 
     # Metadata
     last_analyzed: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ProfileAnalysisResponse(BaseModel):
+    """Response schema for comprehensive GitHub profile analysis."""
+
+    # Core analysis data
+    user_data: Dict[str, Any]
+    repositories: List[Dict[str, Any]]
+    languages: List[Dict[str, Any]]
+    skills: Dict[str, Any]
+    commit_analysis: Dict[str, Any]
+
+    # Metadata
+    analyzed_at: str
+    analysis_context_type: str = "profile"
+
+    class Config:
+        from_attributes = True
+
+
+class RepositoryAnalysisResponse(BaseModel):
+    """Response schema for comprehensive GitHub repository analysis."""
+
+    # Core analysis data
+    repository_info: Dict[str, Any]
+    languages: List[Dict[str, Any]]
+    commits: List[Dict[str, Any]]
+    skills: Dict[str, Any]
+    commit_analysis: Dict[str, Any]
+
+    # Metadata
+    analyzed_at: str
+    analysis_time_seconds: float
+    analysis_context_type: str = "repository"
 
     class Config:
         from_attributes = True
