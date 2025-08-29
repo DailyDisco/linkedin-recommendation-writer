@@ -213,11 +213,22 @@ export default function GeneratorPage() {
         setContributors([
           {
             username: userData.github_username || userData.login,
-            full_name: userData.full_name || userData.name || userData.github_username || userData.login,
-            first_name: userData.full_name || userData.name ? (userData.full_name || userData.name).split(' ')[0] : '',
-            last_name: userData.full_name || userData.name
-              ? (userData.full_name || userData.name).split(' ').slice(1).join(' ')
-              : '',
+            full_name:
+              userData.full_name ||
+              userData.name ||
+              userData.github_username ||
+              userData.login,
+            first_name:
+              userData.full_name || userData.name
+                ? (userData.full_name || userData.name).split(' ')[0]
+                : '',
+            last_name:
+              userData.full_name || userData.name
+                ? (userData.full_name || userData.name)
+                    .split(' ')
+                    .slice(1)
+                    .join(' ')
+                : '',
             email: userData.email,
             bio: userData.bio,
             company: userData.company,
@@ -275,7 +286,7 @@ export default function GeneratorPage() {
         // Add diagnostic suggestion if it looks like a configuration issue
         const enhancedMessage =
           errorMessage.includes('GitHub token') ||
-            errorMessage.includes('not configured')
+          errorMessage.includes('not configured')
             ? `${errorMessage} Please check the Service Diagnostics section below for configuration issues.`
             : errorMessage;
 
@@ -363,10 +374,11 @@ export default function GeneratorPage() {
                   <button
                     type='button'
                     onClick={() => setMode('repository')}
-                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${mode === 'repository'
+                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      mode === 'repository'
                         ? 'bg-blue-600 text-white'
                         : 'text-gray-600 hover:text-gray-900'
-                      }`}
+                    }`}
                   >
                     <Users className='w-4 h-4' />
                     <span>Repository Mode</span>
@@ -374,10 +386,11 @@ export default function GeneratorPage() {
                   <button
                     type='button'
                     onClick={() => setMode('user')}
-                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${mode === 'user'
+                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      mode === 'user'
                         ? 'bg-blue-600 text-white'
                         : 'text-gray-600 hover:text-gray-900'
-                      }`}
+                    }`}
                   >
                     <User className='w-4 h-4' />
                     <span>Single User</span>
@@ -502,15 +515,16 @@ export default function GeneratorPage() {
                       )}
                       {(diagnostics.status === 'unhealthy' ||
                         diagnostics.status === 'error') && (
-                          <XCircle className='w-5 h-5 text-red-600' />
-                        )}
+                        <XCircle className='w-5 h-5 text-red-600' />
+                      )}
                       <span
-                        className={`font-medium ${diagnostics.status === 'healthy'
+                        className={`font-medium ${
+                          diagnostics.status === 'healthy'
                             ? 'text-green-600'
                             : diagnostics.status === 'degraded'
                               ? 'text-yellow-600'
                               : 'text-red-600'
-                          }`}
+                        }`}
                       >
                         {diagnostics.status.toUpperCase()}
                       </span>
@@ -524,10 +538,11 @@ export default function GeneratorPage() {
                           GitHub Token:
                         </span>
                         <span
-                          className={`ml-2 ${diagnostics.github_token_configured
+                          className={`ml-2 ${
+                            diagnostics.github_token_configured
                               ? 'text-green-600'
                               : 'text-red-600'
-                            }`}
+                          }`}
                         >
                           {diagnostics.github_token_configured
                             ? '✓ Configured'
@@ -541,12 +556,13 @@ export default function GeneratorPage() {
                             API Quota Remaining:
                           </span>
                           <span
-                            className={`ml-2 ${diagnostics.rate_limit_remaining > 100
+                            className={`ml-2 ${
+                              diagnostics.rate_limit_remaining > 100
                                 ? 'text-green-600'
                                 : diagnostics.rate_limit_remaining > 0
                                   ? 'text-yellow-600'
                                   : 'text-red-600'
-                              }`}
+                            }`}
                           >
                             {diagnostics.rate_limit_remaining.toLocaleString()}{' '}
                             requests
