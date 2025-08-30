@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, devtools } from 'zustand/middleware';
 import { recommendationApi } from '../services/api';
-import type { HttpError } from '../types';
+import type { HttpError } from '../types/index';
 
 export interface AuthState {
   accessToken: string | null;
@@ -24,8 +24,7 @@ export interface AuthActions {
 }
 
 export interface AuthStore extends AuthState, AuthActions {
-  // Computed properties
-  isLoggedIn: boolean;
+  // No computed properties - isLoggedIn will be computed in useAuth hook
 }
 
 const THROTTLE_MS = 5000; // 5 seconds minimum between fetches
@@ -43,10 +42,7 @@ export const useAuthStore = create<AuthStore>()(
         isAuthenticating: false,
         lastFetchTime: 0,
 
-        // Computed property
-        get isLoggedIn() {
-          return !!get().accessToken;
-        },
+        // Remove computed property - will use selector in useAuth hook instead
 
         // Actions
         setUserDetails: (count: number | null, limit: number | null) => {
@@ -152,10 +148,7 @@ export const useAuthStore = create<AuthStore>()(
           try {
             await fetchUserDetails(); // Fetch user details immediately after login
           } catch (error: unknown) {
-            console.error(
-              'Login: Failed to fetch user details after token set:',
-              error
-            );
+            console.error('Failed to fetch user details after login:', error);
 
             // If user details fetch fails with auth error, the global interceptor will handle logout
             // For other errors, we keep the user logged in but show an error
@@ -164,9 +157,12 @@ export const useAuthStore = create<AuthStore>()(
               (error as HttpError)?.response?.status === 403
             ) {
               console.log(
-                'Login: Auth error during user details fetch, global interceptor will handle'
+                '🔐 Auth Store: Auth error during user details fetch, global interceptor will handle'
               );
             } else {
+              console.log(
+                '⚠️ Auth Store: Non-auth error during user details fetch, keeping user logged in'
+              );
               set({
                 userDetailsError:
                   'Failed to load user details, but you are logged in',
@@ -190,17 +186,5 @@ export const useAuthStore = create<AuthStore>()(
   )
 );
 
-// Auto-fetch user details when login state changes
-useAuthStore.subscribe(
-  state => state.accessToken,
-  (accessToken, previousAccessToken) => {
-    if (accessToken && !previousAccessToken) {
-      // User just logged in, fetch details
-      useAuthStore.getState().fetchUserDetails();
-    } else if (!accessToken && previousAccessToken) {
-      // User just logged out, clear details
-      useAuthStore.getState().setUserDetails(null, null);
-      useAuthStore.getState().setLoadingUserDetails(false);
-    }
-  }
-);
+// Note: User details fetching is handled in the login function
+// No additional subscription needed for now

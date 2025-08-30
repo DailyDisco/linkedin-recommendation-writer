@@ -52,11 +52,11 @@ export default function LoginPage() {
       const errorMessage =
         err && typeof err === 'object' && 'response' in err
           ? (err as { response?: { data?: { detail?: string } } }).response
-              ?.data?.detail
+            ?.data?.detail
           : 'Invalid username or password';
       toast.error(
         errorMessage ||
-          'Login failed. Please check your credentials and try again.'
+        'Login failed. Please check your credentials and try again.'
       );
     } finally {
       setLoading(false);
