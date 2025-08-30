@@ -1171,17 +1171,30 @@ class RecommendationService:
                 "nice_to_have": ["Leadership", "Problem Solving", "Continuous Learning"],
             }
 
-    def _analyze_skill_match(self, user_skill: str, required_skills: List[str], user_skills_data: Dict[str, Any]) -> SkillMatch:
+    def _analyze_skill_match(self, user_skill: str, required_skills: List[str], github_data: Dict[str, Any]) -> SkillMatch:
         """Analyze how well a user's skill matches job requirements."""
-        # Extract user's skills from different categories
-        user_technical_skills = set(user_skills_data.get("technical_skills", []))
-        user_frameworks = set(user_skills_data.get("frameworks", []))
-        user_tools = set(user_skills_data.get("tools", []))
-        user_domains = set(user_skills_data.get("domains", []))
-        user_dependencies = set(user_skills_data.get("dependencies_found", []))
+        # Extract user's skills from the nested skills structure
+        skills_data = github_data.get("skills", {})
+        user_technical_skills = set(skills_data.get("technical_skills", []))
+        user_frameworks = set(skills_data.get("frameworks", []))
+        user_tools = set(skills_data.get("tools", []))
+        user_domains = set(skills_data.get("domains", []))
+        user_dependencies = set(skills_data.get("dependencies_found", []))
 
         # Combine all user skills for matching
         all_user_skills = user_technical_skills | user_frameworks | user_tools | user_domains | user_dependencies
+
+        # Extract additional data sources
+        starred_technologies = github_data.get("starred_technologies", {})
+        commit_analysis = github_data.get("commit_analysis", {})
+
+        # Get starred languages and topics
+        starred_languages = set(starred_technologies.get("languages", {}).keys())
+        starred_topics = set(starred_technologies.get("topics", []))
+
+        # Add starred technologies to skill set
+        all_user_skills.update(starred_languages)
+        all_user_skills.update(starred_topics)
 
         # Normalize skills for comparison
         user_skill_lower = user_skill.lower()
@@ -1191,12 +1204,20 @@ class RecommendationService:
         evidence = []
         match_score = 0
 
-        # Direct match
+        # Direct match in skills
         if user_skill_lower in user_skills_lower:
             match_score += 40
             evidence.append("Direct match found in profile")
 
-        # Partial matches
+        # Check starred technologies
+        if user_skill_lower in starred_languages:
+            match_score += 25
+            evidence.append("Interest shown through starred repositories")
+        elif user_skill_lower in starred_topics:
+            match_score += 20
+            evidence.append("Technology interest indicated by repository topics")
+
+        # Partial matches in skills
         for user_skill_name in all_user_skills:
             user_skill_name_lower = user_skill_name.lower()
             if (user_skill_lower in user_skill_name_lower or user_skill_name_lower in user_skill_lower) and user_skill_lower != user_skill_name_lower:
@@ -1204,12 +1225,41 @@ class RecommendationService:
                 evidence.append(f"Related skill: {user_skill_name}")
                 break
 
+        # Check commit analysis for evidence of expertise
+        primary_strength = commit_analysis.get("excellence_areas", {}).get("primary_strength", "")
+        if primary_strength and (user_skill_lower in primary_strength.lower() or primary_strength.lower() in user_skill_lower):
+            match_score += 30
+            evidence.append(f"Primary strength based on commit analysis: {primary_strength.replace('_', ' ').title()}")
+
+        # Check commit patterns for relevant skills
+        patterns = commit_analysis.get("excellence_areas", {}).get("patterns", {})
+        for pattern_name, pattern_data in patterns.items():
+            pattern_percentage = pattern_data.get("percentage", 0)
+            # If pattern has significant percentage (>15%) and matches skill
+            if pattern_percentage > 15 and (user_skill_lower in pattern_name.lower() or pattern_name.lower() in user_skill_lower):
+                match_score += min(int(pattern_percentage), 25)  # Cap at 25 points
+                evidence.append(f"Strong commit pattern in {pattern_name.replace('_', ' ')} ({pattern_percentage}%)")
+                break
+
+        # Check if user has relevant tools/frameworks from commit analysis
+        tools_and_features = commit_analysis.get("tools_and_features", {})
+        tools_by_category = tools_and_features.get("tools_by_category", {})
+        for category, tools in tools_by_category.items():
+            for tool in tools:
+                if user_skill_lower in tool.lower() or tool.lower() in user_skill_lower:
+                    match_score += 20
+                    evidence.append(f"Experience with {tool} based on commit history")
+                    break
+
         # Check for related technologies
         related_tech = self._get_related_technologies(user_skill)
         for tech in related_tech:
             if tech.lower() in user_skills_lower:
                 match_score += 15
                 evidence.append(f"Related technology: {tech}")
+            elif tech.lower() in starred_languages:
+                match_score += 10
+                evidence.append(f"Related technology interest: {tech}")
 
         # Determine match level
         if match_score >= 40:
@@ -1334,18 +1384,16 @@ class RecommendationService:
             # Analyze skill matches
             logger.info("🔍 STEP 3: ANALYZING SKILL MATCHES")
             logger.info("-" * 50)
-
-            user_skills = github_data.get("skills", {})
             skill_analysis = []
 
             # Analyze required skills
             for skill in role_requirements["required"]:
-                match = self._analyze_skill_match(skill, role_requirements["required"], user_skills)
+                match = self._analyze_skill_match(skill, role_requirements["required"], github_data)
                 skill_analysis.append(match)
 
             # Analyze preferred skills (partial weight)
             for skill in role_requirements["preferred"][:5]:  # Top 5 preferred skills
-                match = self._analyze_skill_match(skill, role_requirements["required"], user_skills)
+                match = self._analyze_skill_match(skill, role_requirements["required"], github_data)
                 match.confidence_score = int(match.confidence_score * 0.8)  # Reduce weight for preferred skills
                 skill_analysis.append(match)
 

@@ -23,11 +23,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Target, TrendingUp, BookOpen, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiClient, handleApiError } from '@/services/api';
+import type { SkillGapAnalysisResponse } from '../types';
 
 interface Skill {
   skill: string;
   match_level: string;
   evidence: string[];
+  confidence_score: number;
 }
 
 interface SkillGapAnalysisProps {
@@ -120,20 +122,8 @@ export const SkillGapAnalysis: React.FC<SkillGapAnalysisProps> = ({
   const [targetRole, setTargetRole] = useState('');
   const [industry, setIndustry] = useState('technology');
   const [experienceLevel, setExperienceLevel] = useState('mid');
-  const [analysisResult, setAnalysisResult] = useState<{
-    overall_match_score: number;
-    skill_analysis: Array<{
-      skill: string;
-      match_level: string;
-      evidence: string[];
-      confidence_score: number;
-    }>;
-    strengths: string[];
-    gaps: string[];
-    recommendations: string[];
-    learning_resources: string[];
-    analysis_summary: string;
-  } | null>(null);
+  const [analysisResult, setAnalysisResult] =
+    useState<SkillGapAnalysisResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleAnalyze = async () => {

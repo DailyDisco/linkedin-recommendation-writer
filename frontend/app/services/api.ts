@@ -8,6 +8,7 @@ import type {
   RecommendationOption,
   RegenerateRequest,
   MultiContributorData, // Added for new API functions
+  SkillGapAnalysisResponse,
 } from '../types';
 import type { AxiosRequestConfig } from 'axios';
 
@@ -319,7 +320,7 @@ export const apiClient = {
     target_role: string;
     industry?: string;
     experience_level?: string;
-  }) {
+  }): Promise<SkillGapAnalysisResponse> {
     const response = await api.post(
       '/recommendations/analyze-skill-gaps',
       data
