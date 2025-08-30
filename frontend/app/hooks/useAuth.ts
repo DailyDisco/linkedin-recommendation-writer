@@ -2,8 +2,18 @@ import { useAuthStore } from './useAuthStore';
 
 export interface AuthContextType {
   isLoggedIn: boolean;
-  userRecommendationCount: number | null;
-  userDailyLimit: number | null;
+  userDetails: {
+    id: number;
+    email: string;
+    username: string;
+    full_name: string;
+    is_active: boolean;
+    recommendation_count: number;
+    last_recommendation_date: string | null;
+    daily_limit: number;
+  } | null;
+  userRecommendationCount: number | null; // Keep for backward compatibility
+  userDailyLimit: number | null; // Keep for backward compatibility
   isLoadingUserDetails: boolean;
   userDetailsError: string | null;
   isAuthenticating: boolean;
@@ -15,6 +25,7 @@ export interface AuthContextType {
 export const useAuth = (): AuthContextType => {
   // Use selectors for reactive properties
   const isLoggedIn = useAuthStore(state => !!state.accessToken);
+  const userDetails = useAuthStore(state => state.userDetails);
   const userRecommendationCount = useAuthStore(
     state => state.userRecommendationCount
   );
@@ -33,8 +44,9 @@ export const useAuth = (): AuthContextType => {
 
   return {
     isLoggedIn,
-    userRecommendationCount,
-    userDailyLimit,
+    userDetails,
+    userRecommendationCount, // Keep for backward compatibility
+    userDailyLimit, // Keep for backward compatibility
     isLoadingUserDetails,
     userDetailsError,
     isAuthenticating,

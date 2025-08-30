@@ -34,7 +34,6 @@ class Recommendation(Base):
     generation_parameters = Column(JSON, nullable=True)
 
     # Quality metrics
-    confidence_score = Column(Integer, default=0)  # 0-100
     word_count = Column(Integer, default=0)
 
     # Selected option information (for when created from multiple options)
@@ -81,7 +80,6 @@ class RecommendationVersion(Base):
     generation_parameters = Column(JSON, nullable=True)
 
     # Quality metrics at this version
-    confidence_score = Column(Integer, default=0)
     word_count = Column(Integer, default=0)
 
     # Metadata

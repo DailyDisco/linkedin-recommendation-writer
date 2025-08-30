@@ -136,7 +136,6 @@ async def generate_recommendation(
         logger.info("✅ RECOMMENDATION GENERATION COMPLETED SUCCESSFULLY")
         logger.info("📊 Final Stats:")
         logger.info(f"   • Word Count: {recommendation.word_count}")
-        logger.info(f"   • Confidence Score: {recommendation.confidence_score}")
         logger.info(f"   • Title: {recommendation.title[:50]}...")
         logger.info("=" * 80)
 
@@ -240,7 +239,6 @@ async def refine_recommendation_with_keywords(
         logger.info("✅ KEYWORD REFINEMENT API COMPLETED SUCCESSFULLY")
         logger.info("📊 Final Results:")
         logger.info(f"   • Refined recommendation ID: {refined_recommendation['id']}")
-        logger.info(f"   • Confidence score: {refined_recommendation['confidence_score']}")
         logger.info("=" * 80)
 
         return refined_recommendation
@@ -280,7 +278,6 @@ async def generate_repository_readme(
         logger.info(f"   • Repository: {readme_result['repository_full_name']}")
         logger.info(f"   • Generated Content: {readme_result['word_count']} words")
         logger.info(f"   • Sections: {len(readme_result['sections'])}")
-        logger.info(f"   • Confidence Score: {readme_result['confidence_score']}")
         logger.info("=" * 80)
 
         return ReadmeGenerationResponse(
@@ -289,7 +286,6 @@ async def generate_repository_readme(
             generated_content=readme_result["generated_content"],
             sections=readme_result["sections"],
             word_count=readme_result["word_count"],
-            confidence_score=readme_result["confidence_score"],
             generation_parameters=readme_result["generation_parameters"],
             analysis_summary=readme_result["analysis_summary"],
         )
@@ -467,7 +463,6 @@ async def create_recommendation_from_option(
         logger.info("✅ RECOMMENDATION CREATION FROM OPTION COMPLETED SUCCESSFULLY")
         logger.info("📊 Final Stats:")
         logger.info(f"   • Word Count: {recommendation.word_count}")
-        logger.info(f"   • Confidence Score: {recommendation.confidence_score}")
         logger.info(f"   • Selected Option: {request.selected_option.name}")
         logger.info("=" * 80)
 
@@ -537,7 +532,6 @@ async def regenerate_recommendation(
         logger.info("✅ RECOMMENDATION REGENERATION COMPLETED SUCCESSFULLY")
         logger.info("📊 Final Stats:")
         logger.info(f"   • Word Count: {recommendation.word_count}")
-        logger.info(f"   • Confidence Score: {recommendation.confidence_score}")
         logger.info("=" * 80)
 
         return recommendation

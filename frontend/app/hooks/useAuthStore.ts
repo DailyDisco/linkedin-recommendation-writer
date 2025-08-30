@@ -5,8 +5,18 @@ import type { HttpError } from '../types/index';
 
 export interface AuthState {
   accessToken: string | null;
-  userRecommendationCount: number | null;
-  userDailyLimit: number | null;
+  userDetails: {
+    id: number;
+    email: string;
+    username: string;
+    full_name: string;
+    is_active: boolean;
+    recommendation_count: number;
+    last_recommendation_date: string | null;
+    daily_limit: number;
+  } | null;
+  userRecommendationCount: number | null; // Keep for backward compatibility
+  userDailyLimit: number | null; // Keep for backward compatibility
   isLoadingUserDetails: boolean;
   userDetailsError: string | null;
   isAuthenticating: boolean;
@@ -17,7 +27,7 @@ export interface AuthActions {
   login: (token: string) => Promise<void>;
   logout: () => void;
   fetchUserDetails: () => Promise<void>;
-  setUserDetails: (count: number | null, limit: number | null) => void;
+  setUserDetails: (userDetails: AuthState['userDetails']) => void;
   setLoadingUserDetails: (loading: boolean) => void;
   setUserDetailsError: (error: string | null) => void;
   setAuthenticating: (authenticating: boolean) => void;
@@ -35,8 +45,9 @@ export const useAuthStore = create<AuthStore>()(
       (set, get) => ({
         // Initial state
         accessToken: null,
-        userRecommendationCount: null,
-        userDailyLimit: null,
+        userDetails: null,
+        userRecommendationCount: null, // Keep for backward compatibility
+        userDailyLimit: null, // Keep for backward compatibility
         isLoadingUserDetails: false,
         userDetailsError: null,
         isAuthenticating: false,
@@ -45,10 +56,11 @@ export const useAuthStore = create<AuthStore>()(
         // Remove computed property - will use selector in useAuth hook instead
 
         // Actions
-        setUserDetails: (count: number | null, limit: number | null) => {
+        setUserDetails: (userDetails: AuthState['userDetails']) => {
           set({
-            userRecommendationCount: count,
-            userDailyLimit: limit,
+            userDetails,
+            userRecommendationCount: userDetails?.recommendation_count || null, // Keep for backward compatibility
+            userDailyLimit: userDetails?.daily_limit || null, // Keep for backward compatibility
             userDetailsError: null,
           });
         },
@@ -69,8 +81,9 @@ export const useAuthStore = create<AuthStore>()(
           set({
             isAuthenticating: true,
             accessToken: null,
-            userRecommendationCount: null,
-            userDailyLimit: null,
+            userDetails: null,
+            userRecommendationCount: null, // Keep for backward compatibility
+            userDailyLimit: null, // Keep for backward compatibility
             userDetailsError: null,
             lastFetchTime: 0,
           });
@@ -86,7 +99,7 @@ export const useAuthStore = create<AuthStore>()(
             return;
           }
 
-          if (state.isLoggedIn) {
+          if (state.accessToken) {
             set({
               isLoadingUserDetails: true,
               userDetailsError: null,
@@ -96,8 +109,9 @@ export const useAuthStore = create<AuthStore>()(
             try {
               const response = await recommendationApi.getUserDetails();
               set({
-                userRecommendationCount: response.recommendation_count,
-                userDailyLimit: response.daily_limit,
+                userDetails: response,
+                userRecommendationCount: response.recommendation_count, // Keep for backward compatibility
+                userDailyLimit: response.daily_limit, // Keep for backward compatibility
                 isLoadingUserDetails: false,
               });
             } catch (error: unknown) {
@@ -132,8 +146,9 @@ export const useAuthStore = create<AuthStore>()(
           } else {
             // Only clear user details if we're actually not logged in
             set({
-              userRecommendationCount: null,
-              userDailyLimit: null,
+              userDetails: null,
+              userRecommendationCount: null, // Keep for backward compatibility
+              userDailyLimit: null, // Keep for backward compatibility
               userDetailsError: null,
               isLoadingUserDetails: false,
             });

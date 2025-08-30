@@ -46,17 +46,17 @@ export default function LoginPage() {
       });
       await login(response.access_token);
       toast.success('Welcome back! You have been logged in successfully.');
-      navigate('/generate'); // Redirect to generate page after successful login
+      navigate('/profile'); // Redirect to profile page after successful login
     } catch (err: unknown) {
       console.error('Login failed:', err);
       const errorMessage =
         err && typeof err === 'object' && 'response' in err
           ? (err as { response?: { data?: { detail?: string } } }).response
-            ?.data?.detail
+              ?.data?.detail
           : 'Invalid username or password';
       toast.error(
         errorMessage ||
-        'Login failed. Please check your credentials and try again.'
+          'Login failed. Please check your credentials and try again.'
       );
     } finally {
       setLoading(false);

@@ -26,7 +26,6 @@ interface AdvancedFeaturesProps {
     repository_name: string;
     generated_content: string;
     sections: Record<string, string>;
-    confidence_score: number;
   }>;
   onAnalyzeSkills: (data: SkillAnalysisData) => Promise<{
     overall_match_score: number;
@@ -34,7 +33,6 @@ interface AdvancedFeaturesProps {
       skill: string;
       match_level: string;
       evidence: string[];
-      confidence_score: number;
     }>;
     strengths: string[];
     gaps: string[];

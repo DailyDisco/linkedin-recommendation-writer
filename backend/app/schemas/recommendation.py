@@ -43,7 +43,6 @@ class RecommendationOption(BaseModel):
     title: str
     word_count: int
     focus: str
-    confidence_score: int
     explanation: str = Field(..., description="Explanation of what makes this option unique and when to choose it")
 
 
@@ -63,7 +62,6 @@ class KeywordRefinementResponse(BaseModel):
     refined_content: str
     refined_title: str
     word_count: int
-    confidence_score: int
     include_keywords_used: List[str] = Field(default_factory=list, description="Keywords that were successfully included")
     exclude_keywords_avoided: List[str] = Field(default_factory=list, description="Keywords that were successfully avoided")
     refinement_summary: str = Field(..., description="Summary of changes made during refinement")
@@ -82,7 +80,6 @@ class RecommendationCreate(BaseModel):
     ai_model: str
     generation_prompt: Optional[str] = None
     generation_parameters: Optional[Dict[str, Any]] = None
-    confidence_score: int = 0
     word_count: int = 0
 
     # Selected option information (when created from multiple options)
@@ -116,7 +113,6 @@ class RecommendationResponse(BaseModel):
     recommendation_type: str
     tone: str
     length: str
-    confidence_score: int
     word_count: int
 
     # Generation metadata
@@ -160,7 +156,6 @@ class ReadmeGenerationResponse(BaseModel):
     generated_content: str
     sections: Dict[str, str] = Field(default_factory=dict, description="Generated sections with their content")
     word_count: int
-    confidence_score: int
     generation_parameters: Dict[str, Any]
     analysis_summary: str = Field(..., description="Summary of repository analysis used for generation")
 
@@ -172,7 +167,6 @@ class RecommendationVersionInfo(BaseModel):
     version_number: int
     change_type: str
     change_description: Optional[str]
-    confidence_score: int
     word_count: int
     created_at: datetime
     created_by: Optional[str]
@@ -191,7 +185,6 @@ class RecommendationVersionDetail(BaseModel):
     title: str
     content: str
     generation_parameters: Optional[Dict[str, Any]]
-    confidence_score: int
     word_count: int
     created_at: datetime
     created_by: Optional[str]
@@ -239,7 +232,6 @@ class SkillMatch(BaseModel):
     skill: str
     match_level: str = Field(..., description="strong, moderate, weak, missing")
     evidence: List[str] = Field(default_factory=list, description="Evidence from GitHub profile")
-    confidence_score: int = Field(..., description="Confidence in the assessment (0-100)")
 
 
 class SkillGapAnalysisResponse(BaseModel):

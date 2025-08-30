@@ -977,20 +977,6 @@ Key Achievements: ${formData.notableAchievements}
                               <span className='font-medium'>Words:</span>
                               <span>{option.word_count}</span>
                             </span>
-                            <span className='flex items-center space-x-1'>
-                              <span className='font-medium'>Confidence:</span>
-                              <span
-                                className={`font-semibold ${
-                                  option.confidence_score >= 80
-                                    ? 'text-green-600'
-                                    : option.confidence_score >= 60
-                                      ? 'text-yellow-600'
-                                      : 'text-red-600'
-                                }`}
-                              >
-                                {option.confidence_score}%
-                              </span>
-                            </span>
                           </div>
                         </div>
                       </div>

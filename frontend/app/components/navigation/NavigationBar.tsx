@@ -9,7 +9,7 @@ import { useAuth } from '../../hooks/useAuth';
 const navigation: NavigationItem[] = [
   { name: 'Home', href: '/', icon: Github },
   { name: 'Get Contributors', href: '/generate', icon: FileText },
-  { name: 'Advanced', href: '/advanced', icon: Settings },
+  { name: 'Profile', href: '/profile', icon: Settings },
   { name: 'History', href: '/history', icon: History },
   { name: 'About', href: '/about', icon: Info },
 ];

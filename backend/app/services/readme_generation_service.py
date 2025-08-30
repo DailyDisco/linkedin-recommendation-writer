@@ -67,7 +67,6 @@ class READMEGenerationService:
                 "generated_content": generated_content.strip(),
                 "sections": sections,
                 "word_count": len(generated_content.split()),
-                "confidence_score": 85,  # Placeholder - will be calculated by ConfidenceScorerService
                 "generation_parameters": {
                     "model": settings.GEMINI_MODEL,
                     "style": style,

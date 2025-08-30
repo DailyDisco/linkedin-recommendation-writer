@@ -34,7 +34,6 @@ interface ReadmeGeneratorProps {
     repository_name: string;
     generated_content: string;
     sections: Record<string, string>;
-    confidence_score: number;
   }>;
   onGenerationComplete?: (result: unknown) => void;
 }
@@ -90,7 +89,6 @@ export const ReadmeGenerator: React.FC<ReadmeGeneratorProps> = ({
     repository_name: string;
     generated_content: string;
     sections: Record<string, string>;
-    confidence_score: number;
   } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -278,8 +276,7 @@ export const ReadmeGenerator: React.FC<ReadmeGeneratorProps> = ({
               <div>
                 <CardTitle>Generated README</CardTitle>
                 <CardDescription>
-                  Repository: {generatedReadme.repository_name} | Confidence:{' '}
-                  {generatedReadme.confidence_score}%
+                  Repository: {generatedReadme.repository_name}
                 </CardDescription>
               </div>
               <div className='flex gap-2'>

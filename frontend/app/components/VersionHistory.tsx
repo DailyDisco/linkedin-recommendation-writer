@@ -32,7 +32,6 @@ interface VersionDetail {
   version_number: number;
   change_type: string;
   change_description: string | null;
-  confidence_score: number;
   word_count: number;
   created_at: string;
   created_by: string | null;
@@ -43,7 +42,6 @@ interface Version {
   version_number: number;
   change_type: string;
   change_description: string | null;
-  confidence_score: number;
   word_count: number;
   created_at: string;
   created_by: string | null;
@@ -60,7 +58,6 @@ interface VersionHistoryProps {
       version_number: number;
       change_type: string;
       change_description: string | null;
-      confidence_score: number;
       word_count: number;
       created_at: string;
       created_by: string | null;
@@ -277,7 +274,6 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
                             'MMM dd, yyyy HH:mm'
                           )}
                         </span>
-                        <span>Confidence: {version.confidence_score}%</span>
                         <span>{version.word_count} words</span>
                         {version.created_by && (
                           <span>by {version.created_by}</span>
@@ -368,9 +364,6 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
                   Version {comparison.version_a.version_number}
                 </h3>
                 <div className='text-sm space-y-2'>
-                  <div>
-                    Confidence: {comparison.version_a.confidence_score}%
-                  </div>
                   <div>Words: {comparison.version_a.word_count}</div>
                   <div>Type: {comparison.version_a.change_type}</div>
                 </div>
@@ -382,9 +375,6 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
                   Version {comparison.version_b.version_number}
                 </h3>
                 <div className='text-sm space-y-2'>
-                  <div>
-                    Confidence: {comparison.version_b.confidence_score}%
-                  </div>
                   <div>Words: {comparison.version_b.word_count}</div>
                   <div>Type: {comparison.version_b.change_type}</div>
                 </div>

@@ -194,7 +194,6 @@ class AIRecommendationService:
                 "title": self.prompt_service.extract_title(option_content, base_username),
                 "word_count": len(option_content.split()),
                 "focus": config["focus"],
-                "confidence_score": 85,  # Placeholder - will be calculated by ConfidenceScorerService
             }
 
             options.append(option)
@@ -530,7 +529,6 @@ class AIRecommendationService:
                 "content": refined_content.strip(),
                 "title": self.prompt_service.extract_title(refined_content, github_data["user_data"]["github_username"]),
                 "word_count": len(refined_content.split()),
-                "confidence_score": 85,  # Placeholder - will be calculated by ConfidenceScorerService
                 "generation_parameters": regeneration_params,
             }
 

@@ -87,7 +87,6 @@ class KeywordRefinementService:
                 "refined_content": formatted_content.strip(),
                 "refined_title": self.prompt_service.extract_title(formatted_content, github_data["user_data"]["github_username"]),
                 "word_count": len(formatted_content.split()),
-                "confidence_score": 85,  # Placeholder - will be calculated by ConfidenceScorerService
                 "include_keywords_used": validation["include_compliance"],
                 "exclude_keywords_avoided": validation["exclude_compliance"],
                 "refinement_summary": refinement_summary,

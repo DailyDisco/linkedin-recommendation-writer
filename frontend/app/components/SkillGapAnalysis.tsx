@@ -29,7 +29,6 @@ interface Skill {
   skill: string;
   match_level: string;
   evidence: string[];
-  confidence_score: number;
 }
 
 interface SkillGapAnalysisProps {
@@ -44,7 +43,6 @@ interface SkillGapAnalysisProps {
       skill: string;
       match_level: string;
       evidence: string[];
-      confidence_score: number;
     }>;
     strengths: string[];
     gaps: string[];

@@ -60,7 +60,7 @@ export default function RegisterPage() {
       toast.success(
         'Account created successfully! Welcome to LinkedIn Recommendation Writer.'
       );
-      navigate('/generate');
+      navigate('/profile');
     } catch (err: unknown) {
       console.error('Registration failed:', err);
       const errorMessage =

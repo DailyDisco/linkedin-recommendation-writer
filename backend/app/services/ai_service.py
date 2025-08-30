@@ -4,7 +4,6 @@ import logging
 from typing import Any, Dict, List, Optional, TypedDict
 
 from app.services.ai_recommendation_service import AIRecommendationService
-from app.services.confidence_scorer_service import ConfidenceScorerService
 from app.services.keyword_refinement_service import KeywordRefinementService
 from app.services.prompt_service import PromptService
 from app.services.readme_generation_service import READMEGenerationService
@@ -29,7 +28,6 @@ class AIService:
 
         # Initialize specialized AI services
         self.recommendation_service = AIRecommendationService(self.prompt_service)
-        self.confidence_scorer = ConfidenceScorerService()
         self.readme_service = READMEGenerationService(self.prompt_service)
         self.keyword_refinement_service = KeywordRefinementService(self.prompt_service)
 
@@ -57,11 +55,6 @@ class AIService:
                 specific_skills=specific_skills,
                 exclude_keywords=exclude_keywords,
             )
-
-            # Update confidence scores using the confidence scorer
-            for option in result.get("options", []):
-                if "confidence_score" in option:
-                    option["confidence_score"] = self.confidence_scorer.calculate_confidence_score(github_data, option["content"])
 
             return result
 
@@ -181,23 +174,6 @@ class AIService:
             include_sections=include_sections,
             target_audience=target_audience,
         )
-
-    # Confidence scoring methods
-    def calculate_confidence_score(self, github_data: Dict[str, Any], generated_content: str, prompt: Optional[str] = None, generation_params: Optional[Dict[str, Any]] = None) -> int:
-        """Calculate confidence score for generated content."""
-        return self.confidence_scorer.calculate_confidence_score(github_data, generated_content, prompt, generation_params)
-
-    def calculate_readme_confidence_score(self, content: str, repository_data: Dict[str, Any], repository_analysis: Dict[str, Any]) -> int:
-        """Calculate confidence score for generated README."""
-        return self.confidence_scorer.calculate_readme_confidence_score(content, repository_data, repository_analysis)
-
-    def validate_keyword_compliance(self, content: str, include_keywords: Optional[List[str]] = None, exclude_keywords: Optional[List[str]] = None) -> Dict[str, Any]:
-        """Validate keyword compliance in content."""
-        return self.confidence_scorer.validate_keyword_compliance(content, include_keywords, exclude_keywords)
-
-    def generate_refinement_summary(self, validation: Dict[str, Any]) -> str:
-        """Generate a summary of the refinement process."""
-        return self.confidence_scorer.generate_refinement_summary(validation)
 
     # Backwards compatibility methods
     def _get_length_guideline(self, length: str) -> str:

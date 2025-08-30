@@ -128,7 +128,6 @@ class RecommendationService:
             logger.info("✅ AI recommendation generated:")
             logger.info(f"   • Content length: {len(ai_result['content'])} characters")
             logger.info(f"   • Word count: {ai_result['word_count']}")
-            logger.info(f"   • Confidence score: {ai_result['confidence_score']}")
 
             # Create recommendation record
             logger.info("💾 STEP 4: SAVING RECOMMENDATION")
@@ -145,7 +144,6 @@ class RecommendationService:
                 ai_model=ai_result["generation_parameters"]["model"],
                 generation_prompt=ai_result.get("generation_prompt"),
                 generation_parameters=ai_result["generation_parameters"],
-                confidence_score=ai_result["confidence_score"],
                 word_count=ai_result["word_count"],
             )
 
@@ -511,7 +509,6 @@ class RecommendationService:
             logger.info("✅ AI recommendation regenerated:")
             logger.info(f"   • Content length: {len(ai_result['content'])} characters")
             logger.info(f"   • Word count: {ai_result['word_count']}")
-            logger.info(f"   • Confidence score: {ai_result['confidence_score']}")
 
             # Create recommendation record
             logger.info("💾 STEP 4: SAVING RECOMMENDATION")
@@ -528,7 +525,6 @@ class RecommendationService:
                 ai_model=ai_result["generation_parameters"]["model"],
                 generation_prompt=refinement_instructions,
                 generation_parameters=ai_result["generation_parameters"],
-                confidence_score=ai_result["confidence_score"],
                 word_count=ai_result["word_count"],
             )
 
@@ -648,7 +644,7 @@ class RecommendationService:
             logger.info(f"⏱️  AI refinement completed in {ai_end - ai_start:.2f} seconds")
             logger.info("✅ Keyword refinement successful:")
             logger.info(f"   • Word count: {ai_result['word_count']}")
-            logger.info(f"   • Confidence score: {ai_result['confidence_score']}")
+
             if ai_result.get("include_keywords_used"):
                 logger.info(f"   • Keywords included: {len(ai_result['include_keywords_used'])}")
             if ai_result.get("exclude_keywords_avoided"):
@@ -662,7 +658,6 @@ class RecommendationService:
                 change_description=ai_result["refinement_summary"],
                 content=ai_result["refined_content"],
                 title=ai_result["refined_title"],
-                confidence_score=ai_result["confidence_score"],
                 word_count=ai_result["word_count"],
                 include_keywords_used=ai_result.get("include_keywords_used"),
                 exclude_keywords_avoided=ai_result.get("exclude_keywords_avoided"),
@@ -674,7 +669,6 @@ class RecommendationService:
                 "refined_content": new_recommendation.content,
                 "refined_title": new_recommendation.title,
                 "word_count": new_recommendation.word_count,
-                "confidence_score": new_recommendation.confidence_score,
                 "exclude_keywords_avoided": new_recommendation.exclude_keywords_avoided or [],
                 "include_keywords_used": new_recommendation.include_keywords_used or [],
                 "refinement_summary": ai_result["refinement_summary"],
@@ -787,7 +781,6 @@ class RecommendationService:
             logger.info("✅ README generation successful:")
             logger.info(f"   • Content length: {ai_result['word_count']} words")
             logger.info(f"   • Sections: {len(ai_result['sections'])}")
-            logger.info(f"   • Confidence score: {ai_result['confidence_score']}")
 
             end_time = time.time()
             total_time = end_time - start_time
@@ -798,7 +791,7 @@ class RecommendationService:
             logger.info("📊 Final Results:")
             logger.info(f"   • Repository: {repository_full_name}")
             logger.info(f"   • Style: {style}")
-            logger.info(f"   • Confidence Score: {ai_result['confidence_score']}")
+
             logger.info("=" * 60)
 
             return {
@@ -807,7 +800,6 @@ class RecommendationService:
                 "generated_content": ai_result["generated_content"],
                 "sections": ai_result["sections"],
                 "word_count": ai_result["word_count"],
-                "confidence_score": ai_result["confidence_score"],
                 "generation_parameters": ai_result["generation_parameters"],
                 "analysis_summary": ai_result["analysis_summary"],
                 "repository_analysis": repository_analysis,
@@ -826,7 +818,6 @@ class RecommendationService:
         change_description: Optional[str] = None,
         content: Optional[str] = None,
         title: Optional[str] = None,
-        confidence_score: Optional[int] = None,
         word_count: Optional[int] = None,
         created_by: str = "system",
         include_keywords_used: Optional[List[str]] = None,
@@ -850,7 +841,6 @@ class RecommendationService:
             title=title if title is not None else recommendation.title,
             content=content if content is not None else recommendation.content,
             generation_parameters=recommendation.generation_parameters,
-            confidence_score=confidence_score if confidence_score is not None else recommendation.confidence_score,
             word_count=word_count if word_count is not None else recommendation.word_count,
             created_by=created_by,
             include_keywords_used=include_keywords_used,
@@ -889,7 +879,6 @@ class RecommendationService:
                     version_number=version.version_number,  # type: ignore
                     change_type=version.change_type,  # type: ignore
                     change_description=version.change_description,  # type: ignore
-                    confidence_score=version.confidence_score,  # type: ignore
                     word_count=version.word_count,  # type: ignore
                     created_at=version.created_at,  # type: ignore
                     created_by=version.created_by,  # type: ignore
@@ -932,7 +921,6 @@ class RecommendationService:
             title=version_a.title,  # type: ignore
             content=version_a.content,  # type: ignore
             generation_parameters=version_a.generation_parameters,  # type: ignore
-            confidence_score=version_a.confidence_score,  # type: ignore
             word_count=version_a.word_count,  # type: ignore
             created_at=version_a.created_at,  # type: ignore
             created_by=version_a.created_by,  # type: ignore
@@ -947,7 +935,6 @@ class RecommendationService:
             title=version_b.title,  # type: ignore
             content=version_b.content,  # type: ignore
             generation_parameters=version_b.generation_parameters,  # type: ignore
-            confidence_score=version_b.confidence_score,  # type: ignore
             word_count=version_b.word_count,  # type: ignore
             created_at=version_b.created_at,  # type: ignore
             created_by=version_b.created_by,  # type: ignore
@@ -977,14 +964,6 @@ class RecommendationService:
                 "version_a_words": version_a.word_count,
                 "version_b_words": version_b.word_count,
                 "difference": version_b.word_count - version_a.word_count,
-            }
-
-        # Confidence score differences
-        if version_a.confidence_score != version_b.confidence_score:
-            differences["confidence_score"] = {
-                "version_a": version_a.confidence_score,
-                "version_b": version_b.confidence_score,
-                "improvement": version_b.confidence_score - version_a.confidence_score,
             }
 
         # Generation parameters differences
@@ -1032,7 +1011,7 @@ class RecommendationService:
         recommendation.title = target_version.title
         recommendation.content = target_version.content
         recommendation.generation_parameters = target_version.generation_parameters
-        recommendation.confidence_score = target_version.confidence_score
+
         recommendation.word_count = target_version.word_count
 
         # Create a new version entry for the revert
@@ -1269,10 +1248,7 @@ class RecommendationService:
             match_level = "missing"
             evidence.append("No relevant skills found in profile")
 
-        # Boost confidence for strong evidence
-        confidence_score = min(match_score + 20, 100)
-
-        return SkillMatch(skill=user_skill, match_level=match_level, evidence=evidence, confidence_score=confidence_score)
+        return SkillMatch(skill=user_skill, match_level=match_level, evidence=evidence)
 
     def _get_related_technologies(self, skill: str) -> List[str]:
         """Get related technologies for a given skill."""
@@ -1391,7 +1367,7 @@ class RecommendationService:
             # Analyze preferred skills (partial weight)
             for skill in role_requirements["preferred"][:5]:  # Top 5 preferred skills
                 match = self._analyze_skill_match(skill, role_requirements["required"], github_data)
-                match.confidence_score = int(match.confidence_score * 0.8)  # Reduce weight for preferred skills
+
                 skill_analysis.append(match)
 
             logger.info(f"✅ Analyzed {len(skill_analysis)} skills")
@@ -1711,7 +1687,6 @@ class RecommendationService:
                 ai_model=generation_parameters["model"],
                 generation_prompt=None,  # This comes from the options generation
                 generation_parameters=generation_parameters,
-                confidence_score=selected_option.get("confidence_score", 0),
                 word_count=selected_option.get("word_count", 0),
                 selected_option_id=selected_option.get("id"),
                 selected_option_name=selected_option.get("name"),

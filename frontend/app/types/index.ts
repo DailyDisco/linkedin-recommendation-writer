@@ -101,7 +101,6 @@ export interface Recommendation {
   recommendation_type: string;
   tone: string;
   length: string;
-  confidence_score: number;
   word_count: number;
   ai_model: string;
   generation_parameters?: Record<string, unknown>;
@@ -118,7 +117,6 @@ export interface KeywordRefinementResult {
   refined_content: string;
   refined_title: string;
   word_count: number;
-  confidence_score: number;
   include_keywords_used?: string[];
   exclude_keywords_avoided?: string[];
   refinement_summary?: string;
@@ -174,7 +172,6 @@ export interface RecommendationOption {
   title: string;
   word_count: number;
   focus: string;
-  confidence_score: number;
 }
 
 export interface RecommendationOptionsResponse {

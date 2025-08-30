@@ -26,7 +26,7 @@ export default [
     route('register', 'routes/auth/register.tsx'), // renders at "/register"
   ]),
 
-  route('advanced', 'routes/advanced.tsx'), // renders at "/advanced"
+  route('profile', 'routes/profile.tsx'), // renders at "/profile"
   route('history', 'routes/history.tsx'), // renders at "/history"
 
   // Protected routes - require authentication

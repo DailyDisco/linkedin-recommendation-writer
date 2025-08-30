@@ -60,7 +60,6 @@ export interface Recommendation {
   recommendation_type: string;
   tone: string;
   length: string;
-  confidence_score: number;
   word_count: number;
   created_at: string;
   github_username: string;
@@ -94,7 +93,6 @@ export interface RecommendationOption {
   title: string;
   word_count: number;
   focus: string;
-  confidence_score: number;
   explanation: string;
   generation_parameters: Record<string, unknown>;
 }
@@ -113,7 +111,6 @@ export interface SkillMatch {
   skill: string;
   match_level: string;
   evidence: string[];
-  confidence_score: number;
 }
 
 export interface SkillGapAnalysisResponse {

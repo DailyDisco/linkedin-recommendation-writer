@@ -478,7 +478,6 @@ export interface RecommendationResponse {
   recommendation_type: string;
   tone: string;
   length: string;
-  confidence_score: number;
   word_count: number;
   created_at: string;
   github_username: string;
@@ -493,7 +492,6 @@ export interface RecommendationOptionsResponse {
     title: string;
     word_count: number;
     focus: string;
-    confidence_score: number;
     explanation: string;
   }>;
   generation_parameters: Record<string, unknown>;
