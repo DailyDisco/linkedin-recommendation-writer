@@ -393,44 +393,6 @@ class ConfidenceScorerService:
 
         return min(score, 100)
 
-    def calculate_multi_contributor_confidence_score(self, content: str, contributors: List[Dict[str, Any]], team_highlights: List[str]) -> int:
-        """Calculate confidence score for multi-contributor recommendations."""
-        score = 60  # Base score for collaborative content
-
-        content_lower = content.lower()
-
-        # Check if contributors are mentioned
-        mentioned_contributors = 0
-        for contributor in contributors:
-            username = contributor.get("username", "").lower()
-            full_name = contributor.get("full_name", "").lower() if contributor.get("full_name") else ""
-            if username in content_lower or full_name in content_lower:
-                mentioned_contributors += 1
-
-        if mentioned_contributors > 0:
-            score += min(mentioned_contributors * 5, 20)
-
-        # Check for team/collaboration language
-        team_words = ["team", "collaboration", "together", "collaborative", "group", "collectively"]
-        team_mentions = sum(1 for word in team_words if word in content_lower)
-        if team_mentions > 0:
-            score += min(team_mentions * 5, 15)
-
-        # Check for technical diversity mentions
-        technical_words = ["diverse", "diversity", "variety", "complementary", "skills", "expertise"]
-        technical_mentions = sum(1 for word in technical_words if word in content_lower)
-        if technical_mentions > 0:
-            score += min(technical_mentions * 3, 10)
-
-        # Length and structure bonus
-        word_count = len(content.split())
-        if word_count > 200:
-            score += 10
-        elif word_count > 150:
-            score += 5
-
-        return min(score, 100)
-
     def validate_keyword_compliance(self, content: str, include_keywords: Optional[List[str]] = None, exclude_keywords: Optional[List[str]] = None) -> Dict[str, Any]:
         """Validate that the refined content complies with keyword requirements."""
         content_lower = content.lower()

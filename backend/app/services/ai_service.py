@@ -6,7 +6,6 @@ from typing import Any, Dict, List, Optional, TypedDict
 from app.services.ai_recommendation_service import AIRecommendationService
 from app.services.confidence_scorer_service import ConfidenceScorerService
 from app.services.keyword_refinement_service import KeywordRefinementService
-from app.services.multi_contributor_service import MultiContributorService
 from app.services.prompt_service import PromptService
 from app.services.readme_generation_service import READMEGenerationService
 
@@ -32,7 +31,6 @@ class AIService:
         self.recommendation_service = AIRecommendationService(self.prompt_service)
         self.confidence_scorer = ConfidenceScorerService()
         self.readme_service = READMEGenerationService(self.prompt_service)
-        self.multi_contributor_service = MultiContributorService(self.prompt_service)
         self.keyword_refinement_service = KeywordRefinementService(self.prompt_service)
 
     async def generate_recommendation(
@@ -184,32 +182,6 @@ class AIService:
             target_audience=target_audience,
         )
 
-    # Multi-contributor methods
-    async def _generate_multi_contributor_recommendation(
-        self,
-        repository_data: Dict[str, Any],
-        contributors: List[Dict[str, Any]],
-        team_highlights: List[str],
-        collaboration_insights: List[str],
-        technical_diversity: Dict[str, int],
-        recommendation_type: str = "professional",
-        tone: str = "professional",
-        length: str = "medium",
-        focus_areas: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
-        """Generate a recommendation highlighting multiple contributors."""
-        return await self.multi_contributor_service.generate_multi_contributor_recommendation(
-            repository_data=repository_data,
-            contributors=contributors,
-            team_highlights=team_highlights,
-            collaboration_insights=collaboration_insights,
-            technical_diversity=technical_diversity,
-            recommendation_type=recommendation_type,
-            tone=tone,
-            length=length,
-            focus_areas=focus_areas,
-        )
-
     # Confidence scoring methods
     def calculate_confidence_score(self, github_data: Dict[str, Any], generated_content: str, prompt: Optional[str] = None, generation_params: Optional[Dict[str, Any]] = None) -> int:
         """Calculate confidence score for generated content."""
@@ -218,10 +190,6 @@ class AIService:
     def calculate_readme_confidence_score(self, content: str, repository_data: Dict[str, Any], repository_analysis: Dict[str, Any]) -> int:
         """Calculate confidence score for generated README."""
         return self.confidence_scorer.calculate_readme_confidence_score(content, repository_data, repository_analysis)
-
-    def calculate_multi_contributor_confidence_score(self, content: str, contributors: List[Dict[str, Any]], team_highlights: List[str]) -> int:
-        """Calculate confidence score for multi-contributor recommendations."""
-        return self.confidence_scorer.calculate_multi_contributor_confidence_score(content, contributors, team_highlights)
 
     def validate_keyword_compliance(self, content: str, include_keywords: Optional[List[str]] = None, exclude_keywords: Optional[List[str]] = None) -> Dict[str, Any]:
         """Validate keyword compliance in content."""

@@ -7,7 +7,6 @@ import type {
   RecommendationRequest,
   RecommendationOption,
   RegenerateRequest,
-  MultiContributorData, // Added for new API functions
   SkillGapAnalysisResponse,
 } from '../types';
 import type { AxiosRequestConfig } from 'axios';
@@ -19,7 +18,7 @@ const API_BASE_URL =
 
 const api = axios.create({
   baseURL: API_BASE_URL ? `${API_BASE_URL}/api/v1` : '/api/v1',
-  timeout: 60000, // Increased to 60 seconds for AI generation
+  timeout: 300000, // Increased to 5 minutes for individual contributor AI generation
   headers: {
     'Content-Type': 'application/json',
   },
@@ -28,10 +27,19 @@ const api = axios.create({
 // Add a request interceptor to include the auth token
 api.interceptors.request.use(
   config => {
-    const accessToken = localStorage.getItem('accessToken');
-    if (accessToken) {
-      const cleanToken = accessToken.replace(/^"|"$/g, ''); // Ensure no extra quotes
-      config.headers.Authorization = `Bearer ${cleanToken}`;
+    // Get token from Zustand store instead of direct localStorage access
+    const authStorage = localStorage.getItem('auth-storage');
+    if (authStorage) {
+      try {
+        const parsed = JSON.parse(authStorage);
+        const accessToken = parsed?.state?.accessToken;
+        if (accessToken) {
+          const cleanToken = accessToken.replace(/^"|"$/g, ''); // Ensure no extra quotes
+          config.headers.Authorization = `Bearer ${cleanToken}`;
+        }
+      } catch (error) {
+        console.error('Failed to parse auth storage:', error);
+      }
     }
     return config;
   },
@@ -57,8 +65,8 @@ api.interceptors.response.use(
         );
         // Show toast notification before redirecting
         toast.error('Your session has expired. Please log in again.');
-        // Handle unauthorized access
-        localStorage.removeItem('accessToken'); // Standardizing on 'accessToken'
+        // Handle unauthorized access - clear Zustand auth storage
+        localStorage.removeItem('auth-storage');
         window.location.href = '/login';
       } else {
         console.log(
@@ -323,14 +331,6 @@ export const apiClient = {
   }): Promise<SkillGapAnalysisResponse> {
     const response = await api.post(
       '/recommendations/analyze-skill-gaps',
-      data
-    );
-    return response.data;
-  },
-
-  async generateMultiContributor(data: MultiContributorData) {
-    const response = await api.post(
-      '/recommendations/generate-multi-contributor',
       data
     );
     return response.data;

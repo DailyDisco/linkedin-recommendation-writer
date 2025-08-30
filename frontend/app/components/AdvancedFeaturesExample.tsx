@@ -24,16 +24,6 @@ interface SkillAnalysisData {
   experience_level: string;
 }
 
-interface MultiContributorData {
-  contributors: Array<{
-    github_username: string;
-    contribution_type: string;
-    project_role?: string;
-  }>;
-  project_description: string;
-  recommendation_tone?: string;
-}
-
 // Example of how to use the AdvancedFeatures component
 export const AdvancedFeaturesExample: React.FC = () => {
   // API integration functions
@@ -93,19 +83,6 @@ export const AdvancedFeaturesExample: React.FC = () => {
     }
   };
 
-  const handleMultiContributor = async (data: MultiContributorData) => {
-    try {
-      const result = await apiClient.generateMultiContributor(data);
-      return result;
-    } catch (error) {
-      console.error(
-        'Failed to generate multi-contributor recommendation:',
-        error
-      );
-      throw error;
-    }
-  };
-
   return (
     <div className='container mx-auto p-6'>
       <h1 className='text-3xl font-bold mb-6'>Advanced Features Dashboard</h1>
@@ -117,7 +94,6 @@ export const AdvancedFeaturesExample: React.FC = () => {
         onGetVersionHistory={handleVersionHistory}
         onCompareVersions={handleVersionComparison}
         onRevertVersion={handleVersionRevert}
-        onGenerateMultiContributor={handleMultiContributor}
       />
     </div>
   );

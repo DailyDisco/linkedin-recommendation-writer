@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Github, Loader2, Users, User } from 'lucide-react';
 import { toast } from 'sonner';
-import { githubApi } from '../services/api';
+import { githubApi, apiClient } from '../services/api';
 import type { ContributorInfo, HttpError, RepositoryInfo } from '../types';
 
 // Extend window interface for debug utilities
@@ -17,6 +17,51 @@ import { ContributorCard } from '../components/ui/memo-components';
 import { testRepositoryUrlParsing } from '../utils/debug-url-parser';
 import { useAuth } from '../hooks/useAuth'; // Import useAuth hook
 
+export const parseRepositoryInput = (input: string): string => {
+  const trimmed = input.trim().toLowerCase();
+
+  console.log('🔍 FRONTEND: Parsing repository input:', input);
+  console.log('   • Trimmed input:', trimmed);
+
+  // Handle various GitHub URL formats
+  const githubUrlPatterns = [
+    // Standard GitHub URLs with optional paths/anchors
+    /^https?:\/\/(?:www\.)?github\.com\/([^/\s]+)\/([^/\s]+)(?:\/.*)?(?:\?.*)?(?:#.*)?$/i,
+    // SSH URLs
+    /^git@github\.com:([^/\s]+)\/([^/\s]+)(?:\.git)?$/i,
+    // GitHub CLI format
+    /^gh:([^/\s]+)\/([^/\s]+)$/i,
+  ];
+
+  for (const pattern of githubUrlPatterns) {
+    const match = input.trim().match(pattern);
+    if (match) {
+      const [, owner, repo] = match;
+      // Remove .git suffix if present
+      const cleanRepo = repo.replace(/\.git$/, '');
+      const result = `${owner}/${cleanRepo}`;
+      console.log('   ✅ Matched URL pattern, extracted:', result);
+      return result;
+    }
+  }
+
+  // If it's already in owner/repo format, return as-is
+  if (
+    trimmed.includes('/') &&
+    !trimmed.includes('http') &&
+    !trimmed.includes('git@')
+  ) {
+    console.log('   ✅ Already in owner/repo format:', trimmed);
+    return trimmed;
+  }
+
+  // Otherwise, return original input (will likely cause an error)
+  console.log('   ⚠️ No pattern matched, returning original:', trimmed);
+  throw new Error(
+    'Invalid repository input. Please use owner/repo format or a valid GitHub URL.'
+  );
+};
+
 export default function GeneratorPage() {
   const [mode, setMode] = useState<'user' | 'repository'>('repository');
   const [isLoading, setIsLoading] = useState(false);
@@ -27,6 +72,7 @@ export default function GeneratorPage() {
   const [selectedContributor, setSelectedContributor] =
     useState<ContributorInfo | null>(null);
   const [showRecommendationModal, setShowRecommendationModal] = useState(false);
+
   const {
     isLoggedIn,
     userRecommendationCount,
@@ -57,50 +103,6 @@ export default function GeneratorPage() {
   useEffect(() => {
     fetchUserDetails();
   }, [fetchUserDetails]);
-
-  // Helper function to parse GitHub URL or repository name
-  const parseRepositoryInput = (input: string): string => {
-    const trimmed = input.trim().toLowerCase();
-
-    console.log('🔍 FRONTEND: Parsing repository input:', input);
-    console.log('   • Trimmed input:', trimmed);
-
-    // Handle various GitHub URL formats
-    const githubUrlPatterns = [
-      // Standard GitHub URLs with optional paths/anchors
-      /^https?:\/\/(?:www\.)?github\.com\/([^/\s]+)\/([^/\s]+)(?:\/.*)?(?:\?.*)?(?:#.*)?$/i,
-      // SSH URLs
-      /^git@github\.com:([^/\s]+)\/([^/\s]+)(?:\.git)?$/i,
-      // GitHub CLI format
-      /^gh:([^/\s]+)\/([^/\s]+)$/i,
-    ];
-
-    for (const pattern of githubUrlPatterns) {
-      const match = input.trim().match(pattern);
-      if (match) {
-        const [, owner, repo] = match;
-        // Remove .git suffix if present
-        const cleanRepo = repo.replace(/\.git$/, '');
-        const result = `${owner}/${cleanRepo}`;
-        console.log('   ✅ Matched URL pattern, extracted:', result);
-        return result;
-      }
-    }
-
-    // If it's already in owner/repo format, return as-is
-    if (
-      trimmed.includes('/') &&
-      !trimmed.includes('http') &&
-      !trimmed.includes('git@')
-    ) {
-      console.log('   ✅ Already in owner/repo format:', trimmed);
-      return trimmed;
-    }
-
-    // Otherwise, return original input (will likely cause an error)
-    console.log('   ⚠️ No pattern matched, returning original:', trimmed);
-    return trimmed;
-  };
 
   const handleGetUsers = async () => {
     if (!formData.input_value.trim()) {
@@ -243,7 +245,12 @@ export default function GeneratorPage() {
         let errorMessage =
           "Repository not found. Please check the repository name or URL and ensure it's a public repository.";
 
-        if (error.response?.status === 404) {
+        if (
+          err instanceof Error &&
+          err.message.includes('Invalid repository input')
+        ) {
+          errorMessage = err.message;
+        } else if (error.response?.status === 404) {
           errorMessage = `Repository "${parseRepositoryInput(formData.input_value)}" not found. Please check the repository name or URL.`;
         } else if (error.response?.status === 403) {
           errorMessage =
@@ -252,7 +259,6 @@ export default function GeneratorPage() {
           errorMessage =
             'GitHub authentication failed. Please contact support.';
         } else if (error.response?.data?.detail) {
-          // Ensure error message is always a string
           const detail = error.response.data.detail;
           errorMessage =
             typeof detail === 'string' ? detail : JSON.stringify(detail);
@@ -261,7 +267,6 @@ export default function GeneratorPage() {
         console.log('🚨 FRONTEND: Setting error message:', errorMessage);
         toast.error(errorMessage);
       } else {
-        // Ensure error message is always a string
         const rawErrorMessage =
           error.response?.data?.detail ||
           'GitHub user not found. Please check the username.';
@@ -269,8 +274,6 @@ export default function GeneratorPage() {
           typeof rawErrorMessage === 'string'
             ? rawErrorMessage
             : JSON.stringify(rawErrorMessage);
-
-        // Provide more specific guidance based on error type
         let enhancedMessage = errorMessage;
 
         if (errorMessage.includes('not found')) {
@@ -286,7 +289,7 @@ export default function GeneratorPage() {
           errorMessage.includes('401') ||
           errorMessage.includes('authentication')
         ) {
-          enhancedMessage = `${errorMessage}\n\n💡 Authentication failed. Please contact support if this persists.`;
+          enhancedMessage = `${errorMessage}\n\n💡 Authentication failed. Please contact support.`;
         }
 
         toast.error(enhancedMessage);
@@ -460,7 +463,7 @@ export default function GeneratorPage() {
           <div className='rounded-lg border border-gray-200 bg-white shadow-sm'>
             <div className='flex flex-col space-y-1.5 p-6 pb-4'>
               <h2 className='text-lg font-semibold leading-none tracking-tight'>
-                {mode === 'repository' ? 'Contributors' : 'User Details'}
+                {mode === 'repository' ? 'Repository Results' : 'User Details'}
               </h2>
               <p className='text-sm text-gray-600'>
                 {contributors.length > 0
@@ -472,7 +475,7 @@ export default function GeneratorPage() {
               {isLoading ? (
                 <ContributorSkeleton />
               ) : contributors.length > 0 ? (
-                <div className='space-y-4 max-h-96 overflow-y-auto'>
+                <div>
                   {repositoryInfo && mode === 'repository' && (
                     <div className='border-b pb-4 mb-4'>
                       <h3 className='font-semibold text-lg'>
@@ -488,14 +491,17 @@ export default function GeneratorPage() {
                       </div>
                     </div>
                   )}
-                  {parsedContributors.map(contributor => (
-                    <ContributorCard
-                      key={contributor.username}
-                      contributor={contributor}
-                      onWriteRecommendation={handleWriteRecommendation}
-                      mode={mode}
-                    />
-                  ))}
+
+                  <div className='space-y-4 max-h-96 overflow-y-auto'>
+                    {parsedContributors.map(contributor => (
+                      <ContributorCard
+                        key={contributor.username}
+                        contributor={contributor}
+                        onWriteRecommendation={handleWriteRecommendation}
+                        mode={mode}
+                      />
+                    ))}
+                  </div>
                 </div>
               ) : (
                 <div className='bg-gray-50 rounded-lg p-6 min-h-[300px] flex items-center justify-center text-gray-500'>

@@ -109,16 +109,6 @@ export interface RegenerateRequest {
   exclude_keywords?: string[];
 }
 
-export interface MultiContributorData {
-  repository_full_name: string;
-  max_contributors?: number;
-  min_contributions?: number;
-  recommendation_type?: string;
-  tone?: string;
-  length?: string;
-  focus_areas?: string[];
-}
-
 export interface SkillMatch {
   skill: string;
   match_level: string;

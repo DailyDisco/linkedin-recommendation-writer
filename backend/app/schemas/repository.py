@@ -31,6 +31,14 @@ class ContributorInfo(BaseModel):
     public_repos: int
 
 
+class OwnerInfo(BaseModel):
+    """Owner information schema."""
+
+    login: str
+    avatar_url: str
+    html_url: str
+
+
 class RepositoryInfo(BaseModel):
     """Repository information schema."""
 
@@ -44,6 +52,7 @@ class RepositoryInfo(BaseModel):
     topics: List[str] = []
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
+    owner: OwnerInfo  # Add owner information
 
 
 class RepositoryContributorsResponse(BaseModel):

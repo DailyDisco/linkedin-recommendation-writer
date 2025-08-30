@@ -13,8 +13,6 @@ from app.models.user import User
 from app.schemas.recommendation import (
     KeywordRefinementRequest,
     KeywordRefinementResponse,
-    MultiContributorRequest,
-    MultiContributorResponse,
     ReadmeGenerationRequest,
     ReadmeGenerationResponse,
     RecommendationFromOptionRequest,
@@ -336,43 +334,6 @@ async def analyze_skill_gaps(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"💥 CRITICAL ERROR in skill gap analysis: {e}")
-        logger.error("=" * 80)
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-
-@router.post("/generate-multi-contributor", response_model=MultiContributorResponse)
-async def generate_multi_contributor_recommendation(
-    request: MultiContributorRequest,
-    recommendation_service: RecommendationService = Depends(get_recommendation_service),
-):
-    """Generate a recommendation highlighting multiple contributors to a repository."""
-    try:
-        logger.info("👥 MULTI-CONTRIBUTOR RECOMMENDATION API REQUEST")
-        logger.info("=" * 80)
-        logger.info(f"📁 Repository: {request.repository_full_name}")
-        logger.info(f"👥 Max Contributors: {request.max_contributors}")
-        logger.info(f"📈 Min Contributions: {request.min_contributions}")
-        logger.info(f"🎯 Recommendation Type: {request.recommendation_type}")
-        logger.info(f"🎨 Tone: {request.tone}")
-        logger.info(f"📏 Length: {request.length}")
-
-        multi_contrib_result = await recommendation_service.generate_multi_contributor_recommendation(request)
-
-        logger.info("✅ MULTI-CONTRIBUTOR RECOMMENDATION COMPLETED SUCCESSFULLY")
-        logger.info("📊 Final Results:")
-        logger.info(f"   • Contributors Analyzed: {multi_contrib_result.contributors_analyzed}")
-        logger.info(f"   • Total Contributors: {multi_contrib_result.total_contributors}")
-        logger.info(f"   • Word Count: {multi_contrib_result.word_count}")
-        logger.info(f"   • Confidence Score: {multi_contrib_result.confidence_score}")
-        logger.info("=" * 80)
-
-        return multi_contrib_result
-
-    except ValueError as e:
-        logger.error(f"❌ Validation Error: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"💥 CRITICAL ERROR in multi-contributor recommendation: {e}")
         logger.error("=" * 80)
         raise HTTPException(status_code=500, detail="Internal server error")
 

@@ -870,3 +870,82 @@ class GitHubUserService:
             "dependencies_found": sorted(list(dependencies_found)),
             "soft_skills": [],  # Could be enhanced with more analysis
         }
+
+    async def get_repository_contributors(self, repository_full_name: str, max_contributors: int = 50, force_refresh: bool = False) -> Optional[Dict[str, Any]]:
+        """Get contributors for a specific repository."""
+        import time
+
+        logger.info("🔍 FETCHING REPOSITORY CONTRIBUTORS")
+        logger.info("=" * 50)
+        logger.info(f"📁 Repository: {repository_full_name}")
+        logger.info(f"👥 Max Contributors: {max_contributors}")
+        logger.info(f"🔄 Force Refresh: {force_refresh}")
+
+        start_time = time.time()
+
+        try:
+            if not self.github_client:
+                logger.error("❌ GitHub client not initialized")
+                logger.error("💡 Make sure GITHUB_TOKEN environment variable is set")
+                return None
+
+            # Get repository object
+            logger.info("📡 Fetching repository data...")
+            repo = self.github_client.get_repo(repository_full_name)
+
+            # Get repository info
+            repo_info = {
+                "name": repo.name,
+                "full_name": repo.full_name,
+                "description": repo.description,
+                "language": repo.language,
+                "stars": repo.stargazers_count,
+                "forks": repo.forks_count,
+                "url": repo.html_url,
+                "created_at": repo.created_at.isoformat() if repo.created_at else None,
+                "updated_at": repo.updated_at.isoformat() if repo.updated_at else None,
+                "topics": list(repo.get_topics()) if hasattr(repo, "get_topics") else [],
+                "owner": {
+                    "login": repo.owner.login,
+                    "avatar_url": repo.owner.avatar_url,
+                    "html_url": repo.owner.html_url,
+                },
+            }
+
+            # Get contributors
+            logger.info("👥 Fetching contributors...")
+            contributors_data = []
+            contributors = repo.get_contributors()
+
+            for i, contributor in enumerate(contributors):
+                if i >= max_contributors:
+                    break
+
+                contributor_info = {
+                    "username": contributor.login,
+                    "contributions": contributor.contributions,
+                    "avatar_url": contributor.avatar_url,
+                    "html_url": contributor.html_url,
+                    "type": contributor.type,
+                }
+                contributors_data.append(contributor_info)
+
+            logger.info(f"✅ Found {len(contributors_data)} contributors")
+
+            result = {
+                "repository": repo_info,
+                "contributors": contributors_data,
+                "total_contributors": len(contributors_data),
+                "fetched_at": time.time(),
+            }
+
+            logger.info("🎉 REPOSITORY CONTRIBUTORS FETCH COMPLETE")
+            logger.info(f"⏱️  Total time: {time.time() - start_time:.2f} seconds")
+            logger.info("=" * 50)
+
+            return result
+
+        except Exception as e:
+            logger.error(f"💥 ERROR fetching contributors for {repository_full_name}: {e}")
+            logger.error(f"⏱️  Failed after {time.time() - start_time:.2f} seconds")
+            return None

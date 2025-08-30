@@ -257,50 +257,6 @@ class SkillGapAnalysisResponse(BaseModel):
     generated_at: datetime
 
 
-class ContributorInfo(BaseModel):
-    """Schema for individual contributor information."""
-
-    username: str
-    full_name: Optional[str]
-    contributions: int
-    primary_languages: List[str]
-    top_skills: List[str]
-    contribution_focus: str  # e.g., "frontend", "backend", "testing", etc.
-    key_contributions: List[str]
-
-
-class MultiContributorRequest(BaseModel):
-    """Schema for multi-contributor recommendation requests."""
-
-    repository_full_name: str = Field(..., description="Full repository name (owner/repo)")
-    max_contributors: int = Field(5, description="Maximum number of contributors to include")
-    min_contributions: int = Field(1, description="Minimum contributions required")
-    focus_areas: Optional[List[str]] = Field(None, description="Specific areas to focus on")
-    recommendation_type: str = Field("professional", description="Type of recommendation")
-    tone: str = Field("professional", description="Tone of recommendation")
-    length: str = Field("medium", description="Length of recommendation")
-
-
-class MultiContributorResponse(BaseModel):
-    """Schema for multi-contributor recommendation responses."""
-
-    repository_name: str
-    repository_full_name: str
-    total_contributors: int
-    contributors_analyzed: int
-    contributors: List[ContributorInfo]
-    recommendation: str
-    team_highlights: List[str] = Field(default_factory=list, description="Key team achievements")
-    collaboration_insights: List[str] = Field(default_factory=list, description="Insights about team collaboration")
-    technical_diversity: Dict[str, int] = Field(default_factory=dict, description="Language/technology distribution")
-    word_count: int
-    confidence_score: int
-    generated_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
 class RecommendationOptionsResponse(BaseModel):
     """Response schema for multiple recommendation options."""
 

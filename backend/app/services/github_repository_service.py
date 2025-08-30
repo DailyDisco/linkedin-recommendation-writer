@@ -59,6 +59,7 @@ class GitHubRepositoryService:
             cached_data = await get_cache(cache_key)
             if cached_data and isinstance(cached_data, dict):
                 logger.info(f"Returning cached contributors for repository: " f"{repo_name}")
+                logger.debug(f"Cached data for {repo_name}: {cached_data}")
                 return cast(Dict[str, Any], cached_data)
 
         try:
@@ -80,6 +81,11 @@ class GitHubRepositoryService:
                 "topics": list(repo.get_topics()),
                 "created_at": repo.created_at.isoformat() if repo.created_at else None,
                 "updated_at": repo.updated_at.isoformat() if repo.updated_at else None,
+                "owner": {
+                    "login": repo.owner.login,
+                    "avatar_url": repo.owner.avatar_url,
+                    "html_url": repo.owner.html_url,
+                },
             }
 
             # Get contributors
@@ -329,6 +335,11 @@ class GitHubRepositoryService:
                 "pushed_at": repo.pushed_at.isoformat() if repo.pushed_at else None,
                 "topics": repo.get_topics(),
                 "visibility": getattr(repo, "visibility", "public"),  # For newer PyGitHub versions
+                "owner": {
+                    "login": repo.owner.login,
+                    "avatar_url": repo.owner.avatar_url,
+                    "html_url": repo.owner.html_url,
+                },
             }
         except Exception as e:
             logger.error(f"Error fetching repository info for {owner}/{repo_name}: {e}")

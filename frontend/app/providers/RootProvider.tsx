@@ -1,6 +1,5 @@
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { AuthProvider } from '../hooks/auth-context';
 import UIErrorBoundary from '../components/ui/error-boundary';
 
 // Create a client
@@ -21,9 +20,7 @@ interface RootProviderProps {
 export const RootProvider = ({ children }: RootProviderProps) => {
   return (
     <UIErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>{children}</AuthProvider>
-      </QueryClientProvider>
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     </UIErrorBoundary>
   );
 };

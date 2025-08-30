@@ -10,7 +10,6 @@ import {
 
 import {
   FileText,
-  Users,
   Target,
   GitBranch,
   Lightbulb,
@@ -19,7 +18,6 @@ import {
 } from 'lucide-react';
 import { ReadmeGenerator } from './ReadmeGenerator';
 import { SkillGapAnalysis } from './SkillGapAnalysis';
-import { MultiContributorGenerator } from './MultiContributorGenerator';
 import type { ReadmeGenerationData, SkillAnalysisData } from '../types/index';
 
 interface AdvancedFeaturesProps {
@@ -44,35 +42,6 @@ interface AdvancedFeaturesProps {
     learning_resources: string[];
     analysis_summary: string;
   }>;
-  onGenerateMultiContributor: (data: {
-    repository_full_name: string;
-    max_contributors: number;
-    min_contributions: number;
-    focus_areas?: string[];
-    recommendation_type: string;
-    tone: string;
-    length: string;
-  }) => Promise<{
-    repository_name: string;
-    repository_full_name: string;
-    total_contributors: number;
-    contributors_analyzed: number;
-    contributors: Array<{
-      username: string;
-      full_name?: string;
-      contributions: number;
-      primary_languages: string[];
-      top_skills: string[];
-      contribution_focus: string;
-      key_contributions: string[];
-    }>;
-    recommendation: string;
-    team_highlights: string[];
-    collaboration_insights: string[];
-    technical_diversity: Record<string, number>;
-    word_count: number;
-    confidence_score: number;
-  }>;
 }
 
 const FEATURES = [
@@ -91,20 +60,11 @@ const FEATURES = [
     icon: Target,
     component: SkillGapAnalysis,
   },
-
-  {
-    id: 'multi-contributor',
-    title: 'Team Recommendations',
-    description: 'Generate recommendations for collaborative team projects',
-    icon: Users,
-    component: MultiContributorGenerator,
-  },
 ];
 
 export const AdvancedFeatures: React.FC<AdvancedFeaturesProps> = ({
   onGenerateReadme,
   onAnalyzeSkills,
-  onGenerateMultiContributor,
 }) => {
   const [activeFeature, setActiveFeature] = useState(FEATURES[0].id);
 
@@ -114,10 +74,6 @@ export const AdvancedFeatures: React.FC<AdvancedFeaturesProps> = ({
         return <ReadmeGenerator onGenerate={onGenerateReadme} />;
       case 'skill-gap-analysis':
         return <SkillGapAnalysis onAnalyze={onAnalyzeSkills} />;
-      case 'multi-contributor':
-        return (
-          <MultiContributorGenerator onGenerate={onGenerateMultiContributor} />
-        );
     }
     return null;
   };
@@ -141,7 +97,7 @@ export const AdvancedFeatures: React.FC<AdvancedFeaturesProps> = ({
             onValueChange={setActiveFeature}
             className='w-full'
           >
-            <TabsList className='grid w-full grid-cols-3'>
+            <TabsList className='grid w-full grid-cols-2'>
               {FEATURES.map(feature => {
                 const Icon = feature.icon;
                 return (
@@ -208,7 +164,6 @@ export const AdvancedFeatures: React.FC<AdvancedFeaturesProps> = ({
                 <li>• Automated README generation</li>
                 <li>• Skill gap analysis for target roles</li>
                 <li>• Recommendation version history</li>
-                <li>• Multi-contributor team recommendations</li>
               </ul>
             </div>
           </div>
@@ -220,8 +175,8 @@ export const AdvancedFeatures: React.FC<AdvancedFeaturesProps> = ({
                 <h4 className='font-medium mb-1'>Pro Tip</h4>
                 <p className='text-sm text-muted-foreground'>
                   Try the new features in order - start with Skill Gap Analysis
-                  to understand your profile, then use Keyword Refinement to
-                  fine-tune your recommendations for specific roles.
+                  to understand your profile, then use README Generator to
+                  create professional documentation for your projects.
                 </p>
               </div>
             </div>

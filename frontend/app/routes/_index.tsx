@@ -250,11 +250,11 @@ export default function HomePage() {
               <Users className='w-6 h-6 text-red-600' />
             </div>
             <h3 className='font-semibold text-gray-900'>
-              Team Recommendations
+              Repository Contributors
             </h3>
             <p className='text-sm text-gray-600'>
-              Generate collaborative recommendations for multiple contributors
-              working on the same project
+              Find and analyze contributors from any GitHub repository for
+              personalized recommendations
             </p>
           </div>
 

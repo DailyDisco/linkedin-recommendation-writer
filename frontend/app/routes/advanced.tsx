@@ -48,27 +48,6 @@ export default function AdvancedPage() {
     // This would be handled by the parent component
   };
 
-  const handleMultiContributor = async (data: {
-    repository_full_name: string;
-    max_contributors: number;
-    min_contributions: number;
-    focus_areas?: string[];
-    recommendation_type: string;
-    tone: string;
-    length: string;
-  }) => {
-    try {
-      const result = await apiClient.generateMultiContributor(data);
-      return result;
-    } catch (error) {
-      console.error(
-        'Failed to generate multi-contributor recommendation:',
-        error
-      );
-      throw error;
-    }
-  };
-
   return (
     <div className='container mx-auto p-6'>
       <div className='mb-8'>
@@ -80,10 +59,8 @@ export default function AdvancedPage() {
       </div>
 
       <AdvancedFeatures
-        onKeywordRefine={handleKeywordRefine}
         onGenerateReadme={handleReadmeGeneration}
         onAnalyzeSkills={handleSkillAnalysis}
-        onGenerateMultiContributor={handleMultiContributor}
       />
     </div>
   );
