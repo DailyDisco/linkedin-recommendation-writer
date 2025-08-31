@@ -37,7 +37,8 @@ export interface AuthStore extends AuthState, AuthActions {
   // No computed properties - isLoggedIn will be computed in useAuth hook
 }
 
-const THROTTLE_MS = 5000; // 5 seconds minimum between fetches
+const THROTTLE_MS = 30000; // 30 seconds minimum between fetches for better caching
+const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes cache duration
 
 export const useAuthStore = create<AuthStore>()(
   devtools(
@@ -90,12 +91,33 @@ export const useAuthStore = create<AuthStore>()(
           set({ isAuthenticating: false });
         },
 
-        fetchUserDetails: async () => {
+        fetchUserDetails: async (forceRefresh: boolean = false) => {
           const state = get();
+
+          // If we have cached data and it's still fresh, don't fetch unless forced
+          if (
+            !forceRefresh &&
+            state.userDetails &&
+            state.lastFetchTime &&
+            Date.now() - state.lastFetchTime < CACHE_DURATION_MS
+          ) {
+            return;
+          }
+
+          // If we don't have userDetails but have a recent lastFetchTime, this might indicate
+          // a page refresh where data was lost but timestamp was preserved. Force a refresh.
+          if (
+            !forceRefresh &&
+            !state.userDetails &&
+            state.lastFetchTime &&
+            Date.now() - state.lastFetchTime < CACHE_DURATION_MS
+          ) {
+            forceRefresh = true;
+          }
 
           // Throttle API calls to prevent rate limiting
           const now = Date.now();
-          if (now - state.lastFetchTime < THROTTLE_MS) {
+          if (!forceRefresh && now - state.lastFetchTime < THROTTLE_MS) {
             return;
           }
 

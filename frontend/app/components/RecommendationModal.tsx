@@ -17,13 +17,14 @@ import type {
   RecommendationOption,
   RegenerateRequest,
   RecommendationRequest,
+  KeywordRefinementResult,
 } from '../types';
 import ErrorBoundary from './ui/error-boundary';
 import { parseGitHubInput, validateGitHubInput } from '@/lib/utils';
 import { useRecommendationCount } from '../hooks/useLocalStorage';
 import { KeywordRefinement } from './KeywordRefinement';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import type { KeywordRefinementResult } from '../types';
+import { trackEngagement, trackConversion } from '../utils/analytics';
 
 interface RecommendationModalProps {
   contributor: ContributorInfo;
@@ -273,6 +274,15 @@ Key Achievements: ${formData.notableAchievements}
       }
 
       setRecommendationOptions(optionsResponse.options);
+
+      // Track successful recommendation generation
+      trackEngagement.recommendationGenerated({
+        githubUsername: !!contributor.username,
+        tone: formData.tone,
+        length: formData.length,
+        hasKeywords: formData.specificSkills.trim().length > 0,
+      });
+
       toast.success('Recommendation options generated successfully!');
       setStep('options');
     } catch (err: unknown) {
@@ -334,6 +344,10 @@ Key Achievements: ${formData.notableAchievements}
 
       setGeneratedRecommendation(recommendation);
       setSelectedOption(option);
+
+      // Track completed recommendation
+      trackConversion.recommendationCompleted();
+
       toast.success('Recommendation created successfully!');
       setStep('result');
     } catch (err: unknown) {

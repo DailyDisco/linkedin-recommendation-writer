@@ -20,6 +20,7 @@ import { PleaseSignInOrRegister } from '../components/PleaseSignInOrRegister';
 import { KeywordRefinement } from '../components/KeywordRefinement';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { KeywordRefinementResult } from '../types';
+import { trackEngagement } from '../utils/analytics';
 
 const RecommendationsHistory = () => {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
@@ -45,6 +46,10 @@ const RecommendationsHistory = () => {
       setIsLoading(true);
       const data = await recommendationApi.getAll();
       setRecommendations(data);
+
+      // Track history page view with recommendation count
+      trackEngagement.viewHistory();
+
       if (data.length > 0 && !hasShownToastRef.current) {
         toast.success(
           `Loaded ${data.length} recommendation${data.length === 1 ? '' : 's'} from your history!`

@@ -45,6 +45,15 @@ export function RootHtmlDocument({ children }: { children: React.ReactNode }) {
         <link rel='icon' type='image/svg+xml' href='/favicon.svg' />
         <link rel='icon' type='image/png' href='/favicon.png' />
 
+        {/* Google Analytics 4 */}
+        {import.meta.env.VITE_ENABLE_ANALYTICS === 'true' &&
+          import.meta.env.VITE_GA4_MEASUREMENT_ID && (
+            <script
+              async
+              src={`https://www.googletagmanager.com/gtag/js?id=${import.meta.env.VITE_GA4_MEASUREMENT_ID}`}
+            ></script>
+          )}
+
         <Meta />
         <Links />
       </head>

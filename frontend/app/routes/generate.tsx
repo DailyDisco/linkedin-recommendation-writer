@@ -16,6 +16,7 @@ import ErrorBoundary from '../components/ui/error-boundary';
 import { ContributorCard } from '../components/ui/memo-components';
 import { testRepositoryUrlParsing } from '../utils/debug-url-parser';
 import { useAuth } from '../hooks/useAuth'; // Import useAuth hook
+import { trackEngagement } from '../utils/analytics';
 
 const parseRepositoryInput = (input: string): string => {
   const trimmed = input.trim().toLowerCase();
@@ -189,6 +190,17 @@ export default function GeneratorPage() {
               }, // Default owner if not present
         };
         setRepositoryInfo(repoInfo);
+
+        // Track successful GitHub repository analysis
+        trackEngagement.githubProfileAnalyzed({
+          repositoriesCount: 1, // Single repository analysis
+          languagesCount: result.repository.language ? 1 : 0,
+          hasRecentActivity: result.repository.updated_at
+            ? new Date(result.repository.updated_at) >
+              new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+            : false,
+        });
+
         toast.success(
           `Found ${result.contributors.length} contributors for ${result.repository.full_name}!`
         );
@@ -226,6 +238,17 @@ export default function GeneratorPage() {
             public_repos: userData.public_repos || 0,
           },
         ]);
+
+        // Track successful GitHub user profile analysis
+        trackEngagement.githubProfileAnalyzed({
+          repositoriesCount: userData.public_repos || 0,
+          languagesCount: 0, // We don't have language data for user profiles
+          hasRecentActivity: userData.updated_at
+            ? new Date(userData.updated_at) >
+              new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+            : false,
+        });
+
         toast.success(
           `Found GitHub profile for ${userData.github_username || userData.login || 'user'}!`
         );
@@ -306,6 +329,12 @@ export default function GeneratorPage() {
 
   const handleWriteRecommendation = useCallback(
     (contributor: ContributorInfo) => {
+      // Track when user clicks "Write Recommendation"
+      trackEngagement.navigationClick(
+        'write_recommendation',
+        'contributor_card'
+      );
+
       setSelectedContributor(contributor);
       setShowRecommendationModal(true);
     },

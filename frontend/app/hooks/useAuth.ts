@@ -19,7 +19,7 @@ export interface AuthContextType {
   isAuthenticating: boolean;
   login: (token: string) => Promise<void>;
   logout: () => void;
-  fetchUserDetails: () => Promise<void>;
+  fetchUserDetails: (forceRefresh?: boolean) => Promise<void>;
 }
 
 export const useAuth = (): AuthContextType => {
@@ -52,6 +52,7 @@ export const useAuth = (): AuthContextType => {
     isAuthenticating,
     login: store.login,
     logout: store.logout,
-    fetchUserDetails: store.fetchUserDetails,
+    fetchUserDetails: (forceRefresh = false) =>
+      store.fetchUserDetails(forceRefresh),
   };
 };

@@ -14,11 +14,12 @@ import type { AxiosRequestConfig } from 'axios';
 const API_BASE_URL =
   import.meta.env.NEXT_PUBLIC_API_URL ||
   import.meta.env.VITE_API_BASE_URL ||
-  '';
+  // Fallback to localhost for development when Docker service name is used
+  (import.meta.env.DEV ? 'http://localhost:8000' : '');
 
 const api = axios.create({
   baseURL: API_BASE_URL ? `${API_BASE_URL}/api/v1` : '/api/v1',
-  timeout: 300000, // Increased to 5 minutes for individual contributor AI generation
+  timeout: 15000, // Reduced to 15 seconds for better UX
   headers: {
     'Content-Type': 'application/json',
   },
