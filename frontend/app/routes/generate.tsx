@@ -106,7 +106,7 @@ export default function GeneratorPage() {
   // Fetch user details when the component mounts
   useEffect(() => {
     fetchUserDetails();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Remove fetchUserDetails from dependencies to prevent infinite loop
 
   const handleGetUsers = async () => {

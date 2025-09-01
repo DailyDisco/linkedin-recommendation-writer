@@ -52,7 +52,7 @@ export default function UserProfilePage() {
     if (isLoggedIn && !userDetails && !isLoadingUserDetails) {
       fetchUserDetails();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoggedIn, userDetails, isLoadingUserDetails]); // Remove fetchUserDetails from dependencies to prevent infinite loop
 
   const handleRefresh = () => {

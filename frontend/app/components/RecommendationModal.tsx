@@ -340,8 +340,6 @@ Key Achievements: ${state.formData.notableAchievements}
     );
   };
 
-
-
   const handleReset = () => {
     reset();
   };
