@@ -9,6 +9,7 @@ from loguru import logger
 from app.core.config import settings
 from app.core.redis_client import get_cache, set_cache
 from app.services.github_commit_service import GitHubCommitService
+from app.services.profile_analysis_service import ProfileAnalysisService
 
 
 class GitHubUserService:
@@ -25,6 +26,7 @@ class GitHubUserService:
         else:
             logger.warning("⚠️  GitHub token not configured - GitHub API calls will fail in user service")
         self.commit_service = commit_service
+        self.profile_analysis_service = ProfileAnalysisService()
 
     async def analyze_github_profile(
         self,
@@ -116,7 +118,7 @@ class GitHubUserService:
             logger.info("-" * 40)
             skills_start = time.time()
 
-            skills = await self._extract_skills(user_data, repositories)
+            skills = self.profile_analysis_service.extract_skills(user_data, repositories)
 
             skills_end = time.time()
             logger.info(f"⏱️  Skills extraction completed in {skills_end - skills_start:.2f} seconds")
@@ -659,217 +661,6 @@ class GitHubUserService:
             logger.debug(f"Error parsing dependency file {filename}: {e}")
 
         return dependencies
-
-    async def _extract_skills(self, user_data: Dict[str, Any], repositories: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Extract skills from user profile and repositories with enhanced analysis."""
-        technical_skills = set()
-        frameworks = set()
-        tools = set()
-        domains = set()
-        dependencies_found = set()
-
-        # Enhanced framework and technology mappings
-        framework_patterns = {
-            # JavaScript Frameworks
-            "React": ["react", "reactjs", "react.js", "next.js", "nextjs", "create-react-app", "react-native"],
-            "Vue": ["vue", "vuejs", "vue.js", "nuxt", "nuxtjs", "nuxt.js"],
-            "Angular": ["angular", "angularjs", "angular.js", "@angular"],
-            "Svelte": ["svelte", "sveltekit"],
-            "Express": ["express", "expressjs", "express.js"],
-            "NestJS": ["nestjs", "nest.js", "@nestjs"],
-            # Python Frameworks
-            "Django": ["django", "django-rest-framework", "djangorestframework"],
-            "Flask": ["flask", "flask-restful", "flask-sqlalchemy"],
-            "FastAPI": ["fastapi", "fastapi-users", "fastapi-admin"],
-            "TensorFlow": ["tensorflow", "tf-", "keras"],
-            "PyTorch": ["torch", "pytorch", "torchvision"],
-            "Scikit-learn": ["scikit-learn", "sklearn"],
-            "Pandas": ["pandas", "pandas-profiling"],
-            "NumPy": ["numpy", "numpy-financial"],
-            "Matplotlib": ["matplotlib", "matplotlib.pyplot"],
-            # Java Frameworks
-            "Spring": ["spring", "spring-boot", "spring-framework", "spring-mvc", "spring-data", "spring-security"],
-            "Hibernate": ["hibernate", "hibernate-core"],
-            "Maven": ["maven", "maven-plugin"],
-            "Gradle": ["gradle", "gradle-wrapper"],
-            # .NET Frameworks
-            "ASP.NET": ["asp.net", "asp.net-core", "asp.net-mvc", "asp.net-web-api"],
-            "Entity Framework": ["entity-framework", "entityframework", "ef-core"],
-            # Go Frameworks
-            "Gin": ["gin", "gin-gonic/gin"],
-            "Echo": ["echo", "labstack/echo"],
-            "Fiber": ["fiber", "gofiber/fiber"],
-            # Ruby Frameworks
-            "Rails": ["rails", "ruby-on-rails", "ror"],
-            "Sinatra": ["sinatra"],
-            # PHP Frameworks
-            "Laravel": ["laravel", "laravel/framework"],
-            "Symfony": ["symfony", "symfony/framework"],
-            "CodeIgniter": ["codeigniter"],
-            # Rust Frameworks
-            "Actix": ["actix", "actix-web"],
-            "Rocket": ["rocket", "rocket_contrib"],
-            "Tokio": ["tokio", "tokio-util"],
-        }
-
-        tool_patterns = {
-            # Cloud Platforms
-            "AWS": ["aws", "amazon-web-services", "boto3", "aws-sdk", "aws-cli", "ec2", "s3", "lambda"],
-            "Google Cloud": ["gcp", "google-cloud", "google-cloud-platform", "gcloud", "firebase"],
-            "Azure": ["azure", "microsoft-azure", "azure-sdk"],
-            "Heroku": ["heroku", "heroku-cli"],
-            "Vercel": ["vercel", "vercel-cli"],
-            "Netlify": ["netlify", "netlify-cli"],
-            # Containers & Orchestration
-            "Docker": ["docker", "docker-compose", "dockerfile", "containerd"],
-            "Kubernetes": ["kubernetes", "k8s", "kubectl", "helm", "istio"],
-            "Podman": ["podman", "buildah"],
-            # Databases
-            "PostgreSQL": ["postgresql", "psycopg2", "postgres", "pg"],
-            "MySQL": ["mysql", "pymysql", "mysql-connector"],
-            "MongoDB": ["mongodb", "pymongo", "mongoose"],
-            "Redis": ["redis", "redis-py"],
-            "SQLite": ["sqlite", "sqlite3"],
-            "Elasticsearch": ["elasticsearch", "elasticsearch-py"],
-            # CI/CD & DevOps
-            "Jenkins": ["jenkins", "jenkins-pipeline"],
-            "GitLab CI": ["gitlab-ci", "gitlab-ci.yml"],
-            "GitHub Actions": ["github-actions", "actions"],
-            "CircleCI": ["circleci", "circle-ci"],
-            "Travis CI": ["travis-ci", ".travis.yml"],
-            # Version Control
-            "Git": ["git", "git-flow", "git-lfs"],
-            "GitHub": ["github", "github-api"],
-            # Testing
-            "Jest": ["jest", "@testing-library"],
-            "Mocha": ["mocha", "chai"],
-            "PyTest": ["pytest", "pytest-django"],
-            "JUnit": ["junit", "junit5"],
-            "Selenium": ["selenium", "selenium-webdriver"],
-            # Build Tools
-            "Webpack": ["webpack", "webpack-cli"],
-            "Vite": ["vite", "vitejs"],
-            "Babel": ["babel", "@babel"],
-            "TypeScript": ["typescript", "ts-node", "@types"],
-        }
-
-        # Extract from languages
-        languages = {repo.get("language") for repo in repositories if repo.get("language")}
-        technical_skills.update(languages)
-
-        # Process each repository
-        for repo in repositories:
-            # Extract from repository topics
-            topics = repo.get("topics", [])
-            technical_skills.update(topics)
-
-            # Enhanced description analysis
-            description = repo.get("description", "")
-            if description:
-                description_lower = description.lower()
-
-                # Check for frameworks in description
-                for framework, patterns in framework_patterns.items():
-                    if any(pattern in description_lower for pattern in patterns):
-                        frameworks.add(framework)
-
-                # Check for tools in description
-                for tool, patterns in tool_patterns.items():
-                    if any(pattern in description_lower for pattern in patterns):
-                        tools.add(tool)
-
-            # Analyze repository dependencies (new feature)
-            try:
-                repo_dependencies = await self._fetch_dependency_data(repo)
-                dependencies_found.update(repo_dependencies)
-
-                # Map dependencies to frameworks and tools
-                for dep in repo_dependencies:
-                    dep_lower = dep.lower()
-
-                    # Check if dependency matches known frameworks
-                    for framework, patterns in framework_patterns.items():
-                        if any(pattern in dep_lower or dep_lower in pattern for pattern in patterns):
-                            frameworks.add(framework)
-                            break
-
-                    # Check if dependency matches known tools
-                    for tool, patterns in tool_patterns.items():
-                        if any(pattern in dep_lower or dep_lower in pattern for pattern in patterns):
-                            tools.add(tool)
-                            break
-
-                    # Add dependency as technical skill if it's a well-known library
-                    if len(dep) > 2 and not any(char.isdigit() for char in dep):
-                        technical_skills.add(dep.title())
-
-            except Exception as e:
-                logger.debug(f"Error analyzing dependencies for {repo.get('name', 'unknown')}: {e}")
-
-        # Extract from repository names (additional signal)
-        for repo in repositories:
-            repo_name = repo.get("name", "").lower()
-            for framework, patterns in framework_patterns.items():
-                if any(pattern in repo_name for pattern in patterns):
-                    frameworks.add(framework)
-
-        # Extract from bio with enhanced pattern matching
-        bio = user_data.get("bio", "")
-        if bio:
-            bio_lower = bio.lower()
-
-            # Domain detection
-            domain_patterns = {
-                "Machine Learning": ["machine learning", "ml", "deep learning", "neural network", "ai", "artificial intelligence"],
-                "Data Science": ["data science", "data analysis", "data visualization", "statistics", "analytics"],
-                "Web Development": ["web development", "web dev", "frontend", "backend", "fullstack", "web application"],
-                "Mobile Development": ["mobile", "ios", "android", "react native", "flutter", "swift", "kotlin"],
-                "DevOps": ["devops", "infrastructure", "deployment", "ci/cd", "automation", "cloud"],
-                "Cybersecurity": ["security", "cybersecurity", "encryption", "authentication", "penetration testing"],
-                "Game Development": ["game", "unity", "unreal", "godot", "game engine"],
-                "Blockchain": ["blockchain", "ethereum", "smart contract", "web3", "cryptocurrency"],
-                "IoT": ["iot", "internet of things", "embedded", "raspberry pi", "arduino"],
-                "API Development": ["api", "rest", "graphql", "microservices", "soap"],
-            }
-
-            for domain, patterns in domain_patterns.items():
-                if any(pattern in bio_lower for pattern in patterns):
-                    domains.add(domain)
-
-            # Extract additional frameworks and tools from bio
-            for framework, patterns in framework_patterns.items():
-                if any(pattern in bio_lower for pattern in patterns):
-                    frameworks.add(framework)
-
-            for tool, patterns in tool_patterns.items():
-                if any(pattern in bio_lower for pattern in patterns):
-                    tools.add(tool)
-
-        # Extract from user company/location (additional context)
-        company = user_data.get("company", "")
-        location = user_data.get("location", "")
-
-        for field in [company, location]:
-            if field:
-                field_lower = field.lower()
-                for tool, patterns in tool_patterns.items():
-                    if any(pattern in field_lower for pattern in patterns):
-                        tools.add(tool)
-
-        # Clean up and deduplicate
-        technical_skills = {skill for skill in technical_skills if skill and len(str(skill)) > 1}
-        frameworks = {framework for framework in frameworks if framework}
-        tools = {tool for tool in tools if tool}
-        domains = {domain for domain in domains if domain}
-
-        return {
-            "technical_skills": sorted(list(technical_skills)),
-            "frameworks": sorted(list(frameworks)),
-            "tools": sorted(list(tools)),
-            "domains": sorted(list(domains)),
-            "dependencies_found": sorted(list(dependencies_found)),
-            "soft_skills": [],  # Could be enhanced with more analysis
-        }
 
     async def get_repository_contributors(self, repository_full_name: str, max_contributors: int = 50, force_refresh: bool = False) -> Optional[Dict[str, Any]]:
         """Get contributors for a specific repository."""
