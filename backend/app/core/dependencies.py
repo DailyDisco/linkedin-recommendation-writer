@@ -16,7 +16,10 @@ from app.services.ai_service import AIService
 from app.services.github_commit_service import GitHubCommitService
 from app.services.github_repository_service import GitHubRepositoryService
 from app.services.github_user_service import GitHubUserService
+from app.services.profile_analysis_service import ProfileAnalysisService
+from app.services.recommendation_engine_service import RecommendationEngineService
 from app.services.recommendation_service import RecommendationService
+from app.services.skill_analysis_service import SkillAnalysisService
 from app.services.user_service import UserService
 
 T = TypeVar("T")
@@ -102,10 +105,26 @@ class ServiceContainer:
         return cls._get_service("recommendation", RecommendationService)
 
     @classmethod
+    def get_recommendation_engine_service(cls) -> RecommendationEngineService:
+        """Get or create recommendation engine service instance."""
+        ai_service = cls.get_ai_service()
+        return cls._get_service("recommendation_engine", RecommendationEngineService, ai_service)
+
+    @classmethod
     def get_repository_service(cls) -> GitHubRepositoryService:
         """Get or create repository service instance."""
         # GitHubRepositoryService requires GitHubCommitService
         return cls._get_service("github_repository", GitHubRepositoryService, GitHubCommitService())
+
+    @classmethod
+    def get_skill_analysis_service(cls) -> SkillAnalysisService:
+        """Get or create skill analysis service instance."""
+        return cls._get_service("skill_analysis", SkillAnalysisService)
+
+    @classmethod
+    def get_profile_analysis_service(cls) -> ProfileAnalysisService:
+        """Get or create profile analysis service instance."""
+        return cls._get_service("profile_analysis", ProfileAnalysisService)
 
     @classmethod
     def get_user_service(cls) -> UserService:
@@ -134,9 +153,24 @@ def get_recommendation_service() -> RecommendationService:
     return ServiceContainer.get_recommendation_service()
 
 
+def get_recommendation_engine_service() -> RecommendationEngineService:
+    """Dependency provider for recommendation engine service."""
+    return ServiceContainer.get_recommendation_engine_service()
+
+
 def get_repository_service() -> GitHubRepositoryService:
     """Dependency injector for GitHubRepositoryService."""
     return ServiceContainer.get_repository_service()
+
+
+def get_skill_analysis_service() -> SkillAnalysisService:
+    """Dependency provider for skill analysis service."""
+    return ServiceContainer.get_skill_analysis_service()
+
+
+def get_profile_analysis_service() -> ProfileAnalysisService:
+    """Dependency provider for profile analysis service."""
+    return ServiceContainer.get_profile_analysis_service()
 
 
 def get_user_service() -> UserService:
