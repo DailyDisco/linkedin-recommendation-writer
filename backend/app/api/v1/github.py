@@ -1,12 +1,14 @@
 """GitHub API endpoints."""
 
 import logging
+from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.core.dependencies import get_github_service, get_repository_service, validate_github_username
+from app.core.redis_client import get_cache, set_cache
 from app.schemas.github import GitHubAnalysisRequest, ProfileAnalysisResponse, RepositoryAnalysisRequest, RepositoryAnalysisResponse, RepositoryContributorsRequest
 from app.schemas.repository import RepositoryContributorsResponse
 from app.services.github_repository_service import GitHubRepositoryService
@@ -23,6 +25,44 @@ def _handle_api_error(error: Exception, operation: str, status_code: int = 500) 
     if isinstance(error, HTTPException):
         raise error
     raise HTTPException(status_code=status_code, detail="Internal server error")
+
+
+async def _process_github_analysis_background(task_id: str, username: str, force_refresh: bool = False, max_repositories: int = 10) -> None:
+    """Background task to process GitHub analysis."""
+    try:
+        logger.info(f"🔄 Starting background analysis for {username} (task: {task_id})")
+
+        # Initialize services
+        from app.services.github_commit_service import GitHubCommitService
+
+        commit_service = GitHubCommitService()
+        github_service = GitHubUserService(commit_service)
+
+        # Update task status to processing
+        await set_cache(f"task_status:{task_id}", {"status": "processing", "username": username, "started_at": datetime.utcnow().isoformat(), "message": "Analyzing GitHub profile..."}, ttl=3600)
+
+        # Perform the analysis
+        analysis = await github_service.analyze_github_profile(username=username, force_refresh=force_refresh, max_repositories=max_repositories)
+
+        if analysis:
+            # Store successful result
+            await set_cache(f"task_result:{task_id}", analysis, ttl=3600)
+            await set_cache(
+                f"task_status:{task_id}", {"status": "completed", "username": username, "completed_at": datetime.utcnow().isoformat(), "message": "Analysis completed successfully"}, ttl=3600
+            )
+            logger.info(f"✅ Background analysis completed for {username}")
+        else:
+            # Store error result
+            await set_cache(
+                f"task_status:{task_id}",
+                {"status": "failed", "username": username, "completed_at": datetime.utcnow().isoformat(), "message": "Analysis failed - user not found or analysis error"},
+                ttl=3600,
+            )
+            logger.error(f"❌ Background analysis failed for {username}")
+
+    except Exception as e:
+        logger.error(f"💥 Background analysis error for {username}: {e}")
+        await set_cache(f"task_status:{task_id}", {"status": "failed", "username": username, "completed_at": datetime.utcnow().isoformat(), "message": f"Analysis failed: {str(e)}"}, ttl=3600)
 
 
 class GitHubServiceHealthResponse(BaseModel):
@@ -59,15 +99,52 @@ async def get_github_service_health(
 @router.post("/analyze", response_model=ProfileAnalysisResponse)
 async def analyze_github_profile(
     request: GitHubAnalysisRequest,
+    background_tasks: BackgroundTasks,
     github_user_service: GitHubUserService = Depends(get_github_service),
 ) -> Optional[ProfileAnalysisResponse]:
-    """Analyze a GitHub profile and return comprehensive data."""
+    """Analyze a GitHub profile - uses background processing for heavy analysis."""
+
+    # Check cache first for quick response
+    cache_key = f"github_profile:{request.username}"
+    cached_analysis = await get_cache(cache_key)
+
+    if cached_analysis and not request.force_refresh:
+        logger.info(f"💨 Returning cached GitHub analysis for {request.username}")
+        return ProfileAnalysisResponse(**cached_analysis)
+
+    # For heavy analysis, use background processing
+    logger.info(f"🚀 Starting background GitHub analysis for {request.username}")
+
+    # Generate unique task ID
+    task_id = f"github_profile_{request.username}_{int(datetime.utcnow().timestamp())}"
+
+    # Start background task
+    background_tasks.add_task(_process_github_analysis_background, task_id=task_id, username=request.username, force_refresh=request.force_refresh, max_repositories=10)
+
+    # Return immediate response with task ID
+    return ProfileAnalysisResponse(
+        user_data={"login": request.username, "processing": True, "task_id": task_id, "message": "Analysis started in background"},
+        repositories=[],
+        languages=[],
+        skills={"status": "processing", "task_id": task_id, "message": "Analysis in progress"},
+        commit_analysis={"task_id": task_id, "status": "processing", "message": "GitHub profile analysis started"},
+        analyzed_at=datetime.utcnow().isoformat(),
+        analysis_context_type="profile",
+    )
+
+
+@router.post("/analyze/sync", response_model=ProfileAnalysisResponse)
+async def analyze_github_profile_sync(
+    request: GitHubAnalysisRequest,
+    github_user_service: GitHubUserService = Depends(get_github_service),
+) -> Optional[ProfileAnalysisResponse]:
+    """Analyze a GitHub profile synchronously (for quick analysis or when background processing is not needed)."""
 
     try:
         analysis = await github_user_service.analyze_github_profile(
             username=request.username,
             force_refresh=request.force_refresh,
-            max_repositories=10,  # Assuming a default max_repositories for this endpoint
+            max_repositories=10,
         )
 
         if not analysis:
@@ -80,21 +157,87 @@ async def analyze_github_profile(
 
     except Exception as e:
         _handle_api_error(e, "GitHub profile analysis")
-        # This return statement will never be reached, but mypy requires it
         return None  # type: ignore
+
+
+@router.get("/task/{task_id}")
+async def get_task_status(task_id: str) -> dict:
+    """Get the status and result of a background analysis task."""
+
+    try:
+        # Check task status
+        status_data = await get_cache(f"task_status:{task_id}")
+
+        if not status_data:
+            raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+
+        # If completed, include result
+        if status_data.get("status") == "completed":
+            result_data = await get_cache(f"task_result:{task_id}")
+            if result_data:
+                return {"task_id": task_id, "status": "completed", "result": result_data, "completed_at": status_data.get("completed_at")}
+
+        return {
+            "task_id": task_id,
+            "status": status_data.get("status", "unknown"),
+            "message": status_data.get("message", ""),
+            "username": status_data.get("username"),
+            "started_at": status_data.get("started_at"),
+            "updated_at": status_data.get("completed_at"),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get task status for {task_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get task status: {str(e)}")
 
 
 @router.get("/user/{username}", response_model=ProfileAnalysisResponse)
 async def get_github_profile(
     username: str = Depends(validate_github_username),
     force_refresh: bool = False,
+    background_tasks: BackgroundTasks = None,
     github_user_service: GitHubUserService = Depends(get_github_service),
 ) -> Optional[ProfileAnalysisResponse]:
-    """Get a GitHub profile analysis (convenience endpoint)."""
+    """Get a GitHub profile analysis (convenience endpoint - uses background processing)."""
 
-    # Create a request object for the main endpoint
-    request = GitHubAnalysisRequest(username=username, force_refresh=force_refresh)
-    return await analyze_github_profile(request, github_user_service)
+    # For GET requests, use synchronous processing for better compatibility
+    try:
+        analysis = await github_user_service.analyze_github_profile(
+            username=username,
+            force_refresh=force_refresh,
+            max_repositories=10,
+        )
+
+        if not analysis:
+            raise HTTPException(
+                status_code=404,
+                detail=f"GitHub user '{username}' not found or could not be analyzed",
+            )
+
+        return ProfileAnalysisResponse(**analysis)
+
+    except Exception as e:
+        _handle_api_error(e, "GitHub profile analysis")
+        return None  # type: ignore
+
+
+@router.get("/user/{username}/async")
+async def get_github_profile_async(
+    username: str = Depends(validate_github_username),
+    force_refresh: bool = False,
+    background_tasks: BackgroundTasks = None,
+) -> dict:
+    """Get a GitHub profile analysis asynchronously (returns task ID immediately)."""
+
+    # Generate unique task ID
+    task_id = f"github_profile_{username}_{int(datetime.utcnow().timestamp())}"
+
+    # Start background task
+    background_tasks.add_task(_process_github_analysis_background, task_id=task_id, username=username, force_refresh=force_refresh, max_repositories=10)
+
+    return {"task_id": task_id, "status": "processing", "username": username, "message": "GitHub profile analysis started in background"}
 
 
 @router.post("/repository/analyze", response_model=RepositoryAnalysisResponse)

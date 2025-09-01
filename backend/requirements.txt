@@ -5,6 +5,11 @@ uvicorn[standard]==0.35.0  # ASGI server for running FastAPI applications
 uvloop  # High-performance drop-in replacement for asyncio event loop
 python-jose[cryptography]>=3.3.0  # JWT (JSON Web Token) implementation for Python
 
+# Security enhancements
+cryptography>=44.0.1  # Updated for security fixes
+urllib3>=2.5.0  # Updated for redirect security fixes
+setuptools>=78.1.1  # Updated for path traversal fix
+
 # Database
 asyncpg==0.30.0  # PostgreSQL driver for asyncio
 sqlalchemy[asyncio]==2.0.43  # SQL toolkit and Object-Relational Mapper (ORM) with async support
@@ -32,6 +37,16 @@ pydantic-settings==2.10.1  # Pydantic extension for settings management
 bcrypt==4.3.0  # Hashing library for passwords
 python-multipart==0.0.20  # Parsing multipart/form-data requests
 email-validator==2.3.0  # Email address validation library
+
+# Advanced security
+bleach==6.1.0  # HTML sanitization
+defusedxml==0.7.1  # XML parsing security
+slowapi==0.1.9  # Rate limiting
+PyJWT[crypto]==2.9.0  # Enhanced JWT handling
+
+# API key security
+cryptography>=44.0.1  # Already included for encryption
+python-magic>=0.4.27  # File type detection
 
 # Date and time
 python-dateutil==2.8.2  # Extensions to the standard datetime module

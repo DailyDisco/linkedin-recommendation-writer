@@ -19,13 +19,14 @@ from app.schemas.recommendation import (
     RecommendationVersionInfo,
     SkillGapAnalysisRequest,
     SkillGapAnalysisResponse,
-    SkillMatch,
     VersionComparisonResponse,
 )
 from app.services.ai_service import AIService
 from app.services.github_commit_service import GitHubCommitService
 from app.services.github_repository_service import GitHubRepositoryService
 from app.services.github_user_service import GitHubUserService
+from app.services.recommendation_engine_service import RecommendationEngineService
+from app.services.skill_analysis_service import SkillAnalysisService
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +55,8 @@ class RecommendationService:
         self.github_service = GitHubUserService(GitHubCommitService())
         self.repository_service = GitHubRepositoryService(GitHubCommitService())
         self.ai_service = AIService()
+        self.skill_analysis_service = SkillAnalysisService()
+        self.recommendation_engine_service = RecommendationEngineService(self.ai_service)
 
     async def create_recommendation(
         self,
@@ -112,7 +115,7 @@ class RecommendationService:
             logger.info("-" * 50)
             ai_start = time.time()
 
-            ai_result = await self.ai_service.generate_recommendation(
+            ai_result = await self.recommendation_engine_service.generate_recommendation(
                 github_data=github_data,
                 recommendation_type=recommendation_type,
                 tone=tone,
@@ -134,17 +137,12 @@ class RecommendationService:
             logger.info("-" * 50)
             save_start = time.time()
 
-            recommendation_data = RecommendationCreate(
+            recommendation_data = self.recommendation_engine_service.create_recommendation_data(
+                ai_result=ai_result,
                 github_profile_id=github_profile.id,  # type: ignore
-                title=ai_result["title"],
-                content=ai_result["content"],
                 recommendation_type=recommendation_type,
                 tone=tone,
                 length=length,
-                ai_model=ai_result["generation_parameters"]["model"],
-                generation_prompt=ai_result.get("generation_prompt"),
-                generation_parameters=ai_result["generation_parameters"],
-                word_count=ai_result["word_count"],
             )
 
             recommendation = Recommendation(**recommendation_data.dict())
@@ -405,21 +403,19 @@ class RecommendationService:
             logger.info("-" * 50)
             ai_start = time.time()
 
-            ai_result = await self.ai_service.generate_recommendation(
+            response = await self.recommendation_engine_service.generate_recommendation_options(
                 github_data=github_data,
-                recommendation_type=recommendation_type,
-                tone=tone,
-                length=length,
-                custom_prompt=custom_prompt,
+                base_recommendation_type=recommendation_type,
+                base_tone=tone,
+                base_length=length,
                 target_role=target_role,
                 specific_skills=specific_skills,
-                exclude_keywords=exclude_keywords,
             )
 
             ai_end = time.time()
             logger.info(f"⏱️  AI generation completed in {ai_end - ai_start:.2f} seconds")
             logger.info("✅ AI recommendation options generated:")
-            logger.info(f"   • Options: {len(ai_result['options'])}")
+            logger.info(f"   • Options: {len(response.options)}")
 
             end_time = time.time()
             total_time = end_time - start_time
@@ -431,13 +427,6 @@ class RecommendationService:
             logger.info(f"   • GitHub Analysis: {github_end - github_start:.2f}s ({((github_end - github_start)/total_time)*100:.1f}%)")
             logger.info(f"   • Database Ops: {db_end - db_start:.2f}s ({((db_end - db_start)/total_time)*100:.1f}%)")
             logger.info(f"   • AI Generation: {ai_end - ai_start:.2f}s ({((ai_end - ai_start)/total_time)*100:.1f}%)")
-
-            # Convert to response
-            response = RecommendationOptionsResponse(
-                options=ai_result["options"],
-                generation_parameters=ai_result["generation_parameters"],
-                generation_prompt=ai_result.get("generation_prompt"),
-            )
 
             return response
 
@@ -495,7 +484,7 @@ class RecommendationService:
             logger.info("-" * 50)
             ai_start = time.time()
 
-            ai_result = await self.ai_service.regenerate_recommendation(
+            ai_result = await self.recommendation_engine_service.regenerate_recommendation(
                 original_content=original_content,
                 refinement_instructions=refinement_instructions,
                 github_data=github_data,
@@ -515,18 +504,15 @@ class RecommendationService:
             logger.info("-" * 50)
             save_start = time.time()
 
-            recommendation_data = RecommendationCreate(
+            recommendation_data = self.recommendation_engine_service.create_recommendation_data(
+                ai_result=ai_result,
                 github_profile_id=int(github_profile.id),
-                title=ai_result["title"],
-                content=ai_result["content"],
                 recommendation_type=recommendation_type,
                 tone=tone,
                 length=length,
-                ai_model=ai_result["generation_parameters"]["model"],
-                generation_prompt=refinement_instructions,
-                generation_parameters=ai_result["generation_parameters"],
-                word_count=ai_result["word_count"],
             )
+            # Override the generation prompt with refinement instructions
+            recommendation_data.generation_prompt = refinement_instructions
 
             recommendation = Recommendation(**recommendation_data.dict())
             db.add(recommendation)
@@ -1038,288 +1024,6 @@ class RecommendationService:
         logger.info(f"🔄 Successfully reverted recommendation {recommendation_id} to version {target_version.version_number}")
         return response
 
-    def _get_role_skill_requirements(self, role: str, experience_level: str = "mid") -> Dict[str, Any]:
-        """Get skill requirements for common job roles."""
-        role_requirements = {
-            "frontend_developer": {
-                "junior": {
-                    "required": ["HTML", "CSS", "JavaScript"],
-                    "preferred": ["React", "Vue", "Angular", "Git", "Responsive Design"],
-                    "nice_to_have": ["TypeScript", "Webpack", "Testing", "Node.js"],
-                },
-                "mid": {
-                    "required": ["HTML", "CSS", "JavaScript", "React/Vue/Angular", "Git"],
-                    "preferred": ["TypeScript", "Testing", "Build Tools", "Performance Optimization"],
-                    "nice_to_have": ["GraphQL", "Mobile Development", "Design Systems", "CI/CD"],
-                },
-                "senior": {
-                    "required": ["HTML", "CSS", "JavaScript", "React/Vue/Angular", "TypeScript", "Testing"],
-                    "preferred": ["Architecture", "Performance", "Mentoring", "Code Review", "CI/CD"],
-                    "nice_to_have": ["Leadership", "System Design", "DevOps", "Product Management"],
-                },
-            },
-            "backend_developer": {
-                "junior": {
-                    "required": ["Python/Java/Node.js", "SQL", "REST APIs"],
-                    "preferred": ["Git", "Testing", "Linux/Unix", "Docker"],
-                    "nice_to_have": ["ORM", "Caching", "Security", "Microservices"],
-                },
-                "mid": {
-                    "required": ["Python/Java/Node.js", "SQL", "REST APIs", "Testing", "Git"],
-                    "preferred": ["ORM", "Caching", "Security", "Docker", "AWS/GCP/Azure"],
-                    "nice_to_have": ["Microservices", "GraphQL", "Message Queues", "Monitoring"],
-                },
-                "senior": {
-                    "required": ["Python/Java/Node.js", "SQL", "REST APIs", "Testing", "Architecture"],
-                    "preferred": ["Microservices", "Cloud Platforms", "Security", "Performance", "Mentoring"],
-                    "nice_to_have": ["System Design", "DevOps", "Leadership", "Product Strategy"],
-                },
-            },
-            "fullstack_developer": {
-                "junior": {
-                    "required": ["HTML", "CSS", "JavaScript", "Python/Java/Node.js", "SQL"],
-                    "preferred": ["React/Vue", "Git", "REST APIs", "Testing"],
-                    "nice_to_have": ["TypeScript", "Docker", "AWS/GCP", "Responsive Design"],
-                },
-                "mid": {
-                    "required": ["HTML", "CSS", "JavaScript", "Python/Java/Node.js", "SQL", "REST APIs"],
-                    "preferred": ["React/Vue", "TypeScript", "Testing", "Docker", "AWS/GCP"],
-                    "nice_to_have": ["GraphQL", "Microservices", "CI/CD", "Performance Optimization"],
-                },
-                "senior": {
-                    "required": ["HTML", "CSS", "JavaScript", "Python/Java/Node.js", "SQL", "Architecture"],
-                    "preferred": ["TypeScript", "Microservices", "Cloud Platforms", "Testing", "Performance"],
-                    "nice_to_have": ["Leadership", "System Design", "DevOps", "Product Management"],
-                },
-            },
-            "data_scientist": {
-                "junior": {
-                    "required": ["Python", "SQL", "Statistics", "Pandas", "NumPy"],
-                    "preferred": ["Machine Learning", "Matplotlib", "Jupyter", "Git"],
-                    "nice_to_have": ["R", "TensorFlow", "Scikit-learn", "Tableau"],
-                },
-                "mid": {
-                    "required": ["Python", "SQL", "Statistics", "Machine Learning", "Pandas", "NumPy"],
-                    "preferred": ["TensorFlow/PyTorch", "Scikit-learn", "Data Visualization", "Big Data"],
-                    "nice_to_have": ["Deep Learning", "Spark", "AWS/GCP", "Experimentation"],
-                },
-                "senior": {
-                    "required": ["Python", "SQL", "Statistics", "Machine Learning", "Deep Learning"],
-                    "preferred": ["Big Data", "MLOps", "Experimentation", "Leadership", "Strategy"],
-                    "nice_to_have": ["System Design", "Product Management", "Research", "Publications"],
-                },
-            },
-            "devops_engineer": {
-                "junior": {
-                    "required": ["Linux/Unix", "Git", "Docker", "CI/CD"],
-                    "preferred": ["AWS/GCP/Azure", "Kubernetes", "Terraform", "Monitoring"],
-                    "nice_to_have": ["Python", "Shell Scripting", "Security", "Networking"],
-                },
-                "mid": {
-                    "required": ["Linux/Unix", "Docker", "Kubernetes", "CI/CD", "AWS/GCP/Azure"],
-                    "preferred": ["Terraform", "Monitoring", "Security", "Python", "Shell Scripting"],
-                    "nice_to_have": ["Service Mesh", "GitOps", "Site Reliability", "Automation"],
-                },
-                "senior": {
-                    "required": ["Linux/Unix", "Docker", "Kubernetes", "CI/CD", "Infrastructure as Code"],
-                    "preferred": ["Site Reliability", "Security", "Automation", "Leadership", "Strategy"],
-                    "nice_to_have": ["Platform Engineering", "Multi-cloud", "Compliance", "Cost Optimization"],
-                },
-            },
-        }
-
-        # Normalize role name
-        normalized_role = role.lower().replace(" ", "_").replace("-", "_")
-
-        # Find matching role or use closest match
-        if normalized_role in role_requirements:
-            return role_requirements[normalized_role].get(experience_level, role_requirements[normalized_role]["mid"])
-        else:
-            # Try to find partial matches
-            for role_key in role_requirements:
-                if role_key in normalized_role or normalized_role in role_key:
-                    return role_requirements[role_key].get(experience_level, role_requirements[role_key]["mid"])
-
-            # Default fallback
-            return {
-                "required": ["Programming", "Git", "Communication"],
-                "preferred": ["Testing", "Documentation", "Teamwork"],
-                "nice_to_have": ["Leadership", "Problem Solving", "Continuous Learning"],
-            }
-
-    def _analyze_skill_match(self, user_skill: str, required_skills: List[str], github_data: Dict[str, Any]) -> SkillMatch:
-        """Analyze how well a user's skill matches job requirements."""
-        # Extract user's skills from the nested skills structure
-        skills_data = github_data.get("skills", {})
-        user_technical_skills = set(skills_data.get("technical_skills", []))
-        user_frameworks = set(skills_data.get("frameworks", []))
-        user_tools = set(skills_data.get("tools", []))
-        user_domains = set(skills_data.get("domains", []))
-        user_dependencies = set(skills_data.get("dependencies_found", []))
-
-        # Combine all user skills for matching
-        all_user_skills = user_technical_skills | user_frameworks | user_tools | user_domains | user_dependencies
-
-        # Extract additional data sources
-        starred_technologies = github_data.get("starred_technologies", {})
-        commit_analysis = github_data.get("commit_analysis", {})
-
-        # Get starred languages and topics
-        starred_languages = set(starred_technologies.get("languages", {}).keys())
-        starred_topics = set(starred_technologies.get("topics", []))
-
-        # Add starred technologies to skill set
-        all_user_skills.update(starred_languages)
-        all_user_skills.update(starred_topics)
-
-        # Normalize skills for comparison
-        user_skill_lower = user_skill.lower()
-        user_skills_lower = {skill.lower() for skill in all_user_skills}
-
-        # Find matches
-        evidence = []
-        match_score = 0
-
-        # Direct match in skills
-        if user_skill_lower in user_skills_lower:
-            match_score += 40
-            evidence.append("Direct match found in profile")
-
-        # Check starred technologies
-        if user_skill_lower in starred_languages:
-            match_score += 25
-            evidence.append("Interest shown through starred repositories")
-        elif user_skill_lower in starred_topics:
-            match_score += 20
-            evidence.append("Technology interest indicated by repository topics")
-
-        # Partial matches in skills
-        for user_skill_name in all_user_skills:
-            user_skill_name_lower = user_skill_name.lower()
-            if (user_skill_lower in user_skill_name_lower or user_skill_name_lower in user_skill_lower) and user_skill_lower != user_skill_name_lower:
-                match_score += 20
-                evidence.append(f"Related skill: {user_skill_name}")
-                break
-
-        # Check commit analysis for evidence of expertise
-        primary_strength = commit_analysis.get("excellence_areas", {}).get("primary_strength", "")
-        if primary_strength and (user_skill_lower in primary_strength.lower() or primary_strength.lower() in user_skill_lower):
-            match_score += 30
-            evidence.append(f"Primary strength based on commit analysis: {primary_strength.replace('_', ' ').title()}")
-
-        # Check commit patterns for relevant skills
-        patterns = commit_analysis.get("excellence_areas", {}).get("patterns", {})
-        for pattern_name, pattern_data in patterns.items():
-            pattern_percentage = pattern_data.get("percentage", 0)
-            # If pattern has significant percentage (>15%) and matches skill
-            if pattern_percentage > 15 and (user_skill_lower in pattern_name.lower() or pattern_name.lower() in user_skill_lower):
-                match_score += min(int(pattern_percentage), 25)  # Cap at 25 points
-                evidence.append(f"Strong commit pattern in {pattern_name.replace('_', ' ')} ({pattern_percentage}%)")
-                break
-
-        # Check if user has relevant tools/frameworks from commit analysis
-        tools_and_features = commit_analysis.get("tools_and_features", {})
-        tools_by_category = tools_and_features.get("tools_by_category", {})
-        for category, tools in tools_by_category.items():
-            for tool in tools:
-                if user_skill_lower in tool.lower() or tool.lower() in user_skill_lower:
-                    match_score += 20
-                    evidence.append(f"Experience with {tool} based on commit history")
-                    break
-
-        # Check for related technologies
-        related_tech = self._get_related_technologies(user_skill)
-        for tech in related_tech:
-            if tech.lower() in user_skills_lower:
-                match_score += 15
-                evidence.append(f"Related technology: {tech}")
-            elif tech.lower() in starred_languages:
-                match_score += 10
-                evidence.append(f"Related technology interest: {tech}")
-
-        # Determine match level
-        if match_score >= 40:
-            match_level = "strong"
-        elif match_score >= 20:
-            match_level = "moderate"
-        elif match_score >= 5:
-            match_level = "weak"
-        else:
-            match_level = "missing"
-            evidence.append("No relevant skills found in profile")
-
-        return SkillMatch(skill=user_skill, match_level=match_level, evidence=evidence)
-
-    def _get_related_technologies(self, skill: str) -> List[str]:
-        """Get related technologies for a given skill."""
-        related_tech_map = {
-            "javascript": ["node.js", "express", "react", "vue", "angular"],
-            "python": ["django", "flask", "fastapi", "pandas", "numpy", "tensorflow"],
-            "java": ["spring", "hibernate", "maven", "gradle"],
-            "react": ["javascript", "typescript", "redux", "next.js"],
-            "docker": ["kubernetes", "containerization", "devops"],
-            "aws": ["cloud", "ec2", "s3", "lambda", "terraform"],
-            "testing": ["jest", "pytest", "junit", "selenium", "cypress"],
-            "git": ["version control", "github", "gitlab", "collaboration"],
-            "sql": ["database", "postgresql", "mysql", "mongodb", "orm"],
-            "machine learning": ["python", "tensorflow", "pytorch", "scikit-learn", "pandas"],
-        }
-
-        skill_lower = skill.lower()
-        for key, related in related_tech_map.items():
-            if key in skill_lower or skill_lower in key:
-                return related
-
-        return []
-
-    def _generate_skill_recommendations(self, skill_analysis: List[SkillMatch], target_role: str) -> Dict[str, List[str]]:
-        """Generate recommendations based on skill analysis."""
-        recommendations = []
-        learning_resources = []
-
-        missing_skills = [match.skill for match in skill_analysis if match.match_level == "missing"]
-        weak_skills = [match.skill for match in skill_analysis if match.match_level == "weak"]
-
-        # Generate specific recommendations
-        for skill in missing_skills[:5]:  # Focus on top 5 missing skills
-            if "javascript" in skill.lower():
-                recommendations.append(f"Learn {skill} fundamentals and practice with small projects")
-                learning_resources.append("freeCodeCamp JavaScript curriculum")
-                learning_resources.append("MDN Web Docs")
-            elif "python" in skill.lower():
-                recommendations.append(f"Master {skill} basics and build data processing applications")
-                learning_resources.append("Python Crash Course book")
-                learning_resources.append("Codecademy Python course")
-            elif "react" in skill.lower():
-                recommendations.append("Build React applications and learn component patterns")
-                learning_resources.append("React Official Documentation")
-                learning_resources.append("React for Beginners course")
-            elif "docker" in skill.lower():
-                recommendations.append(f"Learn containerization with {skill} and Kubernetes basics")
-                learning_resources.append("Docker Getting Started guide")
-                learning_resources.append("Kubernetes documentation")
-            elif "testing" in skill.lower():
-                recommendations.append("Implement comprehensive testing strategies for your projects")
-                learning_resources.append("Testing JavaScript book")
-                learning_resources.append("Jest documentation")
-            else:
-                recommendations.append(f"Develop proficiency in {skill} through hands-on projects")
-                learning_resources.append(f"Search for '{skill} tutorials' on YouTube")
-                learning_resources.append(f"Read documentation for {skill}")
-
-        # Add general recommendations
-        if len(missing_skills) > 3:
-            recommendations.append("Focus on building a portfolio project that demonstrates multiple required skills")
-            learning_resources.append("GitHub learning paths")
-
-        if weak_skills:
-            recommendations.append(f"Strengthen your knowledge in: {', '.join(weak_skills[:3])}")
-
-        return {
-            "recommendations": recommendations[:8],  # Limit to 8 recommendations
-            "learning_resources": learning_resources[:6],  # Limit to 6 resources
-        }
-
     async def analyze_skill_gaps(self, request: SkillGapAnalysisRequest) -> SkillGapAnalysisResponse:
         """Analyze skill gaps for a target role."""
         import time
@@ -1346,76 +1050,8 @@ class RecommendationService:
 
             logger.info("✅ GitHub profile analysis successful")
 
-            # Get skill requirements for the target role
-            logger.info("📋 STEP 2: ANALYZING ROLE REQUIREMENTS")
-            logger.info("-" * 50)
-
-            role_requirements = self._get_role_skill_requirements(request.target_role or "", request.experience_level or "mid")
-
-            logger.info(f"📋 Role requirements loaded: {len(role_requirements['required'])} required skills")
-
-            # Analyze skill matches
-            logger.info("🔍 STEP 3: ANALYZING SKILL MATCHES")
-            logger.info("-" * 50)
-            skill_analysis = []
-
-            # Analyze required skills
-            for skill in role_requirements["required"]:
-                match = self._analyze_skill_match(skill, role_requirements["required"], github_data)
-                skill_analysis.append(match)
-
-            # Analyze preferred skills (partial weight)
-            for skill in role_requirements["preferred"][:5]:  # Top 5 preferred skills
-                match = self._analyze_skill_match(skill, role_requirements["required"], github_data)
-
-                skill_analysis.append(match)
-
-            logger.info(f"✅ Analyzed {len(skill_analysis)} skills")
-
-            # Calculate overall match score
-            required_matches = [match for match in skill_analysis if match.match_level in ["strong", "moderate"]]
-            overall_match_score = int((len(required_matches) / len(role_requirements["required"])) * 100)
-            overall_match_score = min(overall_match_score, 100)
-
-            # Generate insights
-            logger.info("💡 STEP 4: GENERATING INSIGHTS")
-            logger.info("-" * 50)
-
-            # Identify strengths and gaps
-            strengths = []
-            gaps = []
-
-            for match in skill_analysis:
-                if match.match_level == "strong":
-                    strengths.append(match.skill)
-                elif match.match_level in ["missing", "weak"]:
-                    gaps.append(match.skill)
-
-            # Generate recommendations
-            recommendations_data = self._generate_skill_recommendations(skill_analysis, request.target_role)
-
-            # Create analysis summary
-            analysis_summary = self._create_gap_analysis_summary(overall_match_score, len(strengths), len(gaps), request.target_role)
-
-            logger.info("🎉 SKILL GAP ANALYSIS COMPLETED")
-            logger.info("-" * 50)
-            logger.info(f"📊 Overall Match Score: {overall_match_score}%")
-            logger.info(f"💪 Strengths Identified: {len(strengths)}")
-            logger.info(f"🎯 Gaps Identified: {len(gaps)}")
-            logger.info("=" * 60)
-
-            return SkillGapAnalysisResponse(
-                github_username=request.github_username,
-                target_role=request.target_role,
-                overall_match_score=overall_match_score,
-                skill_analysis=skill_analysis,
-                strengths=strengths,
-                gaps=gaps,
-                recommendations=recommendations_data["recommendations"],
-                learning_resources=recommendations_data["learning_resources"],
-                analysis_summary=analysis_summary,
-                generated_at=datetime.utcnow(),
-            )
+            # Use SkillAnalysisService for the rest of the analysis
+            return self.skill_analysis_service.analyze_skill_gaps(request, github_data)
 
         except Exception as e:
             logger.error(f"💥 ERROR in skill gap analysis for {request.github_username}: {e}")

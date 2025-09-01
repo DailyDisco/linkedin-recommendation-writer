@@ -10,6 +10,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
 from app.core.config import settings
+from app.core.security_config import security_utils
 
 logger = logging.getLogger(__name__)
 
@@ -29,14 +30,18 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
 
 
 class LoggingMiddleware(BaseHTTPMiddleware):
-    """Log request and response details."""
+    """Log request and response details with PII filtering."""
 
     async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
         start_time = time.time()
         request_id = getattr(request.state, "request_id", "unknown")
 
+        # Sanitize URL and query parameters for logging
+        safe_url = security_utils.filter_pii_for_logging(str(request.url))
+        safe_client = request.client.host if request.client else "unknown"
+
         # Log request
-        logger.info(f"Request started - ID: {request_id}, Method: {request.method}, " f"URL: {request.url}, Client: {request.client.host if request.client else 'unknown'}")
+        logger.info(f"Request started - ID: {request_id}, Method: {request.method}, " f"URL: {safe_url}, Client: {safe_client}")
 
         try:
             response = await call_next(request)
@@ -49,8 +54,9 @@ class LoggingMiddleware(BaseHTTPMiddleware):
 
         except Exception as e:
             duration = time.time() - start_time
+            safe_error = security_utils.filter_pii_for_logging(str(e))
             logger.error(
-                f"Request failed - ID: {request_id}, Error: {str(e)}, " f"Duration: {duration:.3f}s",
+                f"Request failed - ID: {request_id}, Error: {safe_error}, " f"Duration: {duration:.3f}s",
                 exc_info=True,
             )
             raise

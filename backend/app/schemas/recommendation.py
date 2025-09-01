@@ -3,13 +3,15 @@
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from app.core.security_config import security_utils
 
 
 class RecommendationRequest(BaseModel):
     """Request schema for generating recommendations."""
 
-    github_username: str = Field(..., description="GitHub username to analyze")
+    github_username: str = Field(..., description="GitHub username to analyze", min_length=1, max_length=39)
     recommendation_type: str = Field(
         "professional",
         description="Type of recommendation",
@@ -25,13 +27,52 @@ class RecommendationRequest(BaseModel):
         description="Length of the recommendation",
         pattern="^(short|medium|long)$",
     )
-    custom_prompt: Optional[str] = Field(None, description="Custom prompt additions for personalization")
-    include_specific_skills: Optional[list] = Field(None, description="Specific skills to highlight")
-    target_role: Optional[str] = Field(None, description="Target role or industry for the recommendation")
-    include_keywords: Optional[List[str]] = Field(None, description="Keywords/phrases that must be included in the recommendation")
-    exclude_keywords: Optional[List[str]] = Field(None, description="Keywords/phrases that must NOT be included in the recommendation")
+    custom_prompt: Optional[str] = Field(None, description="Custom prompt additions for personalization", max_length=1000)
+    include_specific_skills: Optional[List[str]] = Field(None, description="Specific skills to highlight", max_items=20)
+    target_role: Optional[str] = Field(None, description="Target role or industry for the recommendation", max_length=200)
+    include_keywords: Optional[List[str]] = Field(None, description="Keywords/phrases that must be included", max_items=10)
+    exclude_keywords: Optional[List[str]] = Field(None, description="Keywords/phrases that must NOT be included", max_items=10)
     analysis_context_type: Optional[str] = Field("profile", description="Type of analysis performed: 'profile' or 'repo_only'")
-    repository_url: Optional[str] = Field(None, description="Repository URL if repo-specific analysis")
+    repository_url: Optional[str] = Field(None, description="Repository URL if repo-specific analysis", max_length=500)
+
+    @field_validator("github_username")
+    @classmethod
+    def validate_github_username(cls, v: str) -> str:
+        """Validate GitHub username format."""
+        if not security_utils.validate_github_username(v):
+            raise ValueError("Invalid GitHub username format")
+        return v
+
+    @field_validator("repository_url")
+    @classmethod
+    def validate_repository_url(cls, v: Optional[str]) -> Optional[str]:
+        """Validate repository URL if provided."""
+        if v and not security_utils.validate_url(v, ["github.com"]):
+            raise ValueError("Invalid repository URL or not a GitHub URL")
+        return v
+
+    @field_validator("custom_prompt", "target_role")
+    @classmethod
+    def sanitize_text_fields(cls, v: Optional[str]) -> Optional[str]:
+        """Sanitize text fields to remove dangerous content."""
+        if v:
+            return security_utils.sanitize_text(v)
+        return v
+
+    @field_validator("include_keywords", "exclude_keywords", "include_specific_skills")
+    @classmethod
+    def validate_and_sanitize_lists(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+        """Validate and sanitize list inputs."""
+        if v:
+            # Limit list size and sanitize each item
+            sanitized = []
+            for item in v[:20]:  # Limit to 20 items
+                if isinstance(item, str):
+                    sanitized_item = security_utils.sanitize_text(item)
+                    if sanitized_item and len(sanitized_item) <= 100:  # Max 100 chars per item
+                        sanitized.append(sanitized_item)
+            return sanitized if sanitized else None
+        return v
 
 
 class RecommendationOption(BaseModel):
