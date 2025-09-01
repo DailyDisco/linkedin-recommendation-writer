@@ -1,4 +1,12 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
+
+// Simple interface for progress updates
+interface ProgressUpdate {
+  stage: string;
+  progress: number;
+  status?: string;
+  error?: string;
+}
 import ErrorBoundary from './ui/error-boundary';
 import { parseGitHubInput, validateGitHubInput } from '@/lib/utils';
 import { useRecommendationCount } from '../hooks/useLocalStorage';
@@ -22,6 +30,8 @@ import type {
   ContributorInfo,
   RecommendationRequest,
   RecommendationOption,
+  Recommendation,
+  RecommendationOptionsResponse,
 } from '../types/index';
 
 interface RecommendationModalProps {
@@ -205,21 +215,22 @@ Key Achievements: ${state.formData.notableAchievements}
     // Use streaming version for real-time progress updates
     generateOptionsStream.generate(
       request,
-      progress => {
+      (progress: ProgressUpdate) => {
         // Update progress in state
         dispatch({ type: 'SET_CURRENT_STAGE', payload: progress.stage });
         dispatch({ type: 'SET_PROGRESS', payload: progress.progress });
       },
-      data => {
+      (data: unknown) => {
         // Increment count only if not logged in and generation was successful
         if (!isLoggedIn) {
           incrementAnonCount();
         }
 
-        const optionsWithParams = data.options.map(
+        const responseData = data as RecommendationOptionsResponse;
+        const optionsWithParams = responseData.options.map(
           (option: RecommendationOption) => ({
             ...option,
-            generation_parameters: data.generation_parameters || {},
+            generation_parameters: responseData.generation_parameters || {},
           })
         );
         dispatch({ type: 'SET_OPTIONS', payload: optionsWithParams });
@@ -281,7 +292,7 @@ Key Achievements: ${state.formData.notableAchievements}
 
         dispatch({ type: 'SET_STEP', payload: 'result' });
       },
-      onError: () => {},
+      onError: () => { },
     });
   };
 
@@ -326,11 +337,11 @@ Key Achievements: ${state.formData.notableAchievements}
         dispatch({ type: 'SET_CURRENT_STAGE', payload: progress.stage });
         dispatch({ type: 'SET_PROGRESS', payload: progress.progress });
       },
-      regeneratedRecommendation => {
+      (regeneratedRecommendation: unknown) => {
         if (!isLoggedIn) {
           incrementAnonCount();
         }
-        dispatch({ type: 'SET_RESULT', payload: regeneratedRecommendation });
+        dispatch({ type: 'SET_RESULT', payload: regeneratedRecommendation as Recommendation });
         dispatch({ type: 'SET_REGENERATE_INSTRUCTIONS', payload: '' });
         dispatch({ type: 'SET_IS_REGENERATING', payload: false });
       },
@@ -344,7 +355,7 @@ Key Achievements: ${state.formData.notableAchievements}
     reset();
   };
 
-  const handleFetchSuggestions = async (
+  const handleFetchSuggestions = useCallback(async (
     githubUsername: string,
     recommendationType: string,
     tone: string,
@@ -372,7 +383,7 @@ Key Achievements: ${state.formData.notableAchievements}
     } finally {
       dispatch({ type: 'SET_LOADING_SUGGESTIONS', payload: false });
     }
-  };
+  }, [isLoggedIn, anonRecommendationCount, dispatch]);
 
   if (!isOpen) return null;
 
