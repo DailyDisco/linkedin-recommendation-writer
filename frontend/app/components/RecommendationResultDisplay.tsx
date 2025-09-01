@@ -22,7 +22,6 @@ import type {
   RecommendationOption,
   ContributorInfo,
   Recommendation as ApiRecommendation,
-  KeywordRefinementResult, // Import KeywordRefinementResult
 } from '@/types/index';
 import {
   Select,

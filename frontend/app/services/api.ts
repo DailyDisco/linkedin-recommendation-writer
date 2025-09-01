@@ -9,6 +9,7 @@ import type {
   RegenerateRequest,
   SkillGapAnalysisResponse,
 } from '../types';
+import type { RecommendationFormData } from '../hooks/useRecommendationState';
 import type { AxiosRequestConfig } from 'axios';
 
 const API_BASE_URL =
@@ -334,6 +335,42 @@ export const apiClient = {
       '/recommendations/analyze-skill-gaps',
       data
     );
+    return response.data;
+  },
+
+  // Prompt Assistant
+  async getPromptSuggestions(data: {
+    github_username: string;
+    recommendation_type: string;
+    tone: string;
+    length: string;
+  }) {
+    const response = await api.post(
+      '/recommendations/prompt-suggestions',
+      data
+    );
+    return response.data;
+  },
+
+  async getAutocompleteSuggestions(data: {
+    github_username: string;
+    field_name: 'specific_skills' | 'notable_achievements';
+    current_input: string;
+  }): Promise<string[]> {
+    const response = await api.post(
+      '/recommendations/autocomplete-suggestions',
+      data
+    );
+    return response.data;
+  },
+
+  async chatWithAssistant(data: {
+    github_username: string;
+    conversation_history: Array<{ role: string; content: string }>;
+    user_message: string;
+    current_form_data: RecommendationFormData;
+  }) {
+    const response = await api.post('/recommendations/chat-assistant', data);
     return response.data;
   },
 

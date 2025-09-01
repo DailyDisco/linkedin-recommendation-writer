@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
+
 import { Send, Bot, User, Loader2, MessageSquare } from 'lucide-react';
 import { apiClient } from '@/services/api';
 import type { ContributorInfo } from '../types/index';
@@ -234,8 +234,9 @@ export const PromptAssistantChat: React.FC<PromptAssistantChatProps> = ({
           </Button>
         </div>
         <p className='text-xs text-gray-500 mt-2'>
-          Examples: "What should I write about working relationship?" or "Help
-          me describe technical skills"
+          Examples: &ldquo;What should I write about working
+          relationship?&rdquo; or &ldquo;Help me describe technical
+          skills&rdquo;
         </p>
       </div>
     </div>

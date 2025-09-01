@@ -10,10 +10,7 @@ import {
   CommandGroup,
   CommandItem,
 } from '@/components/ui/command';
-import {
-  Popover,
-  PopoverContent,
-} from '@/components/ui/popover';
+import { Popover, PopoverContent } from '@/components/ui/popover';
 import { AlertCircle, Loader2, Lightbulb } from 'lucide-react';
 import { GitHubInputSection } from './form-sections/GitHubInputSection';
 import { AnalysisTypeSection } from './form-sections/AnalysisTypeSection';
@@ -247,9 +244,9 @@ export const RecommendationFormNew: React.FC<RecommendationFormNewProps> = ({
           </div>
         )}
         <p className='mt-1 text-sm text-gray-600'>
-          Describe your professional connection, e.g., &ldquo;We collaborated on the
-          frontend team for 8 months&rdquo; or &ldquo;I mentored them during their
-          internship.&rdquo;
+          Describe your professional connection, e.g., &ldquo;We collaborated on
+          the frontend team for 8 months&rdquo; or &ldquo;I mentored them during
+          their internship.&rdquo;
         </p>
       </div>
 
@@ -314,8 +311,9 @@ export const RecommendationFormNew: React.FC<RecommendationFormNewProps> = ({
           </Popover>
         </div>
         <p className='mt-1 text-sm text-gray-600'>
-          List technical skills you observed, e.g., &ldquo;React, Node.js, API design&rdquo;
-          or &ldquo;Strong debugging skills, excellent code reviews.&rdquo;
+          List technical skills you observed, e.g., &ldquo;React, Node.js, API
+          design&rdquo; or &ldquo;Strong debugging skills, excellent code
+          reviews.&rdquo;
         </p>
       </div>
 
@@ -336,8 +334,9 @@ export const RecommendationFormNew: React.FC<RecommendationFormNewProps> = ({
           onChange={e => onChange('timeWorkedTogether', e.target.value)}
         />
         <p className='mt-1 text-sm text-gray-600'>
-          Specify the duration of your collaboration, e.g., &ldquo;6 months&rdquo;, &ldquo;2
-          years&rdquo;, or &ldquo;January 2022 - June 2023&rdquo;.
+          Specify the duration of your collaboration, e.g., &ldquo;6
+          months&rdquo;, &ldquo;2 years&rdquo;, or &ldquo;January 2022 - June
+          2023&rdquo;.
         </p>
       </div>
 
@@ -405,8 +404,9 @@ export const RecommendationFormNew: React.FC<RecommendationFormNewProps> = ({
           </Popover>
         </div>
         <p className='mt-1 text-sm text-gray-600'>
-          Highlight specific accomplishments or impact, e.g., &ldquo;Reduced app load
-          time by 40%&rdquo; or &ldquo;Led the migration to microservices architecture.&rdquo;
+          Highlight specific accomplishments or impact, e.g., &ldquo;Reduced app
+          load time by 40%&rdquo; or &ldquo;Led the migration to microservices
+          architecture.&rdquo;
         </p>
       </div>
 

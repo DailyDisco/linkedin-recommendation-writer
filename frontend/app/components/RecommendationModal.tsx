@@ -19,11 +19,9 @@ import RecommendationOptionsList from './recommendation/RecommendationOptionsLis
 import { RecommendationFormNew } from './recommendation/RecommendationFormNew';
 import RecommendationResultDisplay from './RecommendationResultDisplay';
 import type {
-  KeywordRefinementResult,
   ContributorInfo,
   RecommendationRequest,
   RecommendationOption,
-  Recommendation,
 } from '../types/index';
 
 interface RecommendationModalProps {
@@ -205,7 +203,7 @@ Key Achievements: ${state.formData.notableAchievements}
     };
 
     // Use streaming version for real-time progress updates
-    const { disconnect: _disconnect } = generateOptionsStream.generate(
+    generateOptionsStream.generate(
       request,
       progress => {
         // Update progress in state
@@ -218,10 +216,12 @@ Key Achievements: ${state.formData.notableAchievements}
           incrementAnonCount();
         }
 
-        const optionsWithParams = data.options.map((option: any) => ({
-          ...option,
-          generation_parameters: data.generation_parameters || {},
-        }));
+        const optionsWithParams = data.options.map(
+          (option: RecommendationOption) => ({
+            ...option,
+            generation_parameters: data.generation_parameters || {},
+          })
+        );
         dispatch({ type: 'SET_OPTIONS', payload: optionsWithParams });
 
         trackEngagement.recommendationGenerated({
@@ -233,7 +233,7 @@ Key Achievements: ${state.formData.notableAchievements}
 
         dispatch({ type: 'SET_STEP', payload: 'options' });
       },
-      error => {
+      _error => {
         dispatch({ type: 'SET_STEP', payload: 'form' });
       }
     );
@@ -319,7 +319,7 @@ Key Achievements: ${state.formData.notableAchievements}
     dispatch({ type: 'SET_IS_REGENERATING', payload: true });
 
     // Use streaming version for real-time progress updates during refinement
-    const { disconnect: _disconnectRegenerate } = regenerateStream.regenerate(
+    regenerateStream.regenerate(
       params,
       progress => {
         // Update progress in state
@@ -334,34 +334,13 @@ Key Achievements: ${state.formData.notableAchievements}
         dispatch({ type: 'SET_REGENERATE_INSTRUCTIONS', payload: '' });
         dispatch({ type: 'SET_IS_REGENERATING', payload: false });
       },
-      error => {
+      _error => {
         dispatch({ type: 'SET_IS_REGENERATING', payload: false });
       }
     );
   };
 
-  const handleRefinementComplete = (result: KeywordRefinementResult) => {
-    if (result) {
-      const newRecommendation = state.result
-        ? { ...state.result, content: result.refined_content } // Use `state.result` for original fields
-        : null;
 
-      dispatch({
-        type: 'SET_RESULT',
-        payload: newRecommendation || (state.result as Recommendation),
-      }); // Ensure payload is Recommendation
-
-      dispatch({
-        type: 'UPDATE_DYNAMIC_REFINEMENT_PARAMS',
-        payload: {
-          tone: state.dynamicTone,
-          length: state.dynamicLength,
-          include_keywords: result.include_keywords_used || [],
-          exclude_keywords: result.exclude_keywords_avoided || [],
-        },
-      });
-    }
-  };
 
   const handleReset = () => {
     reset();
@@ -484,20 +463,12 @@ Key Achievements: ${state.formData.notableAchievements}
                     payload: instructions,
                   })
                 }
-                setGeneratedRecommendation={rec =>
-                  dispatch({
-                    type: 'SET_RESULT',
-                    payload: rec || (state.result as Recommendation),
-                  })
-                }
                 isRegenerating={regenerateMutation.isPending}
                 onBackToOptions={() =>
                   dispatch({ type: 'SET_STEP', payload: 'options' })
                 }
                 onGenerateAnother={handleReset}
                 onRefine={handleRegenerate}
-                onClose={onClose}
-                onRefinementComplete={handleRefinementComplete}
                 initialIncludeKeywords={state.dynamicIncludeKeywords}
                 initialExcludeKeywords={state.dynamicExcludeKeywords}
               />

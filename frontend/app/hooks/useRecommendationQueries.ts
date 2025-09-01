@@ -7,7 +7,7 @@ import type { RecommendationRequest, HttpError } from '../types/index';
 // Custom hook for SSE connections
 export const useSSEConnection = (
   url: string,
-  onMessage: (data: any) => void,
+  onMessage: (data: unknown) => void,
   onError?: (error: Event) => void,
   enabled: boolean = true
 ) => {
@@ -61,10 +61,10 @@ export const useGenerateRecommendationOptionsStream = () => {
       stage: string;
       progress: number;
       status: string;
-      result?: any;
+      result?: unknown;
       error?: string;
     }) => void,
-    onComplete: (result: any) => void,
+    onComplete: (result: unknown) => void,
     onError: (error: string) => void
   ) => {
     // Build query string for the streaming endpoint
@@ -346,25 +346,15 @@ export const useRegenerateRecommendationStream = () => {
       stage: string;
       progress: number;
       status: string;
-      result?: any;
+      result?: unknown;
       error?: string;
     }) => void,
-    onComplete: (result: any) => void,
+    onComplete: (result: unknown) => void,
     onError: (error: string) => void
   ) => {
-    // Prepare the request body for POST
-    const requestBody = {
-      original_content: params.original_content,
-      refinement_instructions: params.refinement_instructions,
-      github_username: params.github_username,
-      recommendation_type: params.recommendation_type || 'professional',
-      tone: params.tone || 'professional',
-      length: params.length || 'medium',
-      dynamic_tone: params.dynamic_tone,
-      dynamic_length: params.dynamic_length,
-      include_keywords: params.include_keywords,
-      exclude_keywords: params.exclude_keywords,
-    };
+    // Note: SSE doesn't support POST body directly, so we're not using requestBody
+    // In a real implementation, you might need to establish the SSE connection first,
+    // then send the POST request to trigger the streaming
 
     const url = `${apiClient.baseURL}/recommendations/regenerate/stream`;
 
@@ -394,7 +384,16 @@ export const useRegenerateRecommendationStream = () => {
           // Update in user's recommendations list
           queryClient.setQueryData(
             ['user-recommendations', params.github_username],
-            (oldData: any) => {
+            (
+              oldData:
+                | {
+                    recommendations: unknown[];
+                    total: number;
+                    page: number;
+                    page_size: number;
+                  }
+                | undefined
+            ) => {
               if (!oldData)
                 return {
                   recommendations: [data.result],
@@ -405,8 +404,11 @@ export const useRegenerateRecommendationStream = () => {
 
               return {
                 ...oldData,
-                recommendations: oldData.recommendations.map((rec: any) =>
-                  rec.id === data.result.id ? data.result : rec
+                recommendations: oldData.recommendations.map(
+                  (rec: { id: unknown }) =>
+                    rec.id === (data.result as { id: unknown }).id
+                      ? data.result
+                      : rec
                 ),
               };
             }
@@ -436,8 +438,7 @@ export const useRegenerateRecommendationStream = () => {
       }
     };
 
-    // Since SSE doesn't support POST body directly, we'll need to handle this differently
-    // For now, we'll use a workaround by encoding the data in the URL or using a different approach
+    // Note: SSE doesn't support POST body directly, so we're not using requestBody
     // In a real implementation, you might need to establish the SSE connection first,
     // then send the POST request to trigger the streaming
 
