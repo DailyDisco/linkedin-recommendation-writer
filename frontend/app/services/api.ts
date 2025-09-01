@@ -12,8 +12,19 @@ import type {
 import type { RecommendationFormData } from '../hooks/useRecommendationState';
 import type { AxiosRequestConfig } from 'axios';
 
+// Determine API base URL based on environment
+// Use proxy path for development, full URL for production
+const apiBaseUrl = '/api';
+
+// Debug logging
+if (typeof window !== 'undefined') {
+  console.log('API Base URL:', apiBaseUrl);
+  console.log('Window location hostname:', window.location.hostname);
+  console.log('Window location href:', window.location.href);
+}
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: apiBaseUrl,
   timeout: 15000, // Reduced to 15 seconds for better UX
   headers: {
     'Content-Type': 'application/json',
@@ -364,8 +375,20 @@ export const apiClient = {
     user_message: string;
     current_form_data: RecommendationFormData;
   }) {
-    const response = await api.post('/recommendations/chat-assistant', data);
-    return response.data;
+    console.log(
+      'chatWithAssistant called with URL:',
+      api.defaults.baseURL + '/recommendations/chat-assistant'
+    );
+    console.log('Request data:', data);
+    try {
+      const response = await api.post('/recommendations/chat-assistant', data);
+      console.log('chatWithAssistant response:', response);
+      return response.data;
+    } catch (error) {
+      console.error('chatWithAssistant error:', error);
+      console.error('Error details:', error.response?.data || error.message);
+      throw error;
+    }
   },
 
   // Version History

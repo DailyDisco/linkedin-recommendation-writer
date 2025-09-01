@@ -92,6 +92,8 @@ export interface RecommendationRequest {
   target_role?: string;
   analysis_type?: 'profile' | 'repo_only';
   repository_url?: string;
+  include_keywords?: string[];
+  exclude_keywords?: string[];
 }
 
 export interface Recommendation {
