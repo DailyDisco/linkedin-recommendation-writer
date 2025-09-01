@@ -1,7 +1,7 @@
 """AI Recommendation Service for generating LinkedIn recommendations."""
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from app.core.config import settings
 from app.core.redis_client import get_cache, set_cache
@@ -37,6 +37,302 @@ class AIRecommendationService:
                 top_p=0.9,
                 top_k=40,
             )
+
+    async def generate_recommendation_stream(
+        self,
+        github_data: Dict[str, Any],
+        recommendation_type: str = "professional",
+        tone: str = "professional",
+        length: str = "medium",
+        custom_prompt: Optional[str] = None,
+        target_role: Optional[str] = None,
+        specific_skills: Optional[list] = None,
+        exclude_keywords: Optional[list] = None,
+        dynamic_params: Optional[Dict[str, Any]] = None,
+    ) -> AsyncGenerator[Dict[str, Any], None]:
+        """Generate a LinkedIn recommendation with streaming progress updates."""
+
+        if not self.client:
+            raise ValueError("Gemini AI not configured")
+
+        try:
+            # Stage 1: Initializing
+            yield {
+                "stage": "Initializing AI service...",
+                "progress": 5,
+                "status": "preparing",
+            }
+
+            # Stage 2: Building prompt
+            yield {
+                "stage": "Analyzing GitHub profile data...",
+                "progress": 15,
+                "status": "analyzing",
+            }
+
+            # Build the initial prompt
+            initial_prompt = self.prompt_service.build_prompt(
+                github_data=github_data,
+                recommendation_type=recommendation_type,
+                tone=tone,
+                length=length,
+                custom_prompt=custom_prompt,
+                target_role=target_role,
+                specific_skills=specific_skills,
+                exclude_keywords=exclude_keywords,
+            )
+
+            # Stage 3: Identifying key contributions
+            yield {
+                "stage": "Identifying key contributions and skills...",
+                "progress": 30,
+                "status": "processing",
+            }
+
+            # Check cache for final result
+            cache_key = f"ai_recommendation_v3:{hash(initial_prompt)}"
+
+            cached_result = await get_cache(cache_key)
+            if cached_result and isinstance(cached_result, dict):
+                logger.info("Cache hit for AI recommendation")
+                yield {
+                    "stage": "Generating recommendation options...",
+                    "progress": 70,
+                    "status": "generating",
+                }
+                # Return cached result with final progress
+                yield {
+                    "stage": "Recommendation ready!",
+                    "progress": 100,
+                    "status": "complete",
+                    "result": cached_result,
+                }
+                return
+
+            # Stage 4: Generating options
+            yield {
+                "stage": "Generating recommendation options...",
+                "progress": 50,
+                "status": "generating",
+            }
+
+            # Generate options with progress updates
+            options = []
+            base_username = github_data["user_data"]["github_username"]
+
+            option_configs = [
+                {
+                    "name": "Option 1",
+                    "focus": "technical_expertise",
+                    "temperature_modifier": 0.1,
+                    "custom_instruction": "Focus on technical skills and problem-solving abilities.",
+                },
+                {
+                    "name": "Option 2",
+                    "focus": "collaboration",
+                    "temperature_modifier": 0.2,
+                    "custom_instruction": "Emphasize teamwork and collaborative abilities.",
+                },
+                {
+                    "name": "Option 3",
+                    "focus": "leadership_growth",
+                    "temperature_modifier": 0.15,
+                    "custom_instruction": "Highlight leadership potential and growth mindset.",
+                },
+            ]
+
+            for i, config in enumerate(option_configs, 1):
+                progress = 50 + (i * 15)  # 65%, 80%, 95%
+                yield {
+                    "stage": f"Drafting {config['name']}...",
+                    "progress": progress,
+                    "status": "generating",
+                }
+
+                # Create customized prompt for this option
+                option_prompt = self.prompt_service.build_option_prompt(
+                    initial_prompt,
+                    str(config["custom_instruction"]),
+                    str(config["focus"]),
+                )
+
+                # Generate the option
+                temp_modifier = config.get("temperature_modifier", 0.7)
+                temp_modifier = float(temp_modifier) if isinstance(temp_modifier, (int, float, str)) else 0.7
+
+                option_gen_params = {
+                    "github_username": base_username,
+                    "recommendation_type": recommendation_type,
+                    "tone": tone,
+                    "length": length,
+                    "focus": config["focus"],
+                }
+
+                option_content = await self._generate_single_option(option_prompt, temp_modifier, length, option_gen_params)
+
+                # Create option object
+                option = {
+                    "id": i,
+                    "name": config["name"],
+                    "content": option_content.strip(),
+                    "title": self.prompt_service.extract_title(option_content, base_username),
+                    "word_count": len(option_content.split()),
+                    "focus": config["focus"],
+                }
+
+                options.append(option)
+
+            # Stage 5: Finalizing
+            yield {
+                "stage": "Finalizing recommendation options...",
+                "progress": 95,
+                "status": "finalizing",
+            }
+
+            # Process and format the response
+            result = {
+                "options": options,
+                "generation_parameters": {
+                    "model": settings.GEMINI_MODEL,
+                    "temperature": settings.GEMINI_TEMPERATURE,
+                    "max_tokens": settings.GEMINI_MAX_TOKENS,
+                    "recommendation_type": recommendation_type,
+                    "tone": tone,
+                    "length": length,
+                    "multiple_options": True,
+                },
+                "generation_prompt": (initial_prompt[:500] + "..." if len(initial_prompt) > 500 else initial_prompt),
+            }
+
+            # Cache for 24 hours
+            await set_cache(cache_key, result, ttl=86400)
+
+            # Stage 6: Complete
+            yield {
+                "stage": "Recommendation ready!",
+                "progress": 100,
+                "status": "complete",
+                "result": result,
+            }
+
+        except Exception as e:
+            logger.error(f"Error in streaming recommendation generation: {e}")
+            yield {
+                "stage": f"Error: {str(e)}",
+                "progress": 0,
+                "status": "error",
+                "error": str(e),
+            }
+            raise
+
+    async def regenerate_recommendation_stream(
+        self,
+        original_content: str,
+        refinement_instructions: str,
+        github_data: Dict[str, Any],
+        recommendation_type: str = "professional",
+        tone: str = "professional",
+        length: str = "medium",
+        dynamic_tone: Optional[str] = None,
+        dynamic_length: Optional[str] = None,
+        include_keywords: Optional[List[str]] = None,
+        exclude_keywords: Optional[List[str]] = None,
+    ) -> AsyncGenerator[Dict[str, Any], None]:
+        """Regenerate a recommendation with streaming progress and dynamic refinement parameters."""
+
+        if not self.client:
+            raise ValueError("Gemini AI not configured")
+
+        try:
+            # Stage 1: Initializing
+            yield {
+                "stage": "Preparing refinement...",
+                "progress": 10,
+                "status": "preparing",
+            }
+
+            # Stage 2: Analyzing original content
+            yield {
+                "stage": "Analyzing original recommendation...",
+                "progress": 25,
+                "status": "analyzing",
+            }
+
+            # Use dynamic parameters if provided, otherwise fall back to defaults
+            final_tone = dynamic_tone or tone
+            final_length = dynamic_length or length
+
+            # Stage 3: Building refinement prompt
+            yield {
+                "stage": "Building refinement prompt...",
+                "progress": 40,
+                "status": "processing",
+            }
+
+            # Build refinement prompt with dynamic parameters
+            refinement_prompt = self.prompt_service.build_refinement_prompt_for_regeneration(
+                original_content=original_content,
+                refinement_instructions=refinement_instructions,
+                github_data=github_data,
+                recommendation_type=recommendation_type,
+                tone=final_tone,
+                length=final_length,
+                include_keywords=include_keywords,
+                exclude_keywords=exclude_keywords,
+            )
+
+            # Create regeneration parameters
+            regeneration_params: Dict[str, Any] = {
+                "recommendation_type": recommendation_type,
+                "tone": final_tone,
+                "length": final_length,
+                "include_keywords": include_keywords or [],
+                "exclude_keywords": exclude_keywords or [],
+                "refinement_instructions": refinement_instructions,
+            }
+
+            # Stage 4: Generating refined content
+            yield {
+                "stage": "Generating refined recommendation...",
+                "progress": 70,
+                "status": "generating",
+            }
+
+            # Generate refined recommendation
+            refined_content = await self._generate_refined_regeneration(refinement_prompt, final_length, regeneration_params)
+
+            # Stage 5: Finalizing
+            yield {
+                "stage": "Finalizing refined recommendation...",
+                "progress": 90,
+                "status": "finalizing",
+            }
+
+            # Return refined result
+            result = {
+                "content": refined_content.strip(),
+                "title": self.prompt_service.extract_title(refined_content, github_data["user_data"]["github_username"]),
+                "word_count": len(refined_content.split()),
+                "generation_parameters": regeneration_params,
+            }
+
+            # Stage 6: Complete
+            yield {
+                "stage": "Refined recommendation ready!",
+                "progress": 100,
+                "status": "complete",
+                "result": result,
+            }
+
+        except Exception as e:
+            logger.error(f"Error in streaming recommendation regeneration: {e}")
+            yield {
+                "stage": f"Error: {str(e)}",
+                "progress": 0,
+                "status": "error",
+                "error": str(e),
+            }
+            raise
 
     async def generate_recommendation(
         self,

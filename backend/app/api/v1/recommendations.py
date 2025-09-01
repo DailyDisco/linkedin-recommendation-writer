@@ -4,6 +4,7 @@ import logging
 from typing import Optional, Union
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.auth import get_current_active_user
@@ -11,16 +12,24 @@ from app.core.dependencies import (
     AnonymousUser,
     PaginationParams,
     check_generation_limit,
+    get_ai_service,
     get_current_user_optional,
     get_database_session,
+    get_github_service,
     get_pagination_params,
     get_recommendation_service,
     increment_generation_count,
 )
 from app.models.user import User
 from app.schemas.recommendation import (
+    AutocompleteSuggestionsRequest,
+    ChatAssistantRequest,
+    ChatAssistantResponse,
+    DynamicRefinementRequest,
     KeywordRefinementRequest,
     KeywordRefinementResponse,
+    PromptSuggestionsRequest,
+    PromptSuggestionsResponse,
     ReadmeGenerationRequest,
     ReadmeGenerationResponse,
     RecommendationFromOptionRequest,
@@ -32,8 +41,11 @@ from app.schemas.recommendation import (
     RevertToVersionRequest,
     SkillGapAnalysisRequest,
     SkillGapAnalysisResponse,
+    StreamProgressResponse,
     VersionComparisonResponse,
 )
+from app.services.ai_service import AIService
+from app.services.github_user_service import GitHubUserService
 from app.services.recommendation_service import RecommendationService
 
 logger = logging.getLogger(__name__)
@@ -546,6 +558,130 @@ async def regenerate_recommendation(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
+@router.get("/generate-options/stream")
+async def generate_recommendation_options_stream(
+    request: RecommendationRequest,
+    req: Request,
+    db: AsyncSession = Depends(get_database_session),
+    recommendation_service: RecommendationService = Depends(get_recommendation_service),
+    current_user: Union[User, AnonymousUser] = Depends(get_current_user_optional),
+):
+    """Generate recommendation options with streaming progress updates via SSE."""
+
+    # Check limit but don't increment yet
+    await check_recommendation_limit_only(db, current_user)
+
+    user_type = "authenticated" if isinstance(current_user, User) else "anonymous"
+
+    logger.info("=" * 80)
+    logger.info("🎭 STREAMING RECOMMENDATION OPTIONS GENERATION STARTED")
+    logger.info("=" * 80)
+    logger.info(f"👤 User: {current_user.username} (ID: {current_user.id}, Type: {user_type})")
+
+    async def generate_stream():
+        try:
+            # Get GitHub data
+            github_data = await recommendation_service._get_or_create_github_profile_data(db=db, github_username=request.github_username)
+
+            # Stream the generation process
+            async for progress_update in recommendation_service.ai_service.generate_recommendation_stream(
+                github_data=github_data,
+                recommendation_type=request.recommendation_type,
+                tone=request.tone,
+                length=request.length,
+                custom_prompt=request.custom_prompt,
+                target_role=request.target_role,
+                specific_skills=request.include_specific_skills,
+                exclude_keywords=request.exclude_keywords,
+            ):
+                # Format as SSE data
+                data = f"data: {StreamProgressResponse(**progress_update).model_dump_json()}\n\n"
+                yield data
+
+                # If complete, increment the counter
+                if progress_update.get("status") == "complete":
+                    await increment_recommendation_count(db, current_user, req)
+                    logger.info("✅ STREAMING OPTIONS GENERATION COMPLETED SUCCESSFULLY")
+                    logger.info("=" * 80)
+
+        except Exception as e:
+            logger.error(f"💥 CRITICAL ERROR in streaming options generation: {e}")
+            error_data = f"data: {StreamProgressResponse(stage=f'Error: {str(e)}', progress=0, status='error', error=str(e)).model_dump_json()}\n\n"
+            yield error_data
+
+    return StreamingResponse(
+        generate_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
+    )
+
+
+@router.post("/regenerate/stream")
+async def regenerate_recommendation_stream(
+    request: DynamicRefinementRequest,
+    req: Request,
+    db: AsyncSession = Depends(get_database_session),
+    recommendation_service: RecommendationService = Depends(get_recommendation_service),
+    current_user: Union[User, AnonymousUser] = Depends(get_current_user_optional),
+):
+    """Regenerate a recommendation with streaming progress and dynamic refinement via SSE."""
+
+    # Check limit but don't increment yet
+    await check_recommendation_limit_only(db, current_user)
+
+    user_type = "authenticated" if isinstance(current_user, User) else "anonymous"
+
+    logger.info("=" * 80)
+    logger.info("🔄 STREAMING RECOMMENDATION REGENERATION STARTED")
+    logger.info("=" * 80)
+    logger.info(f"👤 User: {current_user.username} (ID: {current_user.id}, Type: {user_type})")
+
+    async def regenerate_stream():
+        try:
+            # Get GitHub data
+            github_data = await recommendation_service._get_or_create_github_profile_data(db=db, github_username=request.github_username)
+
+            # Stream the regeneration process
+            async for progress_update in recommendation_service.ai_service.regenerate_recommendation_stream(
+                original_content=request.original_content,
+                refinement_instructions=request.refinement_instructions,
+                github_data=github_data,
+                recommendation_type=request.recommendation_type,
+                tone=request.tone,
+                length=request.length,
+                dynamic_tone=request.dynamic_tone,
+                dynamic_length=request.dynamic_length,
+                include_keywords=request.include_keywords,
+                exclude_keywords=request.exclude_keywords,
+            ):
+                # Format as SSE data
+                data = f"data: {StreamProgressResponse(**progress_update).model_dump_json()}\n\n"
+                yield data
+
+                # If complete, increment the counter
+                if progress_update.get("status") == "complete":
+                    await increment_recommendation_count(db, current_user, req)
+                    logger.info("✅ STREAMING REGENERATION COMPLETED SUCCESSFULLY")
+                    logger.info("=" * 80)
+
+        except Exception as e:
+            logger.error(f"💥 CRITICAL ERROR in streaming regeneration: {e}")
+            error_data = f"data: {StreamProgressResponse(stage=f'Error: {str(e)}', progress=0, status='error', error=str(e)).model_dump_json()}\n\n"
+            yield error_data
+
+    return StreamingResponse(
+        regenerate_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
+    )
+
+
 @router.get("/", response_model=RecommendationListResponse)
 async def list_recommendations(
     github_username: Optional[str] = Query(None, description="Filter by GitHub username"),
@@ -625,3 +761,99 @@ async def delete_recommendation(
     except Exception as e:
         logger.error(f"Error deleting recommendation {recommendation_id}: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# Prompt Assistant Endpoints
+@router.post("/prompt-suggestions", response_model=PromptSuggestionsResponse)
+async def get_prompt_suggestions(
+    request: PromptSuggestionsRequest,
+    github_user_service: GitHubUserService = Depends(get_github_service),
+    ai_service: AIService = Depends(get_ai_service),
+    current_user: Union[User, AnonymousUser] = Depends(get_current_user_optional),
+) -> PromptSuggestionsResponse:
+    """Get initial prompt suggestions for recommendation form fields."""
+    try:
+        # Get GitHub profile data for context
+        github_data = await github_user_service.analyze_github_profile(username=request.github_username, force_refresh=False, max_repositories=5)  # Limit for performance
+
+        if not github_data:
+            logger.warning(f"Could not fetch GitHub data for {request.github_username}")
+            # Return empty suggestions if no GitHub data available
+            return PromptSuggestionsResponse()
+
+        # Get AI-generated suggestions
+        suggestions = await ai_service.get_initial_prompt_suggestions(
+            github_data=github_data,
+            recommendation_type=request.recommendation_type,
+            tone=request.tone,
+            length=request.length,
+        )
+
+        return suggestions
+
+    except Exception as e:
+        logger.error(f"Error generating prompt suggestions: {e}")
+        # Return empty suggestions on error to avoid breaking the UI
+        return PromptSuggestionsResponse()
+
+
+@router.post("/autocomplete-suggestions", response_model=list[str])
+async def get_autocomplete_suggestions_api(
+    request: AutocompleteSuggestionsRequest,
+    github_user_service: GitHubUserService = Depends(get_github_service),
+    ai_service: AIService = Depends(get_ai_service),
+    current_user: Union[User, AnonymousUser] = Depends(get_current_user_optional),
+) -> list[str]:
+    """Get AI-powered auto-completion suggestions for form fields."""
+    try:
+        # Get GitHub profile data for context
+        github_data = await github_user_service.analyze_github_profile(username=request.github_username, force_refresh=False, max_repositories=5)  # Limit for performance
+
+        if not github_data:
+            logger.warning(f"Could not fetch GitHub data for {request.github_username}")
+            return []
+
+        # Get AI-generated suggestions
+        suggestions = await ai_service.get_autocomplete_suggestions(
+            github_data=github_data,
+            field_name=request.field_name,
+            current_input=request.current_input,
+        )
+
+        return suggestions
+
+    except Exception as e:
+        logger.error(f"Error generating autocomplete suggestions: {e}")
+        # Return empty list on error to avoid breaking the UI
+        return []
+
+
+@router.post("/chat-assistant", response_model=ChatAssistantResponse)
+async def chat_with_assistant_api(
+    request: ChatAssistantRequest,
+    github_user_service: GitHubUserService = Depends(get_github_service),
+    ai_service: AIService = Depends(get_ai_service),
+    current_user: Union[User, AnonymousUser] = Depends(get_current_user_optional),
+) -> ChatAssistantResponse:
+    """Handle conversational AI assistance for the recommendation form."""
+    try:
+        # Get GitHub profile data for context
+        github_data = await github_user_service.analyze_github_profile(username=request.github_username, force_refresh=False, max_repositories=5)  # Limit for performance
+
+        if not github_data:
+            logger.warning(f"Could not fetch GitHub data for {request.github_username}")
+            return ChatAssistantResponse(ai_reply="I'm sorry, but I need access to your GitHub profile to provide personalized assistance. Please try again later.")
+
+        # Get AI-generated response
+        response = await ai_service.chat_with_assistant(
+            github_data=github_data,
+            conversation_history=request.conversation_history,
+            user_message=request.user_message,
+            current_form_data=request.current_form_data,
+        )
+
+        return response
+
+    except Exception as e:
+        logger.error(f"Error in chat assistant: {e}")
+        return ChatAssistantResponse(ai_reply="I'm sorry, I encountered an error while processing your request. Please try again.")
