@@ -52,7 +52,7 @@ export default function UserProfilePage() {
     if (isLoggedIn && !userDetails && !isLoadingUserDetails) {
       fetchUserDetails();
     }
-  }, [isLoggedIn, userDetails, isLoadingUserDetails, fetchUserDetails]);
+  }, [isLoggedIn, userDetails, isLoadingUserDetails]); // Remove fetchUserDetails from dependencies to prevent infinite loop
 
   const handleRefresh = () => {
     fetchUserDetails(true); // Force refresh
@@ -156,9 +156,9 @@ export default function UserProfilePage() {
                   <AvatarFallback className='bg-gray-600 text-white font-medium'>
                     {userDetails
                       ? getAvatarInitials(
-                          userDetails.username,
-                          userDetails.email
-                        )
+                        userDetails.username,
+                        userDetails.email
+                      )
                       : 'U'}
                   </AvatarFallback>
                 </Avatar>

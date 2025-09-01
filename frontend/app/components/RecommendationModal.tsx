@@ -1,21 +1,19 @@
-import { useState, useEffect, useRef } from 'react';
-import { toast } from 'sonner';
-import { recommendationApi } from '../services/api';
-import type {
-  ContributorInfo,
-  HttpError,
-  RegenerateRequest,
-  RecommendationRequest,
-} from '../types/index';
+import { useEffect, useRef } from 'react';
 import ErrorBoundary from './ui/error-boundary';
 import { parseGitHubInput, validateGitHubInput } from '@/lib/utils';
 import { useRecommendationCount } from '../hooks/useLocalStorage';
 import { trackEngagement, trackConversion } from '../utils/analytics';
+import { useRecommendationState } from '../hooks/useRecommendationState';
+import {
+  useGenerateRecommendationOptions,
+  useCreateRecommendationFromOption,
+  useRegenerateRecommendation,
+} from '../hooks/useRecommendationQueries';
 import RecommendationModalHeader from './RecommendationModalHeader';
 import RecommendationLimitMessage from './RecommendationLimitMessage';
-import RecommendationForm from './RecommendationForm';
 import RecommendationGeneratingState from './RecommendationGeneratingState';
-import RecommendationOptionsDisplay from './RecommendationOptionsDisplay';
+import RecommendationOptionsList from './recommendation/RecommendationOptionsList';
+import { RecommendationFormNew } from './recommendation/RecommendationFormNew';
 import RecommendationResultDisplay from './RecommendationResultDisplay';
 
 interface RecommendationModalProps {
@@ -33,17 +31,22 @@ export default function RecommendationModal({
 }: RecommendationModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const firstInputRef = useRef<HTMLTextAreaElement>(null);
-  const optionsRef = useRef<HTMLDivElement>(null); // New ref for options
-  const resultRef = useRef<HTMLDivElement>(null); // New ref for result
+  const optionsRef = useRef<HTMLDivElement>(null);
+  const resultRef = useRef<HTMLDivElement>(null);
 
   const { count: anonRecommendationCount, incrementCount: incrementAnonCount } =
     useRecommendationCount();
-  const ANONYMOUS_LIMIT = 3; // Updated to match backend limit for anonymous users
+  const ANONYMOUS_LIMIT = 3;
 
-  const [showLimitExceededMessage, setShowLimitExceededMessage] =
-    useState(false);
+  // Use the new reducer-based state management
+  const { state, dispatch, updateFormField, reset } = useRecommendationState();
 
-  // Log modal open/close events
+  // React Query mutations
+  const generateOptionsMutation = useGenerateRecommendationOptions();
+  const createFromOptionMutation = useCreateRecommendationFromOption();
+  const regenerateMutation = useRegenerateRecommendation();
+
+  // Log modal open/close events and initialize state
   useEffect(() => {
     if (isOpen) {
       // Focus the first input when modal opens
@@ -51,14 +54,14 @@ export default function RecommendationModal({
         firstInputRef.current?.focus();
       }, 100);
 
-      // Check anonymous limit only if not logged in
+      // Check anonymous limit and update state
       if (!isLoggedIn && anonRecommendationCount >= ANONYMOUS_LIMIT) {
-        setShowLimitExceededMessage(true);
+        dispatch({ type: 'SET_SHOW_LIMIT_EXCEEDED', payload: true });
       } else {
-        setShowLimitExceededMessage(false);
+        dispatch({ type: 'SET_SHOW_LIMIT_EXCEEDED', payload: false });
       }
     }
-  }, [isOpen, contributor, isLoggedIn, anonRecommendationCount]);
+  }, [isOpen, isLoggedIn, anonRecommendationCount, dispatch]);
 
   // Handle escape key
   useEffect(() => {
@@ -79,57 +82,10 @@ export default function RecommendationModal({
     }
   };
 
-  // State declarations
-  const [step, setStep] = useState<
-    'form' | 'generating' | 'options' | 'result'
-  >('form');
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedRecommendation, setGeneratedRecommendation] = useState<{
-    id: number;
-    title: string;
-    content: string;
-    recommendation_type: string;
-    tone: string;
-    length: string;
-    word_count: number;
-    created_at: string;
-    github_username: string;
-  } | null>(null);
-  const [recommendationOptions, setRecommendationOptions] = useState<
-    Array<{
-      id: number;
-      name: string;
-      content: string;
-      title: string;
-      word_count: number;
-      focus: string;
-      explanation: string;
-      generation_parameters: Record<string, unknown>;
-    }>
-  >([]);
-  const [selectedOption, setSelectedOption] = useState<{
-    id: number;
-    name: string;
-    content: string;
-    title: string;
-    word_count: number;
-    focus: string;
-    explanation: string;
-    generation_parameters: Record<string, unknown>;
-  } | null>(null);
-  const [isCreatingFromOption, setIsCreatingFromOption] = useState(false);
-
-  const [isRegenerating, setIsRegenerating] = useState(false);
-  const [regenerateInstructions, setRegenerateInstructions] = useState('');
-  const [viewingFullContent, setViewingFullContent] = useState<number | null>(
-    null
-  );
-  const [activeTab, setActiveTab] = useState<'preview' | 'refine'>('preview');
-
   // Auto-scroll to options/result when step changes
   useEffect(() => {
-    if ((step === 'options' || step === 'result') && modalRef.current) {
-      const targetRef = step === 'options' ? optionsRef : resultRef;
+    if ((state.step === 'options' || state.step === 'result') && modalRef.current) {
+      const targetRef = state.step === 'options' ? optionsRef : resultRef;
       if (targetRef.current) {
         modalRef.current.scrollTo({
           top: targetRef.current.offsetTop - modalRef.current.offsetTop,
@@ -137,71 +93,33 @@ export default function RecommendationModal({
         });
       }
     }
-  }, [step, recommendationOptions.length, generatedRecommendation]); // Dependency on options/generated recs ensures it runs after content renders
-
-  const [formData, setFormData] = useState<{
-    workingRelationship: string;
-    specificSkills: string;
-    timeWorkedTogether: string;
-    notableAchievements: string;
-    recommendation_type:
-      | 'professional'
-      | 'technical'
-      | 'leadership'
-      | 'academic'
-      | 'personal';
-    tone: 'professional' | 'friendly' | 'formal' | 'casual';
-    length: 'short' | 'medium' | 'long';
-    github_input: string;
-    analysis_type: 'profile' | 'repo_only';
-    repository_url?: string;
-  }>({
-    workingRelationship: '',
-    specificSkills: '',
-    timeWorkedTogether: '',
-    notableAchievements: '',
-    recommendation_type: 'professional',
-    tone: 'professional',
-    length: 'medium',
-    github_input: '',
-    analysis_type: 'profile',
-  });
-
-  const [validationErrors, setValidationErrors] = useState<
-    Record<string, string>
-  >({});
-  const [parsedGitHubInput, setParsedGitHubInput] = useState<{
-    type: 'username' | 'repo_url';
-    username: string;
-    repository?: string;
-    fullUrl?: string;
-  } | null>(null);
+  }, [state.step, state.options.length, state.result]);
 
   // Parse GitHub input when it changes
   useEffect(() => {
-    if (formData.github_input.trim()) {
-      const parsed = parseGitHubInput(formData.github_input);
-      setParsedGitHubInput(parsed);
+    if (state.formData.github_input.trim()) {
+      const parsed = parseGitHubInput(state.formData.github_input);
+      dispatch({ type: 'SET_PARSED_GITHUB_INPUT', payload: parsed });
 
       // Auto-set analysis type based on input type
       if (parsed.type === 'repo_url') {
-        setFormData(prev => ({ ...prev, analysis_type: 'repo_only' }));
+        dispatch({ type: 'UPDATE_FORM', payload: { analysis_type: 'repo_only' } });
       } else {
-        setFormData(prev => ({ ...prev, analysis_type: 'profile' }));
+        dispatch({ type: 'UPDATE_FORM', payload: { analysis_type: 'profile' } });
       }
     } else {
-      setParsedGitHubInput(null);
+      dispatch({ type: 'SET_PARSED_GITHUB_INPUT', payload: null });
     }
-  }, [formData.github_input]);
+  }, [state.formData.github_input, dispatch]);
 
   const validateForm = () => {
     const errors: Record<string, string> = {};
 
     // Validate GitHub input
-    if (!formData.github_input.trim()) {
+    if (!state.formData.github_input.trim()) {
       errors.github_input = 'GitHub username or repository URL is required';
     } else {
-      const validation = validateGitHubInput(formData.github_input);
+      const validation = validateGitHubInput(state.formData.github_input);
       if (!validation.isValid) {
         errors.github_input = validation.error || 'Invalid GitHub input';
       }
@@ -209,20 +127,20 @@ export default function RecommendationModal({
 
     // Validate repository URL for repo_only mode
     if (
-      formData.analysis_type === 'repo_only' &&
-      parsedGitHubInput &&
-      parsedGitHubInput.type === 'username'
+      state.formData.analysis_type === 'repo_only' &&
+      state.parsedGitHubInput &&
+      state.parsedGitHubInput.type === 'username'
     ) {
-      if (!formData.repository_url || !formData.repository_url.trim()) {
+      if (!state.formData.repository_url || !state.formData.repository_url.trim()) {
         errors.repository_url =
           'Repository URL is required for repository-only analysis';
       } else {
-        const repoValidation = validateGitHubInput(formData.repository_url);
+        const repoValidation = validateGitHubInput(state.formData.repository_url);
         if (!repoValidation.isValid) {
           errors.repository_url =
             repoValidation.error || 'Invalid repository URL';
         } else {
-          const repoParsed = parseGitHubInput(formData.repository_url);
+          const repoParsed = parseGitHubInput(state.formData.repository_url);
           if (repoParsed.type !== 'repo_url') {
             errors.repository_url = 'Please enter a valid repository URL';
           }
@@ -231,14 +149,14 @@ export default function RecommendationModal({
     }
 
     // Validate working relationship
-    if (!formData.workingRelationship.trim()) {
+    if (!state.formData.workingRelationship.trim()) {
       errors.workingRelationship = 'Please describe your working relationship';
-    } else if (formData.workingRelationship.trim().length < 10) {
+    } else if (state.formData.workingRelationship.trim().length < 10) {
       errors.workingRelationship =
         'Please provide more details about your working relationship (at least 10 characters)';
     }
 
-    setValidationErrors(errors);
+    dispatch({ type: 'SET_ERRORS', payload: errors });
     return Object.keys(errors).length === 0;
   };
 
@@ -246,7 +164,7 @@ export default function RecommendationModal({
     e.preventDefault();
 
     if (!isLoggedIn && anonRecommendationCount >= ANONYMOUS_LIMIT) {
-      setShowLimitExceededMessage(true);
+      dispatch({ type: 'SET_SHOW_LIMIT_EXCEEDED', payload: true });
       return;
     }
 
@@ -254,91 +172,64 @@ export default function RecommendationModal({
       return;
     }
 
-    setIsGenerating(true);
-    setStep('generating');
+    dispatch({ type: 'SET_STEP', payload: 'generating' });
 
-    try {
-      // Create custom prompt from form data
-      const customPrompt = `
-Working Relationship: ${formData.workingRelationship}
-Notable Skills Observed: ${formData.specificSkills}
-Time Period: ${formData.timeWorkedTogether}
-Key Achievements: ${formData.notableAchievements}
+    // Create custom prompt from form data
+    const customPrompt = `
+Working Relationship: ${state.formData.workingRelationship}
+Notable Skills Observed: ${state.formData.specificSkills}
+Time Period: ${state.formData.timeWorkedTogether}
+Key Achievements: ${state.formData.notableAchievements}
             `.trim();
 
-      const request: RecommendationRequest = {
-        github_username: contributor.username, // Use selected contributor's username
-        recommendation_type: formData.recommendation_type,
-        tone: formData.tone,
-        length: formData.length,
-        custom_prompt: customPrompt,
-        include_specific_skills: formData.specificSkills
-          .split(',')
-          .map(s => s.trim())
-          .filter(Boolean),
-        target_role:
-          formData.analysis_type === 'repo_only'
-            ? `Repository: ${parsedGitHubInput!.repository || parseGitHubInput(formData.repository_url || '').repository}`
-            : undefined,
-        analysis_type: formData.analysis_type,
-        repository_url: formData.repository_url,
-      };
+    const request: RecommendationRequest = {
+      github_username: contributor.username,
+      recommendation_type: state.formData.recommendation_type,
+      tone: state.formData.tone,
+      length: state.formData.length,
+      custom_prompt: customPrompt,
+      include_specific_skills: state.formData.specificSkills
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean),
+      target_role:
+        state.formData.analysis_type === 'repo_only'
+          ? `Repository: ${state.parsedGitHubInput!.repository || parseGitHubInput(state.formData.repository_url || '').repository}`
+          : undefined,
+      analysis_type: state.formData.analysis_type,
+      repository_url: state.formData.repository_url,
+    };
 
-      const optionsResponse = await recommendationApi.generateOptions(request);
+    // Use React Query mutation - it handles loading, error, and success states
+    generateOptionsMutation.mutate(request, {
+      onSuccess: (data) => {
+        // Increment count only if not logged in and generation was successful
+        if (!isLoggedIn) {
+          incrementAnonCount();
+        }
 
-      // Increment count only if not logged in and generation was successful
-      if (!isLoggedIn) {
-        incrementAnonCount();
-      }
+        // Transform API response to include generation_parameters on each option
+        const optionsWithParams = data.options.map(option => ({
+          ...option,
+          generation_parameters: data.generation_parameters || {},
+        }));
+        dispatch({ type: 'SET_OPTIONS', payload: optionsWithParams });
 
-      // Transform API response to include generation_parameters on each option
-      const optionsWithParams = optionsResponse.options.map(option => ({
-        ...option,
-        generation_parameters: optionsResponse.generation_parameters || {},
-      }));
-      setRecommendationOptions(optionsWithParams);
+        // Track successful recommendation generation
+        trackEngagement.recommendationGenerated({
+          githubUsername: contributor.username ? 'true' : 'false',
+          tone: state.formData.tone,
+          length: state.formData.length,
+          hasKeywords: state.formData.specificSkills.trim().length > 0,
+        });
 
-      // Track successful recommendation generation
-      trackEngagement.recommendationGenerated({
-        githubUsername: contributor.username ? 'true' : 'false',
-        tone: formData.tone,
-        length: formData.length,
-        hasKeywords: formData.specificSkills.trim().length > 0,
-      });
-
-      toast.success('Recommendation options generated successfully!');
-      setStep('options');
-    } catch (err: unknown) {
-      console.error('Recommendation generation failed:', err);
-
-      // Provide more specific error messages based on error type
-      let errorMessage = 'Failed to generate recommendation. Please try again.';
-
-      const error = err as HttpError; // Type assertion for axios error structure
-      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
-        errorMessage =
-          'Request timed out. The recommendation generation is taking longer than expected. Please try again.';
-      } else if (error.response?.status === 429) {
-        errorMessage =
-          'Too many requests. Please wait a moment before trying again.';
-      } else if (error.response?.status === 500) {
-        errorMessage = 'Server error. Please try again in a few moments.';
-      } else if (error.response?.status === 400) {
-        errorMessage =
-          error.response?.data?.detail ||
-          'Invalid request. Please check your input.';
-      } else if (!error.response) {
-        errorMessage =
-          'Network error. Please check your connection and try again.';
-      } else if (error.response?.data?.detail) {
-        errorMessage = error.response.data.detail;
-      }
-
-      toast.error(errorMessage);
-      setStep('form');
-    } finally {
-      setIsGenerating(false);
-    }
+        dispatch({ type: 'SET_STEP', payload: 'options' });
+      },
+      onError: () => {
+        // Error handled by mutation
+        dispatch({ type: 'SET_STEP', payload: 'form' });
+      },
+    });
   };
 
   const handleOptionSelect = async (option: {
@@ -352,125 +243,96 @@ Key Achievements: ${formData.notableAchievements}
     generation_parameters?: Record<string, unknown>;
   }) => {
     if (!isLoggedIn && anonRecommendationCount >= ANONYMOUS_LIMIT) {
-      setShowLimitExceededMessage(true);
+      dispatch({ type: 'SET_SHOW_LIMIT_EXCEEDED', payload: true });
       return;
     }
-    setIsCreatingFromOption(true);
 
-    try {
-      const recommendation = await recommendationApi.createFromOption(
-        contributor.username,
-        {
-          ...option,
-          generation_parameters: option.generation_parameters || {},
-        },
-        recommendationOptions.map(opt => ({
-          ...opt,
-          generation_parameters: opt.generation_parameters || {},
-        })),
-        formData.analysis_type,
-        formData.repository_url,
-        formData.recommendation_type,
-        formData.tone,
-        formData.length
-      );
-
-      // Increment count only if not logged in and creation was successful
-      if (!isLoggedIn) {
-        incrementAnonCount();
-      }
-
-      setGeneratedRecommendation(recommendation);
-      setSelectedOption({
+    const params = {
+      github_username: contributor.username,
+      option: {
         ...option,
         generation_parameters: option.generation_parameters || {},
-      });
+      },
+      options: state.options.map(opt => ({
+        ...opt,
+        generation_parameters: opt.generation_parameters || {},
+      })),
+      analysis_type: state.formData.analysis_type,
+      repository_url: state.formData.repository_url,
+      recommendation_type: state.formData.recommendation_type,
+      tone: state.formData.tone,
+      length: state.formData.length,
+    };
 
-      // Track completed recommendation
-      trackConversion.recommendationCompleted();
+    // Use React Query mutation - it handles loading, error, and success states
+    createFromOptionMutation.mutate(params, {
+      onSuccess: (recommendation) => {
+        // Increment count only if not logged in and creation was successful
+        if (!isLoggedIn) {
+          incrementAnonCount();
+        }
 
-      toast.success('Recommendation created successfully!');
-      setStep('result');
-    } catch (err: unknown) {
-      console.error('Failed to create recommendation from option:', err);
-      const error = err as HttpError; // Type assertion for axios error structure
-      toast.error(
-        error.response?.data?.detail ||
-          'Failed to create recommendation from selected option'
-      );
-    } finally {
-      setIsCreatingFromOption(false);
-    }
+        dispatch({ type: 'SET_RESULT', payload: recommendation });
+        dispatch({
+          type: 'SET_SELECTED_OPTION', payload: {
+            ...option,
+            generation_parameters: option.generation_parameters || {},
+          }
+        });
+
+        // Track completed recommendation
+        trackConversion.recommendationCompleted();
+
+        dispatch({ type: 'SET_STEP', payload: 'result' });
+      },
+      onError: () => {
+        // Error handled by mutation
+      },
+    });
   };
 
   const handleViewMore = (optionId: number) => {
-    setViewingFullContent(viewingFullContent === optionId ? null : optionId);
+    dispatch({ type: 'SET_VIEWING_FULL_CONTENT', payload: optionId });
   };
 
   const handleRegenerate = async () => {
-    if (!selectedOption || !regenerateInstructions.trim()) {
+    if (!state.selectedOption || !state.regenerateInstructions.trim()) {
       return;
     }
 
     if (!isLoggedIn && anonRecommendationCount >= ANONYMOUS_LIMIT) {
-      setShowLimitExceededMessage(true);
+      dispatch({ type: 'SET_SHOW_LIMIT_EXCEEDED', payload: true });
       return;
     }
 
-    setIsRegenerating(true);
+    const params = {
+      original_content: state.selectedOption.content,
+      refinement_instructions: state.regenerateInstructions,
+      github_username: contributor.username,
+      recommendation_type: state.formData.recommendation_type,
+      tone: state.formData.tone,
+      length: state.formData.length,
+    };
 
-    try {
-      const request: RegenerateRequest = {
-        original_content: selectedOption.content,
-        refinement_instructions: regenerateInstructions,
-        github_username: contributor.username,
-        recommendation_type: formData.recommendation_type,
-        tone: formData.tone,
-        length: formData.length,
-      };
+    // Use React Query mutation - it handles loading, error, and success states
+    regenerateMutation.mutate(params, {
+      onSuccess: (regeneratedRecommendation) => {
+        // Increment count only if not logged in and regeneration was successful
+        if (!isLoggedIn) {
+          incrementAnonCount();
+        }
 
-      const regeneratedRecommendation =
-        await recommendationApi.regenerate(request);
-
-      // Increment count only if not logged in and regeneration was successful
-      if (!isLoggedIn) {
-        incrementAnonCount();
-      }
-
-      setGeneratedRecommendation(regeneratedRecommendation);
-      setRegenerateInstructions('');
-      toast.success('Recommendation refined successfully!');
-      setIsRegenerating(false);
-    } catch (err: unknown) {
-      console.error('Regeneration failed:', err);
-      const error = err as HttpError; // Type assertion for axios error structure
-
-      toast.error(
-        error.response?.data?.detail ||
-          'Failed to regenerate recommendation. Please try again.'
-      );
-      setIsRegenerating(false);
-    }
+        dispatch({ type: 'SET_RESULT', payload: regeneratedRecommendation });
+        dispatch({ type: 'SET_REGENERATE_INSTRUCTIONS', payload: '' });
+      },
+      onError: () => {
+        // Error handled by mutation
+      },
+    });
   };
 
   const handleReset = () => {
-    setStep('form');
-    setGeneratedRecommendation(null);
-    setRecommendationOptions([]);
-    setSelectedOption(null);
-    setValidationErrors({});
-    setRegenerateInstructions('');
-    setParsedGitHubInput(null);
-    setViewingFullContent(null);
-    setIsCreatingFromOption(false);
-    setIsRegenerating(false);
-    setActiveTab('preview'); // Reset active tab
-    setFormData(prev => ({
-      ...prev,
-      github_input: '',
-      analysis_type: 'profile',
-      repository_url: undefined,
-    }));
+    reset();
   };
 
   if (!isOpen) return null;
@@ -497,63 +359,57 @@ Key Achievements: ${formData.notableAchievements}
 
           {/* Content */}
           <div className='p-6'>
-            {showLimitExceededMessage ? (
+            {state.showLimitExceededMessage ? (
               <RecommendationLimitMessage onClose={onClose} />
-            ) : step === 'form' ? (
-              <RecommendationForm
+            ) : state.step === 'form' ? (
+              <RecommendationFormNew
                 contributor={contributor}
-                formData={formData}
-                setFormData={setFormData}
-                validationErrors={validationErrors}
-                setValidationErrors={setValidationErrors}
-                parsedGitHubInput={parsedGitHubInput}
-                isGenerating={isGenerating}
+                formData={state.formData}
+                errors={state.errors}
+                parsedGitHubInput={state.parsedGitHubInput}
+                isGenerating={generateOptionsMutation.isPending}
                 firstInputRef={firstInputRef}
+                onChange={(field, value) => updateFormField(field, value)}
+                onAnalysisTypeChange={(type) =>
+                  dispatch({ type: 'UPDATE_FORM', payload: { analysis_type: type } })
+                }
                 onSubmit={handleSubmit}
                 onCancel={onClose}
               />
-            ) : step === 'generating' ? (
+            ) : state.step === 'generating' ? (
               <RecommendationGeneratingState contributor={contributor} />
-            ) : step === 'options' && recommendationOptions.length > 0 ? (
-              <RecommendationOptionsDisplay
-                recommendationOptions={
-                  recommendationOptions as Array<{
-                    id: number;
-                    name: string;
-                    content: string;
-                    title: string;
-                    word_count: number;
-                    focus: string;
-                    explanation: string;
-                    generation_parameters?: Record<string, unknown>;
-                  }>
-                }
+            ) : state.step === 'options' && state.options.length > 0 ? (
+              <RecommendationOptionsList
+                options={state.options}
                 contributor={contributor}
-                formData={formData}
-                parsedGitHubInput={parsedGitHubInput}
-                isCreatingFromOption={isCreatingFromOption}
-                viewingFullContent={viewingFullContent}
-                optionsRef={optionsRef}
+                formData={state.formData}
+                parsedGitHubInput={state.parsedGitHubInput}
+                isCreatingFromOption={createFromOptionMutation.isPending}
+                viewingFullContent={state.viewingFullContent}
                 onViewMore={handleViewMore}
                 onOptionSelect={handleOptionSelect}
-                onEditDetails={() => setStep('form')}
+                onEditDetails={() => dispatch({ type: 'SET_STEP', payload: 'form' })}
                 onStartOver={handleReset}
               />
-            ) : step === 'result' &&
-              (generatedRecommendation || selectedOption) ? (
+            ) : state.step === 'result' &&
+              (state.result || state.selectedOption) ? (
               <RecommendationResultDisplay
-                generatedRecommendation={generatedRecommendation}
-                selectedOption={selectedOption}
+                generatedRecommendation={state.result}
+                selectedOption={state.selectedOption}
                 contributor={contributor}
-                formData={formData}
-                activeTab={activeTab}
+                formData={state.formData}
+                activeTab={state.activeTab}
                 resultRef={resultRef}
-                regenerateInstructions={regenerateInstructions}
-                setActiveTab={setActiveTab}
-                setRegenerateInstructions={setRegenerateInstructions}
-                setGeneratedRecommendation={setGeneratedRecommendation}
-                isRegenerating={isRegenerating}
-                onBackToOptions={() => setStep('options')}
+                regenerateInstructions={state.regenerateInstructions}
+                setActiveTab={(tab) => dispatch({ type: 'SET_ACTIVE_TAB', payload: tab })}
+                setRegenerateInstructions={(instructions) =>
+                  dispatch({ type: 'SET_REGENERATE_INSTRUCTIONS', payload: instructions })
+                }
+                setGeneratedRecommendation={(rec) =>
+                  rec ? dispatch({ type: 'SET_RESULT', payload: rec }) : null
+                }
+                isRegenerating={regenerateMutation.isPending}
+                onBackToOptions={() => dispatch({ type: 'SET_STEP', payload: 'options' })}
                 onGenerateAnother={handleReset}
                 onRefine={handleRegenerate}
                 onClose={onClose}

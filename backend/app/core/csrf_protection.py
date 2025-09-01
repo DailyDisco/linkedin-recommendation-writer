@@ -214,7 +214,7 @@ class APICSRFProtectionMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         # TEMPORARY: Allow GitHub analysis endpoints without authentication for testing
-        if "/api/v1/github/analyze" in request.url.path:
+        if "/api/v1/github/analyze" in request.url.path or "/api/v1/github/repository/contributors" in request.url.path:
             return await call_next(request)
 
         # Check for API key or proper authorization
