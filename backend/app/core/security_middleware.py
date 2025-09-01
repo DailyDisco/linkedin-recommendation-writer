@@ -110,7 +110,7 @@ class EnhancedSecurityHeadersMiddleware(BaseHTTPMiddleware):
         # Enhanced security headers
         headers = {
             # Content Security Policy - strict but practical
-            "Content-Security-Policy": self._get_csp_policy(),
+            "Content-Security-Policy": self._get_csp_policy(request),
             # Prevent MIME type sniffing
             "X-Content-Type-Options": "nosniff",
             # Prevent clickjacking
@@ -139,8 +139,10 @@ class EnhancedSecurityHeadersMiddleware(BaseHTTPMiddleware):
 
         return response
 
-    def _get_csp_policy(self) -> str:
-        """Generate Content Security Policy based on environment."""
+    def _get_csp_policy(self, request: Request) -> str:
+        """Generate Content Security Policy based on environment and request path."""
+        is_frontend_request = not request.url.path.startswith("/api/")
+
         if settings.ENVIRONMENT == "development":
             # More permissive for development
             return (
@@ -155,19 +157,35 @@ class EnhancedSecurityHeadersMiddleware(BaseHTTPMiddleware):
                 "form-action 'self';"
             )
         else:
-            # Strict CSP for production
-            return (
-                "default-src 'self'; "
-                "script-src 'self'; "
-                "style-src 'self' 'unsafe-inline'; "
-                "img-src 'self' data: https:; "
-                "font-src 'self' data:; "
-                "connect-src 'self'; "
-                "frame-ancestors 'none'; "
-                "base-uri 'self'; "
-                "form-action 'self'; "
-                "upgrade-insecure-requests;"
-            )
+            # Production CSP - more permissive for frontend, strict for API
+            if is_frontend_request:
+                # Allow inline scripts for frontend HTML files
+                return (
+                    "default-src 'self'; "
+                    "script-src 'self' 'unsafe-inline'; "
+                    "style-src 'self' 'unsafe-inline'; "
+                    "img-src 'self' data: https:; "
+                    "font-src 'self' data:; "
+                    "connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com; "
+                    "frame-ancestors 'none'; "
+                    "base-uri 'self'; "
+                    "form-action 'self'; "
+                    "upgrade-insecure-requests;"
+                )
+            else:
+                # Strict CSP for API endpoints
+                return (
+                    "default-src 'none'; "
+                    "script-src 'self'; "
+                    "style-src 'none'; "
+                    "img-src 'none'; "
+                    "font-src 'none'; "
+                    "connect-src 'none'; "
+                    "frame-ancestors 'none'; "
+                    "base-uri 'self'; "
+                    "form-action 'none'; "
+                    "upgrade-insecure-requests;"
+                )
 
 
 class PIIFilteringMiddleware(BaseHTTPMiddleware):
