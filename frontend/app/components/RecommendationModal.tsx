@@ -84,7 +84,10 @@ export default function RecommendationModal({
 
   // Auto-scroll to options/result when step changes
   useEffect(() => {
-    if ((state.step === 'options' || state.step === 'result') && modalRef.current) {
+    if (
+      (state.step === 'options' || state.step === 'result') &&
+      modalRef.current
+    ) {
       const targetRef = state.step === 'options' ? optionsRef : resultRef;
       if (targetRef.current) {
         modalRef.current.scrollTo({
@@ -103,9 +106,15 @@ export default function RecommendationModal({
 
       // Auto-set analysis type based on input type
       if (parsed.type === 'repo_url') {
-        dispatch({ type: 'UPDATE_FORM', payload: { analysis_type: 'repo_only' } });
+        dispatch({
+          type: 'UPDATE_FORM',
+          payload: { analysis_type: 'repo_only' },
+        });
       } else {
-        dispatch({ type: 'UPDATE_FORM', payload: { analysis_type: 'profile' } });
+        dispatch({
+          type: 'UPDATE_FORM',
+          payload: { analysis_type: 'profile' },
+        });
       }
     } else {
       dispatch({ type: 'SET_PARSED_GITHUB_INPUT', payload: null });
@@ -131,11 +140,16 @@ export default function RecommendationModal({
       state.parsedGitHubInput &&
       state.parsedGitHubInput.type === 'username'
     ) {
-      if (!state.formData.repository_url || !state.formData.repository_url.trim()) {
+      if (
+        !state.formData.repository_url ||
+        !state.formData.repository_url.trim()
+      ) {
         errors.repository_url =
           'Repository URL is required for repository-only analysis';
       } else {
-        const repoValidation = validateGitHubInput(state.formData.repository_url);
+        const repoValidation = validateGitHubInput(
+          state.formData.repository_url
+        );
         if (!repoValidation.isValid) {
           errors.repository_url =
             repoValidation.error || 'Invalid repository URL';
@@ -202,7 +216,7 @@ Key Achievements: ${state.formData.notableAchievements}
 
     // Use React Query mutation - it handles loading, error, and success states
     generateOptionsMutation.mutate(request, {
-      onSuccess: (data) => {
+      onSuccess: data => {
         // Increment count only if not logged in and generation was successful
         if (!isLoggedIn) {
           incrementAnonCount();
@@ -266,7 +280,7 @@ Key Achievements: ${state.formData.notableAchievements}
 
     // Use React Query mutation - it handles loading, error, and success states
     createFromOptionMutation.mutate(params, {
-      onSuccess: (recommendation) => {
+      onSuccess: recommendation => {
         // Increment count only if not logged in and creation was successful
         if (!isLoggedIn) {
           incrementAnonCount();
@@ -274,10 +288,11 @@ Key Achievements: ${state.formData.notableAchievements}
 
         dispatch({ type: 'SET_RESULT', payload: recommendation });
         dispatch({
-          type: 'SET_SELECTED_OPTION', payload: {
+          type: 'SET_SELECTED_OPTION',
+          payload: {
             ...option,
             generation_parameters: option.generation_parameters || {},
-          }
+          },
         });
 
         // Track completed recommendation
@@ -316,7 +331,7 @@ Key Achievements: ${state.formData.notableAchievements}
 
     // Use React Query mutation - it handles loading, error, and success states
     regenerateMutation.mutate(params, {
-      onSuccess: (regeneratedRecommendation) => {
+      onSuccess: regeneratedRecommendation => {
         // Increment count only if not logged in and regeneration was successful
         if (!isLoggedIn) {
           incrementAnonCount();
@@ -370,8 +385,11 @@ Key Achievements: ${state.formData.notableAchievements}
                 isGenerating={generateOptionsMutation.isPending}
                 firstInputRef={firstInputRef}
                 onChange={(field, value) => updateFormField(field, value)}
-                onAnalysisTypeChange={(type) =>
-                  dispatch({ type: 'UPDATE_FORM', payload: { analysis_type: type } })
+                onAnalysisTypeChange={type =>
+                  dispatch({
+                    type: 'UPDATE_FORM',
+                    payload: { analysis_type: type },
+                  })
                 }
                 onSubmit={handleSubmit}
                 onCancel={onClose}
@@ -388,7 +406,9 @@ Key Achievements: ${state.formData.notableAchievements}
                 viewingFullContent={state.viewingFullContent}
                 onViewMore={handleViewMore}
                 onOptionSelect={handleOptionSelect}
-                onEditDetails={() => dispatch({ type: 'SET_STEP', payload: 'form' })}
+                onEditDetails={() =>
+                  dispatch({ type: 'SET_STEP', payload: 'form' })
+                }
                 onStartOver={handleReset}
               />
             ) : state.step === 'result' &&
@@ -401,15 +421,22 @@ Key Achievements: ${state.formData.notableAchievements}
                 activeTab={state.activeTab}
                 resultRef={resultRef}
                 regenerateInstructions={state.regenerateInstructions}
-                setActiveTab={(tab) => dispatch({ type: 'SET_ACTIVE_TAB', payload: tab })}
-                setRegenerateInstructions={(instructions) =>
-                  dispatch({ type: 'SET_REGENERATE_INSTRUCTIONS', payload: instructions })
+                setActiveTab={tab =>
+                  dispatch({ type: 'SET_ACTIVE_TAB', payload: tab })
                 }
-                setGeneratedRecommendation={(rec) =>
+                setRegenerateInstructions={instructions =>
+                  dispatch({
+                    type: 'SET_REGENERATE_INSTRUCTIONS',
+                    payload: instructions,
+                  })
+                }
+                setGeneratedRecommendation={rec =>
                   rec ? dispatch({ type: 'SET_RESULT', payload: rec }) : null
                 }
                 isRegenerating={regenerateMutation.isPending}
-                onBackToOptions={() => dispatch({ type: 'SET_STEP', payload: 'options' })}
+                onBackToOptions={() =>
+                  dispatch({ type: 'SET_STEP', payload: 'options' })
+                }
                 onGenerateAnother={handleReset}
                 onRefine={handleRegenerate}
                 onClose={onClose}

@@ -156,9 +156,9 @@ export default function UserProfilePage() {
                   <AvatarFallback className='bg-gray-600 text-white font-medium'>
                     {userDetails
                       ? getAvatarInitials(
-                        userDetails.username,
-                        userDetails.email
-                      )
+                          userDetails.username,
+                          userDetails.email
+                        )
                       : 'U'}
                   </AvatarFallback>
                 </Avatar>
