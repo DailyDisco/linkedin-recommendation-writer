@@ -3,6 +3,7 @@ import type {
   Recommendation,
   RecommendationOption,
   ParsedGitHubInput,
+  PromptSuggestionsResponse,
 } from '../types/index';
 
 // Form data type
@@ -24,7 +25,7 @@ export interface RecommendationFormData {
   repository_url?: string;
 }
 
-// State interface
+// Define the overall state shape
 export interface RecommendationState {
   step: 'form' | 'generating' | 'options' | 'result';
   formData: RecommendationFormData;
@@ -39,9 +40,21 @@ export interface RecommendationState {
   regenerateInstructions: string;
   isRegenerating: boolean;
   showLimitExceededMessage: boolean;
+  // New state for real-time progress
+  currentStage: string;
+  progress: number;
+  // New state for dynamic refinement parameters
+  dynamicTone: RecommendationFormData['tone'];
+  dynamicLength: RecommendationFormData['length'];
+  dynamicIncludeKeywords: string[];
+  dynamicExcludeKeywords: string[];
+  // New state for prompt assistant
+  initialSuggestions: PromptSuggestionsResponse | null;
+  autocompleteSuggestions: Record<string, string[]>;
+  isLoadingSuggestions: boolean;
 }
 
-// Action types
+// Define action types for the reducer
 export type RecommendationAction =
   | { type: 'SET_STEP'; payload: RecommendationState['step'] }
   | { type: 'UPDATE_FORM'; payload: Partial<RecommendationFormData> }
@@ -56,22 +69,45 @@ export type RecommendationAction =
   | { type: 'SET_REGENERATE_INSTRUCTIONS'; payload: string }
   | { type: 'SET_IS_REGENERATING'; payload: boolean }
   | { type: 'SET_SHOW_LIMIT_EXCEEDED'; payload: boolean }
+  | { type: 'SET_CURRENT_STAGE'; payload: string } // New action
+  | { type: 'SET_PROGRESS'; payload: number } // New action
+  | {
+      // New action to update all dynamic refinement params
+      type: 'UPDATE_DYNAMIC_REFINEMENT_PARAMS';
+      payload: {
+        tone: RecommendationFormData['tone'];
+        length: RecommendationFormData['length'];
+        include_keywords: string[];
+        exclude_keywords: string[];
+      };
+    }
+  | {
+      type: 'SET_INITIAL_SUGGESTIONS';
+      payload: PromptSuggestionsResponse | null;
+    }
+  | {
+      type: 'SET_AUTOCOMPLETE_SUGGESTIONS';
+      payload: { field: string; suggestions: string[] };
+    }
+  | { type: 'SET_LOADING_SUGGESTIONS'; payload: boolean }
   | { type: 'RESET' };
 
-// Initial state
+const initialFormData: RecommendationFormData = {
+  workingRelationship: '',
+  specificSkills: '',
+  timeWorkedTogether: '',
+  notableAchievements: '',
+  recommendation_type: 'professional',
+  tone: 'professional',
+  length: 'medium',
+  github_input: '',
+  analysis_type: 'profile',
+  repository_url: '',
+};
+
 const initialState: RecommendationState = {
   step: 'form',
-  formData: {
-    workingRelationship: '',
-    specificSkills: '',
-    timeWorkedTogether: '',
-    notableAchievements: '',
-    recommendation_type: 'professional',
-    tone: 'professional',
-    length: 'medium',
-    github_input: '',
-    analysis_type: 'profile',
-  },
+  formData: initialFormData,
   errors: {},
   parsedGitHubInput: null,
   options: [],
@@ -83,9 +119,17 @@ const initialState: RecommendationState = {
   regenerateInstructions: '',
   isRegenerating: false,
   showLimitExceededMessage: false,
+  currentStage: 'Initializing...', // Default initial stage
+  progress: 0, // Default initial progress
+  dynamicTone: 'professional',
+  dynamicLength: 'medium',
+  dynamicIncludeKeywords: [],
+  dynamicExcludeKeywords: [],
+  initialSuggestions: null,
+  autocompleteSuggestions: {},
+  isLoadingSuggestions: false,
 };
 
-// Reducer function
 function recommendationReducer(
   state: RecommendationState,
   action: RecommendationAction
@@ -93,87 +137,87 @@ function recommendationReducer(
   switch (action.type) {
     case 'SET_STEP':
       return { ...state, step: action.payload };
-
     case 'UPDATE_FORM':
-      return {
-        ...state,
-        formData: { ...state.formData, ...action.payload },
-        errors: {}, // Clear errors when form changes
-      };
-
+      return { ...state, formData: { ...state.formData, ...action.payload } };
     case 'SET_ERRORS':
       return { ...state, errors: action.payload };
-
     case 'SET_PARSED_GITHUB_INPUT':
       return { ...state, parsedGitHubInput: action.payload };
-
     case 'SET_OPTIONS':
       return { ...state, options: action.payload };
-
     case 'SET_SELECTED_OPTION':
       return { ...state, selectedOption: action.payload };
-
     case 'SET_RESULT':
-      return { ...state, result: action.payload };
-
-    case 'SET_LOADING':
-      return { ...state, isLoading: action.payload };
-
-    case 'SET_VIEWING_FULL_CONTENT':
+      // When a new result is set, update the dynamic refinement parameters to match the new result
       return {
         ...state,
-        viewingFullContent:
-          state.viewingFullContent === action.payload ? null : action.payload,
+        result: action.payload,
+        dynamicTone:
+          (action.payload.tone as RecommendationFormData['tone']) ||
+          state.dynamicTone,
+        dynamicLength:
+          (action.payload.length as RecommendationFormData['length']) ||
+          state.dynamicLength,
+        dynamicIncludeKeywords:
+          (action.payload.generation_parameters
+            ?.include_keywords as string[]) || state.dynamicIncludeKeywords,
+        dynamicExcludeKeywords:
+          (action.payload.generation_parameters
+            ?.exclude_keywords as string[]) || state.dynamicExcludeKeywords,
       };
-
+    case 'SET_LOADING':
+      return { ...state, isLoading: action.payload };
+    case 'SET_VIEWING_FULL_CONTENT':
+      return { ...state, viewingFullContent: action.payload };
     case 'SET_ACTIVE_TAB':
       return { ...state, activeTab: action.payload };
-
     case 'SET_REGENERATE_INSTRUCTIONS':
       return { ...state, regenerateInstructions: action.payload };
-
     case 'SET_IS_REGENERATING':
       return { ...state, isRegenerating: action.payload };
-
     case 'SET_SHOW_LIMIT_EXCEEDED':
       return { ...state, showLimitExceededMessage: action.payload };
-
+    case 'SET_CURRENT_STAGE': // New case
+      return { ...state, currentStage: action.payload };
+    case 'SET_PROGRESS': // New case
+      return { ...state, progress: action.payload };
+    case 'UPDATE_DYNAMIC_REFINEMENT_PARAMS': // New case
+      return {
+        ...state,
+        dynamicTone: action.payload.tone,
+        dynamicLength: action.payload.length,
+        dynamicIncludeKeywords: action.payload.include_keywords,
+        dynamicExcludeKeywords: action.payload.exclude_keywords,
+      };
+    case 'SET_INITIAL_SUGGESTIONS':
+      return { ...state, initialSuggestions: action.payload };
+    case 'SET_AUTOCOMPLETE_SUGGESTIONS':
+      return {
+        ...state,
+        autocompleteSuggestions: {
+          ...state.autocompleteSuggestions,
+          [action.payload.field]: action.payload.suggestions,
+        },
+      };
+    case 'SET_LOADING_SUGGESTIONS':
+      return { ...state, isLoadingSuggestions: action.payload };
     case 'RESET':
       return initialState;
-
     default:
       return state;
   }
 }
 
-// Custom hook
 export const useRecommendationState = () => {
   const [state, dispatch] = useReducer(recommendationReducer, initialState);
 
-  // Helper functions for common operations
   const updateFormField = useCallback((field: string, value: string) => {
     dispatch({ type: 'UPDATE_FORM', payload: { [field]: value } });
-  }, []);
-
-  const setFormData = useCallback((data: Partial<RecommendationFormData>) => {
-    dispatch({ type: 'UPDATE_FORM', payload: data });
-  }, []);
-
-  const setStep = useCallback((step: RecommendationState['step']) => {
-    dispatch({ type: 'SET_STEP', payload: step });
   }, []);
 
   const reset = useCallback(() => {
     dispatch({ type: 'RESET' });
   }, []);
 
-  return {
-    state,
-    dispatch,
-    // Helper functions
-    updateFormField,
-    setFormData,
-    setStep,
-    reset,
-  };
+  return { state, dispatch, updateFormField, reset };
 };

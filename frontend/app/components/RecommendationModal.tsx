@@ -6,15 +6,25 @@ import { trackEngagement, trackConversion } from '../utils/analytics';
 import { useRecommendationState } from '../hooks/useRecommendationState';
 import {
   useGenerateRecommendationOptions,
+  useGenerateRecommendationOptionsStream,
   useCreateRecommendationFromOption,
   useRegenerateRecommendation,
+  useRegenerateRecommendationStream,
 } from '../hooks/useRecommendationQueries';
+import { apiClient } from '@/services/api';
 import RecommendationModalHeader from './RecommendationModalHeader';
 import RecommendationLimitMessage from './RecommendationLimitMessage';
 import RecommendationGeneratingState from './RecommendationGeneratingState';
 import RecommendationOptionsList from './recommendation/RecommendationOptionsList';
 import { RecommendationFormNew } from './recommendation/RecommendationFormNew';
 import RecommendationResultDisplay from './RecommendationResultDisplay';
+import type {
+  KeywordRefinementResult,
+  ContributorInfo,
+  RecommendationRequest,
+  RecommendationOption,
+  Recommendation,
+} from '../types/index';
 
 interface RecommendationModalProps {
   contributor: ContributorInfo;
@@ -38,23 +48,20 @@ export default function RecommendationModal({
     useRecommendationCount();
   const ANONYMOUS_LIMIT = 3;
 
-  // Use the new reducer-based state management
   const { state, dispatch, updateFormField, reset } = useRecommendationState();
 
-  // React Query mutations
   const generateOptionsMutation = useGenerateRecommendationOptions();
+  const generateOptionsStream = useGenerateRecommendationOptionsStream();
   const createFromOptionMutation = useCreateRecommendationFromOption();
   const regenerateMutation = useRegenerateRecommendation();
+  const regenerateStream = useRegenerateRecommendationStream();
 
-  // Log modal open/close events and initialize state
   useEffect(() => {
     if (isOpen) {
-      // Focus the first input when modal opens
       setTimeout(() => {
         firstInputRef.current?.focus();
       }, 100);
 
-      // Check anonymous limit and update state
       if (!isLoggedIn && anonRecommendationCount >= ANONYMOUS_LIMIT) {
         dispatch({ type: 'SET_SHOW_LIMIT_EXCEEDED', payload: true });
       } else {
@@ -63,7 +70,6 @@ export default function RecommendationModal({
     }
   }, [isOpen, isLoggedIn, anonRecommendationCount, dispatch]);
 
-  // Handle escape key
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
@@ -75,14 +81,12 @@ export default function RecommendationModal({
     return () => document.removeEventListener('keydown', handleEscape);
   }, [isOpen, onClose]);
 
-  // Handle click outside
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
       onClose();
     }
   };
 
-  // Auto-scroll to options/result when step changes
   useEffect(() => {
     if (
       (state.step === 'options' || state.step === 'result') &&
@@ -98,13 +102,11 @@ export default function RecommendationModal({
     }
   }, [state.step, state.options.length, state.result]);
 
-  // Parse GitHub input when it changes
   useEffect(() => {
     if (state.formData.github_input.trim()) {
       const parsed = parseGitHubInput(state.formData.github_input);
       dispatch({ type: 'SET_PARSED_GITHUB_INPUT', payload: parsed });
 
-      // Auto-set analysis type based on input type
       if (parsed.type === 'repo_url') {
         dispatch({
           type: 'UPDATE_FORM',
@@ -124,7 +126,6 @@ export default function RecommendationModal({
   const validateForm = () => {
     const errors: Record<string, string> = {};
 
-    // Validate GitHub input
     if (!state.formData.github_input.trim()) {
       errors.github_input = 'GitHub username or repository URL is required';
     } else {
@@ -134,7 +135,6 @@ export default function RecommendationModal({
       }
     }
 
-    // Validate repository URL for repo_only mode
     if (
       state.formData.analysis_type === 'repo_only' &&
       state.parsedGitHubInput &&
@@ -147,22 +147,13 @@ export default function RecommendationModal({
         errors.repository_url =
           'Repository URL is required for repository-only analysis';
       } else {
-        const repoValidation = validateGitHubInput(
-          state.formData.repository_url
-        );
-        if (!repoValidation.isValid) {
-          errors.repository_url =
-            repoValidation.error || 'Invalid repository URL';
-        } else {
-          const repoParsed = parseGitHubInput(state.formData.repository_url);
-          if (repoParsed.type !== 'repo_url') {
-            errors.repository_url = 'Please enter a valid repository URL';
-          }
+        const repoParsed = parseGitHubInput(state.formData.repository_url);
+        if (repoParsed.type !== 'repo_url') {
+          errors.repository_url = 'Please enter a valid repository URL';
         }
       }
     }
 
-    // Validate working relationship
     if (!state.formData.workingRelationship.trim()) {
       errors.workingRelationship = 'Please describe your working relationship';
     } else if (state.formData.workingRelationship.trim().length < 10) {
@@ -188,7 +179,6 @@ export default function RecommendationModal({
 
     dispatch({ type: 'SET_STEP', payload: 'generating' });
 
-    // Create custom prompt from form data
     const customPrompt = `
 Working Relationship: ${state.formData.workingRelationship}
 Notable Skills Observed: ${state.formData.specificSkills}
@@ -214,22 +204,26 @@ Key Achievements: ${state.formData.notableAchievements}
       repository_url: state.formData.repository_url,
     };
 
-    // Use React Query mutation - it handles loading, error, and success states
-    generateOptionsMutation.mutate(request, {
-      onSuccess: data => {
+    // Use streaming version for real-time progress updates
+    const { disconnect: _disconnect } = generateOptionsStream.generate(
+      request,
+      progress => {
+        // Update progress in state
+        dispatch({ type: 'SET_CURRENT_STAGE', payload: progress.stage });
+        dispatch({ type: 'SET_PROGRESS', payload: progress.progress });
+      },
+      data => {
         // Increment count only if not logged in and generation was successful
         if (!isLoggedIn) {
           incrementAnonCount();
         }
 
-        // Transform API response to include generation_parameters on each option
-        const optionsWithParams = data.options.map(option => ({
+        const optionsWithParams = data.options.map((option: any) => ({
           ...option,
           generation_parameters: data.generation_parameters || {},
         }));
         dispatch({ type: 'SET_OPTIONS', payload: optionsWithParams });
 
-        // Track successful recommendation generation
         trackEngagement.recommendationGenerated({
           githubUsername: contributor.username ? 'true' : 'false',
           tone: state.formData.tone,
@@ -239,23 +233,13 @@ Key Achievements: ${state.formData.notableAchievements}
 
         dispatch({ type: 'SET_STEP', payload: 'options' });
       },
-      onError: () => {
-        // Error handled by mutation
+      error => {
         dispatch({ type: 'SET_STEP', payload: 'form' });
-      },
-    });
+      }
+    );
   };
 
-  const handleOptionSelect = async (option: {
-    id: number;
-    name: string;
-    content: string;
-    title: string;
-    word_count: number;
-    focus: string;
-    explanation: string;
-    generation_parameters?: Record<string, unknown>;
-  }) => {
+  const handleOptionSelect = async (option: RecommendationOption) => {
     if (!isLoggedIn && anonRecommendationCount >= ANONYMOUS_LIMIT) {
       dispatch({ type: 'SET_SHOW_LIMIT_EXCEEDED', payload: true });
       return;
@@ -278,10 +262,8 @@ Key Achievements: ${state.formData.notableAchievements}
       length: state.formData.length,
     };
 
-    // Use React Query mutation - it handles loading, error, and success states
     createFromOptionMutation.mutate(params, {
       onSuccess: recommendation => {
-        // Increment count only if not logged in and creation was successful
         if (!isLoggedIn) {
           incrementAnonCount();
         }
@@ -295,14 +277,11 @@ Key Achievements: ${state.formData.notableAchievements}
           },
         });
 
-        // Track completed recommendation
         trackConversion.recommendationCompleted();
 
         dispatch({ type: 'SET_STEP', payload: 'result' });
       },
-      onError: () => {
-        // Error handled by mutation
-      },
+      onError: () => {},
     });
   };
 
@@ -310,8 +289,14 @@ Key Achievements: ${state.formData.notableAchievements}
     dispatch({ type: 'SET_VIEWING_FULL_CONTENT', payload: optionId });
   };
 
-  const handleRegenerate = async () => {
-    if (!state.selectedOption || !state.regenerateInstructions.trim()) {
+  const handleRegenerate = async (dynamicParams: {
+    tone: string;
+    length: string;
+    include_keywords: string[];
+    exclude_keywords: string[];
+    refinement_instructions: string;
+  }) => {
+    if (!state.selectedOption) {
       return;
     }
 
@@ -322,32 +307,94 @@ Key Achievements: ${state.formData.notableAchievements}
 
     const params = {
       original_content: state.selectedOption.content,
-      refinement_instructions: state.regenerateInstructions,
+      refinement_instructions: dynamicParams.refinement_instructions,
       github_username: contributor.username,
       recommendation_type: state.formData.recommendation_type,
-      tone: state.formData.tone,
-      length: state.formData.length,
+      tone: dynamicParams.tone,
+      length: dynamicParams.length,
+      include_keywords: dynamicParams.include_keywords,
+      exclude_keywords: dynamicParams.exclude_keywords,
     };
 
-    // Use React Query mutation - it handles loading, error, and success states
-    regenerateMutation.mutate(params, {
-      onSuccess: regeneratedRecommendation => {
-        // Increment count only if not logged in and regeneration was successful
+    dispatch({ type: 'SET_IS_REGENERATING', payload: true });
+
+    // Use streaming version for real-time progress updates during refinement
+    const { disconnect: _disconnectRegenerate } = regenerateStream.regenerate(
+      params,
+      progress => {
+        // Update progress in state
+        dispatch({ type: 'SET_CURRENT_STAGE', payload: progress.stage });
+        dispatch({ type: 'SET_PROGRESS', payload: progress.progress });
+      },
+      regeneratedRecommendation => {
         if (!isLoggedIn) {
           incrementAnonCount();
         }
-
         dispatch({ type: 'SET_RESULT', payload: regeneratedRecommendation });
         dispatch({ type: 'SET_REGENERATE_INSTRUCTIONS', payload: '' });
+        dispatch({ type: 'SET_IS_REGENERATING', payload: false });
       },
-      onError: () => {
-        // Error handled by mutation
-      },
-    });
+      error => {
+        dispatch({ type: 'SET_IS_REGENERATING', payload: false });
+      }
+    );
+  };
+
+  const handleRefinementComplete = (result: KeywordRefinementResult) => {
+    if (result) {
+      const newRecommendation = state.result
+        ? { ...state.result, content: result.refined_content } // Use `state.result` for original fields
+        : null;
+
+      dispatch({
+        type: 'SET_RESULT',
+        payload: newRecommendation || (state.result as Recommendation),
+      }); // Ensure payload is Recommendation
+
+      dispatch({
+        type: 'UPDATE_DYNAMIC_REFINEMENT_PARAMS',
+        payload: {
+          tone: state.dynamicTone,
+          length: state.dynamicLength,
+          include_keywords: result.include_keywords_used || [],
+          exclude_keywords: result.exclude_keywords_avoided || [],
+        },
+      });
+    }
   };
 
   const handleReset = () => {
     reset();
+  };
+
+  const handleFetchSuggestions = async (
+    githubUsername: string,
+    recommendationType: string,
+    tone: string,
+    length: string
+  ) => {
+    if (!isLoggedIn && anonRecommendationCount >= ANONYMOUS_LIMIT) {
+      dispatch({ type: 'SET_SHOW_LIMIT_EXCEEDED', payload: true });
+      return;
+    }
+
+    dispatch({ type: 'SET_LOADING_SUGGESTIONS', payload: true });
+
+    try {
+      const suggestions = await apiClient.getPromptSuggestions({
+        github_username: githubUsername,
+        recommendation_type: recommendationType,
+        tone,
+        length,
+      });
+      dispatch({ type: 'SET_INITIAL_SUGGESTIONS', payload: suggestions });
+    } catch (error) {
+      console.error('Error fetching suggestions:', error);
+      // Set empty suggestions on error to avoid breaking the UI
+      dispatch({ type: 'SET_INITIAL_SUGGESTIONS', payload: null });
+    } finally {
+      dispatch({ type: 'SET_LOADING_SUGGESTIONS', payload: false });
+    }
   };
 
   if (!isOpen) return null;
@@ -384,6 +431,8 @@ Key Achievements: ${state.formData.notableAchievements}
                 parsedGitHubInput={state.parsedGitHubInput}
                 isGenerating={generateOptionsMutation.isPending}
                 firstInputRef={firstInputRef}
+                initialSuggestions={state.initialSuggestions}
+                isLoadingSuggestions={state.isLoadingSuggestions}
                 onChange={(field, value) => updateFormField(field, value)}
                 onAnalysisTypeChange={type =>
                   dispatch({
@@ -391,11 +440,16 @@ Key Achievements: ${state.formData.notableAchievements}
                     payload: { analysis_type: type },
                   })
                 }
+                onFetchSuggestions={handleFetchSuggestions}
                 onSubmit={handleSubmit}
                 onCancel={onClose}
               />
             ) : state.step === 'generating' ? (
-              <RecommendationGeneratingState contributor={contributor} />
+              <RecommendationGeneratingState
+                contributor={contributor}
+                currentStage={state.currentStage}
+                progress={state.progress}
+              />
             ) : state.step === 'options' && state.options.length > 0 ? (
               <RecommendationOptionsList
                 options={state.options}
@@ -431,7 +485,10 @@ Key Achievements: ${state.formData.notableAchievements}
                   })
                 }
                 setGeneratedRecommendation={rec =>
-                  rec ? dispatch({ type: 'SET_RESULT', payload: rec }) : null
+                  dispatch({
+                    type: 'SET_RESULT',
+                    payload: rec || (state.result as Recommendation),
+                  })
                 }
                 isRegenerating={regenerateMutation.isPending}
                 onBackToOptions={() =>
@@ -440,6 +497,9 @@ Key Achievements: ${state.formData.notableAchievements}
                 onGenerateAnother={handleReset}
                 onRefine={handleRegenerate}
                 onClose={onClose}
+                onRefinementComplete={handleRefinementComplete}
+                initialIncludeKeywords={state.dynamicIncludeKeywords}
+                initialExcludeKeywords={state.dynamicExcludeKeywords}
               />
             ) : null}
           </div>

@@ -1,13 +1,39 @@
-import React from 'react';
-import { CheckCircle, Loader2, FileText } from 'lucide-react';
-import { toast } from 'sonner';
+import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { KeywordRefinement } from './KeywordRefinement';
+import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from '@/components/ui/card';
+import {
+  CheckCircle,
+  Share2,
+  Clipboard,
+  ChevronLeft,
+  Loader2,
+} from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
 import type {
-  ContributorInfo,
   RecommendationOption,
-  KeywordRefinementResult,
-} from '../types/index';
+  ContributorInfo,
+  Recommendation as ApiRecommendation,
+  KeywordRefinementResult, // Import KeywordRefinementResult
+} from '@/types/index';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Plus, X } from 'lucide-react';
 
 interface FormData {
   workingRelationship: string;
@@ -25,20 +51,8 @@ interface FormData {
   github_input: string;
   analysis_type: 'profile' | 'repo_only';
   repository_url?: string;
-}
-
-interface ApiRecommendation {
-  id: number;
-  title: string;
-  content: string;
-  recommendation_type: string;
-  tone: string;
-  length: string;
-  word_count: number;
-  created_at: string;
-  github_username: string;
-  ai_model?: string;
-  updated_at?: string;
+  include_keywords?: string[]; // Added to FormData
+  exclude_keywords?: string[]; // Added to FormData
 }
 
 interface RecommendationResultDisplayProps {
@@ -51,13 +65,35 @@ interface RecommendationResultDisplayProps {
   regenerateInstructions: string;
   setActiveTab: (tab: 'preview' | 'refine') => void;
   setRegenerateInstructions: (instructions: string) => void;
-  setGeneratedRecommendation: (rec: ApiRecommendation | null) => void;
+
   isRegenerating: boolean;
   onBackToOptions: () => void;
   onGenerateAnother: () => void;
-  onRefine: (instructions: string) => void;
-  onClose: () => void;
+  onRefine: (params: {
+    // Modified to accept dynamic parameters
+    tone: FormData['tone'];
+    length: FormData['length'];
+    include_keywords: string[];
+    exclude_keywords: string[];
+    refinement_instructions: string;
+  }) => void;
+
+  initialIncludeKeywords?: string[];
+  initialExcludeKeywords?: string[];
 }
+
+const TONE_OPTIONS = [
+  { value: 'professional', label: 'Professional' },
+  { value: 'friendly', label: 'Friendly' },
+  { value: 'formal', label: 'Formal' },
+  { value: 'casual', label: 'Casual' },
+];
+
+const LENGTH_OPTIONS = [
+  { value: 'short', label: 'Short' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'long', label: 'Long' },
+];
 
 export default function RecommendationResultDisplay({
   generatedRecommendation,
@@ -69,149 +105,343 @@ export default function RecommendationResultDisplay({
   regenerateInstructions,
   setActiveTab,
   setRegenerateInstructions,
-  setGeneratedRecommendation,
   isRegenerating,
   onBackToOptions,
   onGenerateAnother,
   onRefine,
-  onClose,
+  initialIncludeKeywords = [],
+  initialExcludeKeywords = [],
 }: RecommendationResultDisplayProps) {
+  const [isCopied, setIsCopied] = useState(false);
+
+  // State for dynamic refinement
+  const [dynamicTone, setDynamicTone] = useState<FormData['tone']>(
+    formData.tone
+  );
+  const [dynamicLength, setDynamicLength] = useState<FormData['length']>(
+    formData.length
+  );
+  const [includeKeywords, setIncludeKeywords] = useState<string[]>(
+    initialIncludeKeywords
+  );
+  const [excludeKeywords, setExcludeKeywords] = useState<string[]>(
+    initialExcludeKeywords
+  );
+  const [newIncludeKeyword, setNewIncludeKeyword] = useState('');
+  const [newExcludeKeyword, setNewExcludeKeyword] = useState('');
+
+  useEffect(() => {
+    if (generatedRecommendation) {
+      setIsCopied(false);
+    }
+  }, [generatedRecommendation]);
+
+  // Initialize and update dynamic parameters when formData changes or component mounts
+  useEffect(() => {
+    setDynamicTone(formData.tone);
+    setDynamicLength(formData.length);
+    setIncludeKeywords(formData.include_keywords || []);
+    setExcludeKeywords(formData.exclude_keywords || []);
+    // Note: regenerateInstructions is managed by its own state in RecommendationModal/useRecommendationState
+  }, [
+    formData.tone,
+    formData.length,
+    formData.include_keywords,
+    formData.exclude_keywords,
+  ]);
+
+  // Update dynamic keywords if initial props change (e.g., when a regenerated result comes back)
+  useEffect(() => {
+    setIncludeKeywords(initialIncludeKeywords);
+  }, [initialIncludeKeywords]);
+
+  useEffect(() => {
+    setExcludeKeywords(initialExcludeKeywords);
+  }, [initialExcludeKeywords]);
+
+  const currentContent =
+    generatedRecommendation?.content || selectedOption?.content || '';
+  const currentTitle =
+    generatedRecommendation?.title || selectedOption?.title || '';
+  const currentWordCount =
+    generatedRecommendation?.word_count || selectedOption?.word_count || 0;
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(currentContent);
+    setIsCopied(true);
+    toast.success('Recommendation copied to clipboard!');
+  };
+
+  const addKeyword = (keyword: string, type: 'include' | 'exclude') => {
+    if (!keyword.trim()) return;
+
+    if (type === 'include') {
+      if (!includeKeywords.includes(keyword.trim())) {
+        setIncludeKeywords([...includeKeywords, keyword.trim()]);
+      }
+      setNewIncludeKeyword('');
+    } else {
+      if (!excludeKeywords.includes(keyword.trim())) {
+        setExcludeKeywords([...excludeKeywords, keyword.trim()]);
+      }
+      setNewExcludeKeyword('');
+    }
+  };
+
+  const removeKeyword = (keyword: string, type: 'include' | 'exclude') => {
+    if (type === 'include') {
+      setIncludeKeywords(includeKeywords.filter(k => k !== keyword));
+    } else {
+      setExcludeKeywords(excludeKeywords.filter(k => k !== keyword));
+    }
+  };
+
+  const handleRefineClick = () => {
+    onRefine({
+      tone: dynamicTone,
+      length: dynamicLength,
+      include_keywords: includeKeywords,
+      exclude_keywords: excludeKeywords,
+      refinement_instructions: regenerateInstructions,
+    });
+  };
+
   return (
     <div ref={resultRef} className='space-y-6'>
-      <Tabs
-        value={activeTab}
-        onValueChange={value => setActiveTab(value as 'preview' | 'refine')}
-      >
-        <TabsList className='grid w-full grid-cols-2 h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground'>
-          <TabsTrigger
-            value='preview'
-            className='inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm'
-          >
-            Preview
-          </TabsTrigger>
-          <TabsTrigger
-            value='refine'
-            className='inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm'
-          >
-            Refine
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value='preview' className='mt-4'>
+      <Card>
+        <CardHeader>
           <div className='flex items-center justify-between'>
-            <div className='flex items-center space-x-3'>
-              <CheckCircle className='w-6 h-6 text-green-600' />
-              <div>
-                <h3 className='text-xl font-semibold text-gray-900'>
-                  Recommendation Ready
-                </h3>
-                <p className='text-sm text-gray-600'>
-                  for {contributor.full_name || contributor.username}
-                </p>
-              </div>
+            <div>
+              <CardTitle className='text-2xl font-bold'>
+                {currentTitle}
+              </CardTitle>
+              <CardDescription className='text-gray-600'>
+                Recommendation for{' '}
+                {contributor.full_name || contributor.username}
+              </CardDescription>
             </div>
-            <div className='flex space-x-2'>
-              <button
-                onClick={onBackToOptions}
-                className='px-3 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors text-sm'
+            <div className='flex items-center gap-2'>
+              <Button
+                onClick={copyToClipboard}
+                variant='secondary'
+                size='sm'
+                className='flex items-center gap-1'
+                disabled={isCopied}
               >
-                ← Back to Options
-              </button>
-              <button
-                onClick={onGenerateAnother}
-                className='px-3 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors text-sm'
+                {isCopied ? (
+                  <CheckCircle className='w-4 h-4 text-green-500' />
+                ) : (
+                  <Clipboard className='w-4 h-4' />
+                )}
+                {isCopied ? 'Copied!' : 'Copy'}
+              </Button>
+              <Button
+                variant='outline'
+                size='sm'
+                className='flex items-center gap-1'
               >
-                Generate Another
-              </button>
+                <Share2 className='w-4 h-4' /> Share
+              </Button>
             </div>
           </div>
+        </CardHeader>
+        <CardContent>
+          <Tabs
+            value={activeTab}
+            onValueChange={value => setActiveTab(value as 'preview' | 'refine')}
+            className='w-full'
+          >
+            <TabsList className='grid w-full grid-cols-2'>
+              <TabsTrigger value='preview'>Preview</TabsTrigger>
+              <TabsTrigger value='refine'>Refine</TabsTrigger>
+            </TabsList>
 
-          <div className='bg-gray-50 p-6 rounded-lg mt-4'>
-            <div className='mb-4 flex items-center justify-between text-sm text-gray-600'>
-              <div className='flex items-center space-x-4'>
+            {/* Preview Tab */}
+            <TabsContent value='preview' className='mt-4'>
+              <div className='prose prose-sm max-w-none mb-4'>
+                <pre className='whitespace-pre-wrap font-sans text-sm bg-muted p-4 rounded-md'>
+                  {currentContent}
+                </pre>
+              </div>
+              <div className='flex justify-between items-center text-sm text-gray-500'>
+                <span>Word Count: {currentWordCount}</span>
                 <span>
-                  Type:{' '}
-                  {generatedRecommendation?.recommendation_type ||
-                    formData.recommendation_type}
-                </span>
-                <span>
-                  Tone: {generatedRecommendation?.tone || formData.tone}
-                </span>
-                <span>
-                  Length: {generatedRecommendation?.length || formData.length}
+                  Type: {formData.recommendation_type} | Tone: {dynamicTone} |
+                  Length: {dynamicLength}
                 </span>
               </div>
-              <span>
-                {generatedRecommendation?.word_count ||
-                  selectedOption?.word_count}{' '}
-                words
-              </span>
-            </div>
-            <div className='prose max-w-none'>
-              <p className='text-gray-900 leading-relaxed whitespace-pre-wrap'>
-                {generatedRecommendation?.content || selectedOption?.content}
-              </p>
-            </div>
-          </div>
+            </TabsContent>
 
-          {/* Regeneration Section */}
-          <div className='bg-blue-50 p-4 rounded-lg mt-4'>
-            <h4 className='font-medium text-gray-900 mb-2'>
-              Want to refine this recommendation?
-            </h4>
-            <p className='text-sm text-gray-600 mb-3'>
-              Provide specific instructions for how you&apos;d like the
-              recommendation modified.
-            </p>
-            <textarea
-              className='w-full h-20 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 mb-3'
-              placeholder='e.g., Make it more specific about their React skills, focus less on teamwork, emphasize their problem-solving abilities...'
-              value={regenerateInstructions}
-              onChange={e => setRegenerateInstructions(e.target.value)}
-            />
-            <button
-              onClick={() => onRefine(regenerateInstructions)}
-              disabled={!regenerateInstructions.trim() || isRegenerating}
-              className='px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2'
-            >
-              {isRegenerating ? (
-                <Loader2 className='w-4 h-4 animate-spin' />
-              ) : (
-                <FileText className='w-4 h-4' />
-              )}
-              <span>
-                {isRegenerating ? 'Refining...' : 'Refine Recommendation'}
-              </span>
-            </button>
-          </div>
-
-          <div className='flex justify-end space-x-3 mt-4'>
-            <button
-              onClick={onClose}
-              className='px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors'
-            >
-              Done
-            </button>
-          </div>
-        </TabsContent>
-
-        <TabsContent value='refine' className='mt-4'>
-          <KeywordRefinement
-            recommendationId={generatedRecommendation?.id || 0}
-            onRefinementComplete={(refinedContent: KeywordRefinementResult) => {
-              setGeneratedRecommendation(prev =>
-                prev
-                  ? {
-                      ...prev,
-                      content: refinedContent.refined_content,
+            {/* Refine Tab */}
+            <TabsContent value='refine' className='mt-4 space-y-6'>
+              <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                {/* Tone Selection */}
+                <div className='space-y-2'>
+                  <Label htmlFor='tone-select'>Tone</Label>
+                  <Select
+                    value={dynamicTone}
+                    onValueChange={value =>
+                      setDynamicTone(value as FormData['tone'])
                     }
-                  : null
-              );
-              toast.success('Recommendation refined successfully');
-            }}
-          />
-        </TabsContent>
-      </Tabs>
+                  >
+                    <SelectTrigger id='tone-select'>
+                      <SelectValue placeholder='Select tone' />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TONE_OPTIONS.map(option => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Length Selection */}
+                <div className='space-y-2'>
+                  <Label htmlFor='length-select'>Length</Label>
+                  <Select
+                    value={dynamicLength}
+                    onValueChange={value =>
+                      setDynamicLength(value as FormData['length'])
+                    }
+                  >
+                    <SelectTrigger id='length-select'>
+                      <SelectValue placeholder='Select length' />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {LENGTH_OPTIONS.map(option => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Include Keywords */}
+              <div className='space-y-3'>
+                <Label htmlFor='include-keywords'>Keywords to Include</Label>
+                <div className='flex gap-2'>
+                  <Input
+                    id='include-keywords'
+                    value={newIncludeKeyword}
+                    onChange={e => setNewIncludeKeyword(e.target.value)}
+                    placeholder='Enter keyword to include...'
+                    onKeyPress={e => {
+                      if (e.key === 'Enter') {
+                        addKeyword(newIncludeKeyword, 'include');
+                      }
+                    }}
+                  />
+                  <Button
+                    type='button'
+                    variant='outline'
+                    size='sm'
+                    onClick={() => addKeyword(newIncludeKeyword, 'include')}
+                  >
+                    <Plus className='w-4 h-4' />
+                  </Button>
+                </div>
+                <div className='flex flex-wrap gap-2'>
+                  {includeKeywords.map(keyword => (
+                    <Badge
+                      key={keyword}
+                      variant='default'
+                      className='flex items-center gap-1'
+                    >
+                      {keyword}
+                      <X
+                        className='w-3 h-3 cursor-pointer'
+                        onClick={() => removeKeyword(keyword, 'include')}
+                      />
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              {/* Exclude Keywords */}
+              <div className='space-y-3'>
+                <Label htmlFor='exclude-keywords'>Keywords to Exclude</Label>
+                <div className='flex gap-2'>
+                  <Input
+                    id='exclude-keywords'
+                    value={newExcludeKeyword}
+                    onChange={e => setNewExcludeKeyword(e.target.value)}
+                    placeholder='Enter keyword to exclude...'
+                    onKeyPress={e => {
+                      if (e.key === 'Enter') {
+                        addKeyword(newExcludeKeyword, 'exclude');
+                      }
+                    }}
+                  />
+                  <Button
+                    type='button'
+                    variant='outline'
+                    size='sm'
+                    onClick={() => addKeyword(newExcludeKeyword, 'exclude')}
+                  >
+                    <Plus className='w-4 h-4' />
+                  </Button>
+                </div>
+                <div className='flex flex-wrap gap-2'>
+                  {excludeKeywords.map(keyword => (
+                    <Badge
+                      key={keyword}
+                      variant='destructive'
+                      className='flex items-center gap-1'
+                    >
+                      {keyword}
+                      <X
+                        className='w-3 h-3 cursor-pointer'
+                        onClick={() => removeKeyword(keyword, 'exclude')}
+                      />
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              {/* Additional Refinement Instructions */}
+              <div className='space-y-3'>
+                <Label htmlFor='refinement-instructions'>
+                  Additional Refinement Instructions
+                </Label>
+                <Textarea
+                  id='refinement-instructions'
+                  value={regenerateInstructions}
+                  onChange={e => setRegenerateInstructions(e.target.value)}
+                  placeholder='Enter any specific instructions for refining the recommendation (e.g., "Make it more concise", "Emphasize leadership skills")...'
+                  rows={3}
+                />
+              </div>
+
+              <Button
+                onClick={handleRefineClick}
+                disabled={isRegenerating}
+                className='w-full'
+              >
+                {isRegenerating && (
+                  <Loader2 className='w-4 h-4 mr-2 animate-spin' />
+                )}
+                {isRegenerating ? 'Refining...' : 'Refine Recommendation'}
+              </Button>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+
+      {/* Action Buttons */}
+      <div className='flex justify-between mt-6'>
+        <Button
+          variant='outline'
+          onClick={onBackToOptions}
+          className='flex items-center gap-2'
+        >
+          <ChevronLeft className='w-4 h-4' /> Back to Options
+        </Button>
+        <Button onClick={onGenerateAnother}>Generate Another</Button>
+      </div>
     </div>
   );
 }
