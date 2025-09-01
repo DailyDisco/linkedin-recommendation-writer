@@ -6,9 +6,12 @@ from app.services.github_commit_service import GitHubCommitService
 from app.services.github_repository_service import GitHubRepositoryService
 from app.services.github_user_service import GitHubUserService
 from app.services.keyword_refinement_service import KeywordRefinementService
+from app.services.profile_analysis_service import ProfileAnalysisService
 from app.services.prompt_service import PromptService
 from app.services.readme_generation_service import READMEGenerationService
+from app.services.recommendation_engine_service import RecommendationEngineService
 from app.services.recommendation_service import RecommendationService
+from app.services.skill_analysis_service import SkillAnalysisService
 from app.services.user_service import UserService
 
 __all__ = [
@@ -18,8 +21,11 @@ __all__ = [
     "GitHubRepositoryService",
     "GitHubUserService",
     "KeywordRefinementService",
+    "ProfileAnalysisService",
     "PromptService",
     "READMEGenerationService",
+    "RecommendationEngineService",
     "RecommendationService",
+    "SkillAnalysisService",
     "UserService",
 ]
