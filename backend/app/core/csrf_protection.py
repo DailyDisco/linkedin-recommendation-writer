@@ -213,8 +213,15 @@ class APICSRFProtectionMiddleware(BaseHTTPMiddleware):
         if request.method in {"GET", "HEAD", "OPTIONS"}:
             return await call_next(request)
 
-        # TEMPORARY: Allow GitHub analysis endpoints without authentication for testing
-        if "/api/v1/github/analyze" in request.url.path or "/api/v1/github/repository/contributors" in request.url.path:
+        # TEMPORARY: Allow certain endpoints without authentication for testing
+        if (
+            "/api/v1/github/analyze" in request.url.path
+            or "/api/v1/github/repository/contributors" in request.url.path
+            or "/api/v1/recommendations/prompt-suggestions" in request.url.path
+            or "/api/v1/recommendations/autocomplete-suggestions" in request.url.path
+            or "/api/v1/recommendations/generate-options/stream" in request.url.path
+            or "/api/v1/recommendations/chat-assistant" in request.url.path
+        ):
             return await call_next(request)
 
         # Check for API key or proper authorization
