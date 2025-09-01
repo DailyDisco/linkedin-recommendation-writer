@@ -41,10 +41,10 @@ async def init_redis() -> None:
         raise
 
 
-async def get_redis() -> Redis:
+async def get_redis() -> Optional[Redis]:
     """Get Redis client instance."""
     if redis_client is None:
-        raise ConnectionError("Redis client not initialized")
+        return None
     return redis_client
 
 
@@ -52,6 +52,9 @@ async def set_cache(key: str, value: Any, ttl: Optional[int] = None) -> bool:
     """Set a value in Redis cache."""
     try:
         client = await get_redis()
+        if client is None:
+            logger.warning("Redis not available, skipping cache set")
+            return False
         serialized_value = json.dumps(value) if not isinstance(value, str) else value
         cache_ttl = ttl or settings.REDIS_DEFAULT_TTL
         await client.setex(key, cache_ttl, serialized_value)
@@ -65,6 +68,9 @@ async def get_cache(key: str) -> Optional[Any]:
     """Get a value from Redis cache."""
     try:
         client = await get_redis()
+        if client is None:
+            logger.warning("Redis not available, skipping cache get")
+            return None
         value = await client.get(key)
         if value is None:
             return None
@@ -84,6 +90,9 @@ async def delete_cache(key: str) -> bool:
     """Delete a key from Redis cache."""
     try:
         client = await get_redis()
+        if client is None:
+            logger.warning("Redis not available, skipping cache delete")
+            return False
         await client.delete(key)
         return True
     except Exception as e:
@@ -95,6 +104,8 @@ async def check_redis_health() -> str:
     """Check Redis connectivity for health checks."""
     try:
         client = await get_redis()
+        if client is None:
+            return "unavailable"
         await client.ping()
         return "ok"
     except Exception as e:
