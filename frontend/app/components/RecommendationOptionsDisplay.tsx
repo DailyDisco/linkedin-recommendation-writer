@@ -1,9 +1,6 @@
 import React from 'react';
 import { CheckCircle, Eye, EyeOff, Loader2 } from 'lucide-react';
-import type {
-  ContributorInfo,
-  ParsedGitHubInput,
-} from '../types/index';
+import type { ContributorInfo, ParsedGitHubInput } from '../types/index';
 
 interface FormData {
   workingRelationship: string;
