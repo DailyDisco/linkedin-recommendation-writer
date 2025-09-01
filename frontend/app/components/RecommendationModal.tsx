@@ -1,30 +1,22 @@
 import { useState, useEffect, useRef } from 'react';
-import {
-  X,
-  Loader2,
-  FileText,
-  CheckCircle,
-  AlertCircle,
-  Eye,
-  EyeOff,
-} from 'lucide-react';
 import { toast } from 'sonner';
 import { recommendationApi } from '../services/api';
 import type {
   ContributorInfo,
   HttpError,
-  Recommendation,
-  RecommendationOption,
   RegenerateRequest,
   RecommendationRequest,
-  KeywordRefinementResult,
-} from '../types';
+} from '../types/index';
 import ErrorBoundary from './ui/error-boundary';
 import { parseGitHubInput, validateGitHubInput } from '@/lib/utils';
 import { useRecommendationCount } from '../hooks/useLocalStorage';
-import { KeywordRefinement } from './KeywordRefinement';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { trackEngagement, trackConversion } from '../utils/analytics';
+import RecommendationModalHeader from './RecommendationModalHeader';
+import RecommendationLimitMessage from './RecommendationLimitMessage';
+import RecommendationForm from './RecommendationForm';
+import RecommendationGeneratingState from './RecommendationGeneratingState';
+import RecommendationOptionsDisplay from './RecommendationOptionsDisplay';
+import RecommendationResultDisplay from './RecommendationResultDisplay';
 
 interface RecommendationModalProps {
   contributor: ContributorInfo;
@@ -46,7 +38,7 @@ export default function RecommendationModal({
 
   const { count: anonRecommendationCount, incrementCount: incrementAnonCount } =
     useRecommendationCount();
-  const ANONYMOUS_LIMIT = 1;
+  const ANONYMOUS_LIMIT = 3; // Updated to match backend limit for anonymous users
 
   const [showLimitExceededMessage, setShowLimitExceededMessage] =
     useState(false);
@@ -92,13 +84,39 @@ export default function RecommendationModal({
     'form' | 'generating' | 'options' | 'result'
   >('form');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedRecommendation, setGeneratedRecommendation] =
-    useState<Recommendation | null>(null);
+  const [generatedRecommendation, setGeneratedRecommendation] = useState<{
+    id: number;
+    title: string;
+    content: string;
+    recommendation_type: string;
+    tone: string;
+    length: string;
+    word_count: number;
+    created_at: string;
+    github_username: string;
+  } | null>(null);
   const [recommendationOptions, setRecommendationOptions] = useState<
-    RecommendationOption[]
+    Array<{
+      id: number;
+      name: string;
+      content: string;
+      title: string;
+      word_count: number;
+      focus: string;
+      explanation: string;
+      generation_parameters: Record<string, unknown>;
+    }>
   >([]);
-  const [selectedOption, setSelectedOption] =
-    useState<RecommendationOption | null>(null);
+  const [selectedOption, setSelectedOption] = useState<{
+    id: number;
+    name: string;
+    content: string;
+    title: string;
+    word_count: number;
+    focus: string;
+    explanation: string;
+    generation_parameters: Record<string, unknown>;
+  } | null>(null);
   const [isCreatingFromOption, setIsCreatingFromOption] = useState(false);
 
   const [isRegenerating, setIsRegenerating] = useState(false);
@@ -273,11 +291,16 @@ Key Achievements: ${formData.notableAchievements}
         incrementAnonCount();
       }
 
-      setRecommendationOptions(optionsResponse.options);
+      // Transform API response to include generation_parameters on each option
+      const optionsWithParams = optionsResponse.options.map(option => ({
+        ...option,
+        generation_parameters: optionsResponse.generation_parameters || {},
+      }));
+      setRecommendationOptions(optionsWithParams);
 
       // Track successful recommendation generation
       trackEngagement.recommendationGenerated({
-        githubUsername: !!contributor.username,
+        githubUsername: contributor.username ? 'true' : 'false',
         tone: formData.tone,
         length: formData.length,
         hasKeywords: formData.specificSkills.trim().length > 0,
@@ -318,7 +341,16 @@ Key Achievements: ${formData.notableAchievements}
     }
   };
 
-  const handleOptionSelect = async (option: RecommendationOption) => {
+  const handleOptionSelect = async (option: {
+    id: number;
+    name: string;
+    content: string;
+    title: string;
+    word_count: number;
+    focus: string;
+    explanation: string;
+    generation_parameters?: Record<string, unknown>;
+  }) => {
     if (!isLoggedIn && anonRecommendationCount >= ANONYMOUS_LIMIT) {
       setShowLimitExceededMessage(true);
       return;
@@ -328,8 +360,14 @@ Key Achievements: ${formData.notableAchievements}
     try {
       const recommendation = await recommendationApi.createFromOption(
         contributor.username,
-        option,
-        recommendationOptions,
+        {
+          ...option,
+          generation_parameters: option.generation_parameters || {},
+        },
+        recommendationOptions.map(opt => ({
+          ...opt,
+          generation_parameters: opt.generation_parameters || {},
+        })),
         formData.analysis_type,
         formData.repository_url,
         formData.recommendation_type,
@@ -343,7 +381,10 @@ Key Achievements: ${formData.notableAchievements}
       }
 
       setGeneratedRecommendation(recommendation);
-      setSelectedOption(option);
+      setSelectedOption({
+        ...option,
+        generation_parameters: option.generation_parameters || {},
+      });
 
       // Track completed recommendation
       trackConversion.recommendationCompleted();
@@ -449,752 +490,74 @@ Key Achievements: ${formData.notableAchievements}
           onClick={e => e.stopPropagation()}
         >
           {/* Header */}
-          <div className='flex items-center justify-between p-6 border-b'>
-            <div className='flex items-center space-x-3'>
-              <img
-                src={contributor.avatar_url}
-                alt={contributor.username}
-                className='w-10 h-10 rounded-full'
-              />
-              <div>
-                <h2
-                  id='modal-title'
-                  className='text-xl font-semibold text-gray-900'
-                >
-                  Write LinkedIn Recommendation
-                </h2>
-                <p className='text-gray-600'>
-                  for {contributor.full_name || contributor.username} (@
-                  {contributor.username})
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={onClose}
-              className='text-gray-400 hover:text-gray-600'
-              aria-label='Close modal'
-            >
-              <X className='w-6 h-6' />
-            </button>
-          </div>
+          <RecommendationModalHeader
+            contributor={contributor}
+            onClose={onClose}
+          />
 
           {/* Content */}
           <div className='p-6'>
             {showLimitExceededMessage ? (
-              <div className='text-center py-12'>
-                <AlertCircle className='w-16 h-16 text-red-500 mx-auto mb-4' />
-                <h3 className='text-2xl font-bold text-gray-900 mb-2'>
-                  Recommendation Limit Reached
-                </h3>
-                <p className='text-lg text-gray-700 mb-6'>
-                  You have used your one free recommendation for today.
-                </p>
-                <p className='text-gray-600 mb-6'>
-                  Please create an account to generate up to 3 recommendations
-                  per day.
-                </p>
-                <button
-                  onClick={onClose}
-                  className='px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-lg font-semibold'
-                >
-                  Create Account
-                </button>
-              </div>
+              <RecommendationLimitMessage onClose={onClose} />
             ) : step === 'form' ? (
-              <form onSubmit={handleSubmit} className='space-y-6'>
-                {/* GitHub Input Section */}
-                <div>
-                  <label
-                    htmlFor='github-input'
-                    className='block text-sm font-medium text-gray-700 mb-2'
-                  >
-                    GitHub Username or Repository URL *
-                  </label>
-                  <input
-                    id='github-input'
-                    type='text'
-                    required
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${
-                      validationErrors.github_input
-                        ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
-                        : 'border-gray-300'
-                    }`}
-                    placeholder='e.g., johnsmith or https://github.com/johnsmith/myproject'
-                    value={formData.github_input}
-                    onChange={e => {
-                      setFormData(prev => ({
-                        ...prev,
-                        github_input: e.target.value,
-                      }));
-                      if (validationErrors.github_input) {
-                        setValidationErrors(prev => ({
-                          ...prev,
-                          github_input: '',
-                        }));
-                      }
-                    }}
-                    aria-describedby={
-                      validationErrors.github_input
-                        ? 'github-input-error'
-                        : undefined
-                    }
-                  />
-                  {validationErrors.github_input && (
-                    <div
-                      id='github-input-error'
-                      className='mt-1 flex items-center space-x-1 text-sm text-red-600'
-                    >
-                      <AlertCircle className='w-4 h-4 flex-shrink-0' />
-                      <p>{validationErrors.github_input}</p>
-                    </div>
-                  )}
-                  {parsedGitHubInput && (
-                    <div className='mt-2 p-2 bg-gray-50 rounded-md'>
-                      <p className='text-sm text-gray-600'>
-                        {parsedGitHubInput.type === 'repo_url' ? (
-                          <>
-                            📁 Repository:{' '}
-                            <strong>
-                              {parsedGitHubInput.username}/
-                              {parsedGitHubInput.repository}
-                            </strong>
-                          </>
-                        ) : (
-                          <>
-                            👤 User:{' '}
-                            <strong>{parsedGitHubInput.username}</strong>
-                          </>
-                        )}
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Analysis Type Selection */}
-                {parsedGitHubInput && parsedGitHubInput.type === 'username' && (
-                  <div>
-                    <label className='block text-sm font-medium text-gray-700 mb-2'>
-                      Analysis Type
-                    </label>
-                    <div className='space-y-2'>
-                      <label className='flex items-center'>
-                        <input
-                          type='radio'
-                          name='analysis_type'
-                          value='profile'
-                          checked={formData.analysis_type === 'profile'}
-                          onChange={e =>
-                            setFormData(prev => ({
-                              ...prev,
-                              analysis_type: e.target.value as
-                                | 'profile'
-                                | 'repo_only',
-                            }))
-                          }
-                          className='mr-2'
-                        />
-                        <span className='text-sm'>
-                          <strong>Full Profile Analysis</strong> - Use all
-                          repositories and profile information
-                        </span>
-                      </label>
-                      <label className='flex items-center'>
-                        <input
-                          type='radio'
-                          name='analysis_type'
-                          value='repo_only'
-                          checked={formData.analysis_type === 'repo_only'}
-                          onChange={e =>
-                            setFormData(prev => ({
-                              ...prev,
-                              analysis_type: e.target.value as
-                                | 'profile'
-                                | 'repo_only',
-                            }))
-                          }
-                          className='mr-2'
-                        />
-                        <span className='text-sm text-gray-600'>
-                          <strong>Repository Only</strong> - Focus on specific
-                          repository (you&apos;ll be asked to provide one)
-                        </span>
-                      </label>
-                    </div>
-                  </div>
-                )}
-
-                {/* Repository Selection for repo_only mode */}
-                {formData.analysis_type === 'repo_only' &&
-                  parsedGitHubInput &&
-                  parsedGitHubInput.type === 'username' && (
-                    <div>
-                      <label
-                        htmlFor='repository-url'
-                        className='block text-sm font-medium text-gray-700 mb-2'
-                      >
-                        Repository URL *
-                      </label>
-                      <input
-                        id='repository-url'
-                        type='text'
-                        required
-                        className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500'
-                        placeholder='e.g., https://github.com/username/repository or username/repository'
-                        value={formData.repository_url || ''}
-                        onChange={e =>
-                          setFormData(prev => ({
-                            ...prev,
-                            repository_url: e.target.value,
-                          }))
-                        }
-                      />
-                      <p className='text-xs text-gray-500 mt-1'>
-                        Enter the specific repository URL you want to focus on
-                        for the recommendation.
-                      </p>
-                      {validationErrors.repository_url && (
-                        <div className='mt-1 flex items-center space-x-1 text-sm text-red-600'>
-                          <AlertCircle className='w-4 h-4 flex-shrink-0' />
-                          <p>{validationErrors.repository_url}</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                <div>
-                  <label
-                    htmlFor='working-relationship'
-                    className='block text-sm font-medium text-gray-700 mb-2'
-                  >
-                    How did you work together? *
-                  </label>
-                  <textarea
-                    id='working-relationship'
-                    ref={firstInputRef}
-                    required
-                    className={`w-full h-20 px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${
-                      validationErrors.workingRelationship
-                        ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
-                        : 'border-gray-300'
-                    }`}
-                    placeholder='e.g., We collaborated on the frontend development team for 8 months...'
-                    value={formData.workingRelationship}
-                    onChange={e => {
-                      setFormData(prev => ({
-                        ...prev,
-                        workingRelationship: e.target.value,
-                      }));
-                      if (validationErrors.workingRelationship) {
-                        setValidationErrors(prev => ({
-                          ...prev,
-                          workingRelationship: '',
-                        }));
-                      }
-                    }}
-                    aria-describedby={
-                      validationErrors.workingRelationship
-                        ? 'working-relationship-error'
-                        : undefined
-                    }
-                  />
-                  {validationErrors.workingRelationship && (
-                    <div
-                      id='working-relationship-error'
-                      className='mt-1 flex items-center space-x-1 text-sm text-red-600'
-                    >
-                      <AlertCircle className='w-4 h-4 flex-shrink-0' />
-                      <p>{validationErrors.workingRelationship}</p>
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <label
-                    htmlFor='specific-skills'
-                    className='block text-sm font-medium text-gray-700 mb-2'
-                  >
-                    What specific skills did you observe?
-                  </label>
-                  <textarea
-                    id='specific-skills'
-                    className='w-full h-20 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500'
-                    placeholder='e.g., Excellent React skills, great at debugging, strong problem-solving...'
-                    value={formData.specificSkills}
-                    onChange={e =>
-                      setFormData(prev => ({
-                        ...prev,
-                        specificSkills: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor='time-worked'
-                    className='block text-sm font-medium text-gray-700 mb-2'
-                  >
-                    How long did you work together?
-                  </label>
-                  <input
-                    id='time-worked'
-                    type='text'
-                    className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500'
-                    placeholder='e.g., 8 months, 2 years...'
-                    value={formData.timeWorkedTogether}
-                    onChange={e =>
-                      setFormData(prev => ({
-                        ...prev,
-                        timeWorkedTogether: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor='achievements'
-                    className='block text-sm font-medium text-gray-700 mb-2'
-                  >
-                    Notable achievements or impact? (optional)
-                  </label>
-                  <textarea
-                    id='achievements'
-                    className='w-full h-20 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500'
-                    placeholder='e.g., Reduced load times by 40%, mentored junior developers...'
-                    value={formData.notableAchievements}
-                    onChange={e =>
-                      setFormData(prev => ({
-                        ...prev,
-                        notableAchievements: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
-
-                {/* Recommendation Settings */}
-                <div className='bg-gray-50 p-4 rounded-lg space-y-4'>
-                  <h3 className='font-medium text-gray-900'>
-                    Recommendation Settings
-                  </h3>
-
-                  <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
-                    <div>
-                      <label
-                        htmlFor='rec-type'
-                        className='block text-sm font-medium text-gray-700 mb-1'
-                      >
-                        Type
-                      </label>
-                      <p className='text-xs text-gray-500 mb-2'>
-                        Focus area of the recommendation
-                      </p>
-                      <select
-                        id='rec-type'
-                        className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500'
-                        value={formData.recommendation_type}
-                        onChange={e =>
-                          setFormData(prev => ({
-                            ...prev,
-                            recommendation_type: e.target.value as
-                              | 'professional'
-                              | 'technical'
-                              | 'leadership'
-                              | 'academic'
-                              | 'personal',
-                          }))
-                        }
-                      >
-                        <option value='professional'>Professional</option>
-                        <option value='technical'>Technical</option>
-                        <option value='leadership'>Leadership</option>
-                        <option value='academic'>Academic</option>
-                        <option value='personal'>Personal</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label
-                        htmlFor='rec-tone'
-                        className='block text-sm font-medium text-gray-700 mb-1'
-                      >
-                        Tone
-                      </label>
-                      <p className='text-xs text-gray-500 mb-2'>
-                        Writing style and voice
-                      </p>
-                      <select
-                        id='rec-tone'
-                        className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500'
-                        value={formData.tone}
-                        onChange={e =>
-                          setFormData(prev => ({
-                            ...prev,
-                            tone: e.target.value as
-                              | 'professional'
-                              | 'friendly'
-                              | 'formal'
-                              | 'casual',
-                          }))
-                        }
-                      >
-                        <option value='professional'>Professional</option>
-                        <option value='friendly'>Friendly</option>
-                        <option value='formal'>Formal</option>
-                        <option value='casual'>Casual</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label
-                        htmlFor='rec-length'
-                        className='block text-sm font-medium text-gray-700 mb-1'
-                      >
-                        Length
-                      </label>
-                      <p className='text-xs text-gray-500 mb-2'>
-                        Word count of the recommendation
-                      </p>
-                      <select
-                        id='rec-length'
-                        className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500'
-                        value={formData.length}
-                        onChange={e =>
-                          setFormData(prev => ({
-                            ...prev,
-                            length: e.target.value as
-                              | 'short'
-                              | 'medium'
-                              | 'long',
-                          }))
-                        }
-                      >
-                        <option value='short'>Short</option>
-                        <option value='medium'>Medium</option>
-                        <option value='long'>Long</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                <div className='flex justify-end space-x-3'>
-                  <button
-                    type='button'
-                    onClick={onClose}
-                    className='px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors'
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type='submit'
-                    disabled={isGenerating}
-                    className='px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2'
-                  >
-                    <FileText className='w-4 h-4' />
-                    <span>Generate Recommendation</span>
-                  </button>
-                </div>
-              </form>
+              <RecommendationForm
+                contributor={contributor}
+                formData={formData}
+                setFormData={setFormData}
+                validationErrors={validationErrors}
+                setValidationErrors={setValidationErrors}
+                parsedGitHubInput={parsedGitHubInput}
+                isGenerating={isGenerating}
+                firstInputRef={firstInputRef}
+                onSubmit={handleSubmit}
+                onCancel={onClose}
+              />
             ) : step === 'generating' ? (
-              <div className='text-center py-12'>
-                <Loader2 className='w-12 h-12 animate-spin text-blue-600 mx-auto mb-4' />
-                <h3 className='text-lg font-medium text-gray-900 mb-2'>
-                  Generating Recommendation Options
-                </h3>
-                <p className='text-gray-600 mb-4'>
-                  Analyzing {contributor.username}&apos;s GitHub profile and
-                  creating multiple options...
-                </p>
-                <div className='bg-gray-200 rounded-full h-2 w-64 mx-auto mb-4'>
-                  <div
-                    className='bg-blue-600 h-2 rounded-full animate-pulse'
-                    style={{ width: '60%' }}
-                  ></div>
-                </div>
-                <p className='text-sm text-gray-500'>
-                  This may take up to 60 seconds...
-                </p>
-              </div>
+              <RecommendationGeneratingState contributor={contributor} />
             ) : step === 'options' && recommendationOptions.length > 0 ? (
-              <div ref={optionsRef} className='space-y-6'>
-                {/* Header with navigation */}
-                <div className='flex items-center justify-between'>
-                  <div className='flex items-center space-x-3'>
-                    <CheckCircle className='w-6 h-6 text-green-600' />
-                    <div>
-                      <h3 className='text-xl font-semibold text-gray-900'>
-                        Choose Your Recommendation
-                      </h3>
-                      <p className='text-sm text-gray-600'>
-                        for {contributor.full_name || contributor.username}
-                      </p>
-                    </div>
-                  </div>
-                  <div className='flex space-x-2'>
-                    <button
-                      onClick={() => setStep('form')}
-                      className='px-3 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors text-sm'
-                    >
-                      ← Edit Details
-                    </button>
-                    <button
-                      onClick={handleReset}
-                      className='px-3 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors text-sm'
-                    >
-                      Start Over
-                    </button>
-                  </div>
-                </div>
-
-                {/* Generation summary */}
-                <div className='bg-blue-50 border border-blue-200 rounded-lg p-4'>
-                  <div className='flex items-center space-x-2 mb-2'>
-                    <div className='w-2 h-2 bg-blue-600 rounded-full'></div>
-                    <span className='text-sm font-medium text-blue-900'>
-                      Generated based on your inputs
-                    </span>
-                  </div>
-                  <p className='text-sm text-blue-800'>
-                    {parsedGitHubInput?.type === 'repo_url'
-                      ? `Repository: ${parsedGitHubInput.username}/${parsedGitHubInput.repository}`
-                      : `GitHub Profile: ${parsedGitHubInput?.username || contributor.username}`}{' '}
-                    • {formData.recommendation_type} • {formData.tone} tone •{' '}
-                    {formData.length}
-                  </p>
-                </div>
-
-                <p className='text-gray-600'>
-                  Here are 3 different recommendation options based on the
-                  GitHub analysis. Each option has a different focus area.
-                  Choose the one that best fits your needs.
-                </p>
-
-                <div className='space-y-4'>
-                  {recommendationOptions.map(option => (
-                    <div
-                      key={option.id}
-                      className='border-2 border-gray-200 rounded-lg p-6 hover:border-blue-300 hover:shadow-md transition-all duration-200'
-                    >
-                      <div className='flex items-start justify-between mb-4'>
-                        <div className='flex-1'>
-                          <h4 className='text-lg font-semibold text-gray-900 mb-1'>
-                            {option.name}
-                          </h4>
-                          <div className='flex items-center space-x-4 text-sm text-gray-600'>
-                            <span className='flex items-center space-x-1'>
-                              <span className='font-medium'>Focus:</span>
-                              <span className='capitalize'>
-                                {option.focus.replace('_', ' ')}
-                              </span>
-                            </span>
-                            <span className='flex items-center space-x-1'>
-                              <span className='font-medium'>Words:</span>
-                              <span>{option.word_count}</span>
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className='bg-gray-50 p-4 rounded-md mb-4 border-l-4 border-blue-200'>
-                        <p className='text-gray-900 leading-relaxed'>
-                          {viewingFullContent === option.id
-                            ? option.content
-                            : option.content.length > 400
-                              ? option.content.substring(0, 400) + '...'
-                              : option.content}
-                        </p>
-                      </div>
-
-                      <div className='flex space-x-3'>
-                        <button
-                          onClick={() => handleViewMore(option.id)}
-                          className='flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors text-sm flex items-center justify-center space-x-2'
-                        >
-                          {viewingFullContent === option.id ? (
-                            <>
-                              <EyeOff className='w-4 h-4' />
-                              <span>Show Less</span>
-                            </>
-                          ) : (
-                            <>
-                              <Eye className='w-4 h-4' />
-                              <span>Read Full</span>
-                            </>
-                          )}
-                        </button>
-                        <button
-                          onClick={() => handleOptionSelect(option)}
-                          disabled={isCreatingFromOption}
-                          className='flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm flex items-center justify-center space-x-2 font-medium'
-                        >
-                          {isCreatingFromOption ? (
-                            <>
-                              <Loader2 className='w-4 h-4 animate-spin' />
-                              <span>Creating...</span>
-                            </>
-                          ) : (
-                            <>
-                              <CheckCircle className='w-4 h-4' />
-                              <span>Select This</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <RecommendationOptionsDisplay
+                recommendationOptions={
+                  recommendationOptions as Array<{
+                    id: number;
+                    name: string;
+                    content: string;
+                    title: string;
+                    word_count: number;
+                    focus: string;
+                    explanation: string;
+                    generation_parameters?: Record<string, unknown>;
+                  }>
+                }
+                contributor={contributor}
+                formData={formData}
+                parsedGitHubInput={parsedGitHubInput}
+                isCreatingFromOption={isCreatingFromOption}
+                viewingFullContent={viewingFullContent}
+                optionsRef={optionsRef}
+                onViewMore={handleViewMore}
+                onOptionSelect={handleOptionSelect}
+                onEditDetails={() => setStep('form')}
+                onStartOver={handleReset}
+              />
             ) : step === 'result' &&
               (generatedRecommendation || selectedOption) ? (
-              <div ref={resultRef} className='space-y-6'>
-                <Tabs
-                  value={activeTab}
-                  onValueChange={value =>
-                    setActiveTab(value as 'preview' | 'refine')
-                  }
-                >
-                  <TabsList className='grid w-full grid-cols-2 h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground'>
-                    <TabsTrigger
-                      value='preview'
-                      className='inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm'
-                    >
-                      Preview
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value='refine'
-                      className='inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm'
-                    >
-                      Refine
-                    </TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value='preview' className='mt-4'>
-                    <div className='flex items-center justify-between'>
-                      <div className='flex items-center space-x-3'>
-                        <CheckCircle className='w-6 h-6 text-green-600' />
-                        <div>
-                          <h3 className='text-xl font-semibold text-gray-900'>
-                            Recommendation Ready
-                          </h3>
-                          <p className='text-sm text-gray-600'>
-                            for {contributor.full_name || contributor.username}
-                          </p>
-                        </div>
-                      </div>
-                      <div className='flex space-x-2'>
-                        <button
-                          onClick={() => setStep('options')}
-                          className='px-3 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors text-sm'
-                        >
-                          ← Back to Options
-                        </button>
-                        <button
-                          onClick={handleReset}
-                          className='px-3 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors text-sm'
-                        >
-                          Generate Another
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className='bg-gray-50 p-6 rounded-lg mt-4'>
-                      <div className='mb-4 flex items-center justify-between text-sm text-gray-600'>
-                        <div className='flex items-center space-x-4'>
-                          <span>
-                            Type:{' '}
-                            {generatedRecommendation?.recommendation_type ||
-                              formData.recommendation_type}
-                          </span>
-                          <span>
-                            Tone:{' '}
-                            {generatedRecommendation?.tone || formData.tone}
-                          </span>
-                          <span>
-                            Length:{' '}
-                            {generatedRecommendation?.length || formData.length}
-                          </span>
-                        </div>
-                        <span>
-                          {generatedRecommendation?.word_count ||
-                            selectedOption?.word_count}{' '}
-                          words
-                        </span>
-                      </div>
-                      <div className='prose max-w-none'>
-                        <p className='text-gray-900 leading-relaxed whitespace-pre-wrap'>
-                          {generatedRecommendation?.content ||
-                            selectedOption?.content}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Regeneration Section */}
-                    <div className='bg-blue-50 p-4 rounded-lg mt-4'>
-                      <h4 className='font-medium text-gray-900 mb-2'>
-                        Want to refine this recommendation?
-                      </h4>
-                      <p className='text-sm text-gray-600 mb-3'>
-                        Provide specific instructions for how you&apos;d like
-                        the recommendation modified.
-                      </p>
-                      <textarea
-                        className='w-full h-20 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 mb-3'
-                        placeholder='e.g., Make it more specific about their React skills, focus less on teamwork, emphasize their problem-solving abilities...'
-                        value={regenerateInstructions}
-                        onChange={e =>
-                          setRegenerateInstructions(e.target.value)
-                        }
-                      />
-                      <button
-                        onClick={handleRegenerate}
-                        disabled={
-                          !regenerateInstructions.trim() || isRegenerating
-                        }
-                        className='px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2'
-                      >
-                        {isRegenerating ? (
-                          <Loader2 className='w-4 h-4 animate-spin' />
-                        ) : (
-                          <FileText className='w-4 h-4' />
-                        )}
-                        <span>
-                          {isRegenerating
-                            ? 'Refining...'
-                            : 'Refine Recommendation'}
-                        </span>
-                      </button>
-                    </div>
-
-                    <div className='flex justify-end space-x-3 mt-4'>
-                      <button
-                        onClick={onClose}
-                        className='px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors'
-                      >
-                        Done
-                      </button>
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value='refine' className='mt-4'>
-                    <KeywordRefinement
-                      recommendationId={generatedRecommendation?.id || 0}
-                      onRefinementComplete={(
-                        refinedContent: KeywordRefinementResult
-                      ) => {
-                        setGeneratedRecommendation(prev =>
-                          prev
-                            ? {
-                                ...prev,
-                                content: refinedContent.refined_content,
-                              }
-                            : null
-                        );
-                        toast.success('Recommendation refined successfully');
-                      }}
-                    />
-                  </TabsContent>
-                </Tabs>
-              </div>
+              <RecommendationResultDisplay
+                generatedRecommendation={generatedRecommendation}
+                selectedOption={selectedOption}
+                contributor={contributor}
+                formData={formData}
+                activeTab={activeTab}
+                resultRef={resultRef}
+                regenerateInstructions={regenerateInstructions}
+                setActiveTab={setActiveTab}
+                setRegenerateInstructions={setRegenerateInstructions}
+                setGeneratedRecommendation={setGeneratedRecommendation}
+                isRegenerating={isRegenerating}
+                onBackToOptions={() => setStep('options')}
+                onGenerateAnother={handleReset}
+                onRefine={handleRegenerate}
+                onClose={onClose}
+              />
             ) : null}
           </div>
         </div>

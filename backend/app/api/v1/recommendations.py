@@ -1,14 +1,22 @@
 """Recommendation API endpoints."""
 
 import logging
-from datetime import date
-from typing import Optional
+from typing import Optional, Union
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.auth import get_current_active_user
-from app.core.dependencies import PaginationParams, get_database_session, get_pagination_params, get_recommendation_service
+from app.core.dependencies import (
+    AnonymousUser,
+    PaginationParams,
+    check_generation_limit,
+    get_current_user_optional,
+    get_database_session,
+    get_pagination_params,
+    get_recommendation_service,
+    increment_generation_count,
+)
 from app.models.user import User
 from app.schemas.recommendation import (
     KeywordRefinementRequest,
@@ -33,79 +41,58 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Role-based recommendation limits
-DEFAULT_LIMITS = {"free": 3, "premium": 10, "admin": float("inf")}  # Unlimited
+DEFAULT_LIMITS = {"free": 5, "premium": 10, "admin": float("inf"), "anonymous": 3}  # Updated limits
 
 
 async def check_recommendation_limit_only(
     db: AsyncSession,
-    user: User,
+    user: Union[User, AnonymousUser],
 ) -> None:
     """Checks user's daily recommendation limit WITHOUT incrementing the counter."""
-    today = date.today()
-
-    # Reset count if it's a new day
-    if not user.last_recommendation_date or user.last_recommendation_date.date() < today:
-        user.recommendation_count = 0  # type: ignore
-        user.last_recommendation_date = today  # type: ignore
-
-    # Admin users have unlimited access - skip limit checks entirely
-    if user.role == "admin":
-        logger.info(f"Admin user {user.username} (ID: {user.id}) has unlimited access - skipping limit check")
-        return
-
-    # Get user's daily limit based on their role or stored limit
-    daily_limit = user.daily_limit or DEFAULT_LIMITS.get(user.role or "free", 3)
-
-    if user.recommendation_count >= daily_limit:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Daily recommendation limit ({int(daily_limit)}) exceeded. Please try again tomorrow.",
-        )
+    # Use the new unified limit checking function
+    await check_generation_limit(user, db)
 
 
 async def increment_recommendation_count(
     db: AsyncSession,
-    user: User,
+    user: Union[User, AnonymousUser],
+    request: Request,
 ) -> None:
     """Increments the user's recommendation count after successful generation."""
-    # Admin users still get their usage tracked for analytics
-    user.recommendation_count += 1  # type: ignore
-    await db.commit()
-    await db.refresh(user)
-
-    # Get user's daily limit for logging (admins show unlimited)
-    if user.role == "admin":
-        logger.info(f"Admin user {user.username} (ID: {user.id}) generated recommendation (unlimited access)")
-    else:
-        daily_limit = user.daily_limit or DEFAULT_LIMITS.get(user.role or "free", 3)
-        logger.info(f"User {user.username} (ID: {user.id}) has used {user.recommendation_count}/{int(daily_limit)} recommendations today (role: {user.role})")
+    # Use the new unified increment function
+    await increment_generation_count(user, request, db)
 
 
 async def check_and_update_recommendation_limit(
     db: AsyncSession,
-    user: User,
+    user: Union[User, AnonymousUser],
+    request: Request,
 ) -> None:
     """Legacy function - kept for backward compatibility."""
     await check_recommendation_limit_only(db, user)
-    await increment_recommendation_count(db, user)
+    await increment_recommendation_count(db, user, request)
 
 
 @router.post("/generate", response_model=RecommendationResponse)
 async def generate_recommendation(
     request: RecommendationRequest,
+    req: Request,
     db: AsyncSession = Depends(get_database_session),
     recommendation_service: RecommendationService = Depends(get_recommendation_service),
-    current_user: User = Depends(get_current_active_user),
+    current_user: Union[User, AnonymousUser] = Depends(get_current_user_optional),
 ) -> RecommendationResponse:
     """Generate a new LinkedIn recommendation."""
 
     # Check limit but don't increment yet
     await check_recommendation_limit_only(db, current_user)
 
+    user_type = "authenticated" if isinstance(current_user, User) else "anonymous"
+    user_id = current_user.id if isinstance(current_user, User) else None
+
     logger.info("=" * 80)
     logger.info("🚀 RECOMMENDATION GENERATION STARTED")
     logger.info("=" * 80)
-    logger.info(f"👤 User: {current_user.username} (ID: {current_user.id})")
+    logger.info(f"👤 User: {current_user.username} (ID: {current_user.id}, Type: {user_type})")
     logger.info("📋 Request Details:")
     logger.info(f"   • GitHub Username: {request.github_username}")
     logger.info(f"   • Type: {request.recommendation_type}")
@@ -118,7 +105,7 @@ async def generate_recommendation(
         logger.info("🎯 Starting recommendation creation process...")
         recommendation = await recommendation_service.create_recommendation(
             db=db,
-            user_id=current_user.id,  # type: ignore # Associate with user
+            user_id=user_id,  # Can be None for anonymous users
             github_username=request.github_username,
             recommendation_type=request.recommendation_type,
             tone=request.tone,
@@ -131,7 +118,7 @@ async def generate_recommendation(
         )
 
         # Only increment after successful generation
-        await increment_recommendation_count(db, current_user)
+        await increment_recommendation_count(db, current_user, req)
 
         logger.info("✅ RECOMMENDATION GENERATION COMPLETED SUCCESSFULLY")
         logger.info("📊 Final Stats:")
@@ -155,19 +142,23 @@ async def generate_recommendation(
 @router.post("/generate-options", response_model=RecommendationOptionsResponse)
 async def generate_recommendation_options(
     request: RecommendationRequest,
+    req: Request,
     db: AsyncSession = Depends(get_database_session),
     recommendation_service: RecommendationService = Depends(get_recommendation_service),
-    current_user: User = Depends(get_current_active_user),
+    current_user: Union[User, AnonymousUser] = Depends(get_current_user_optional),
 ) -> RecommendationOptionsResponse:
     """Generate multiple recommendation options."""
 
     # Check limit but don't increment yet
     await check_recommendation_limit_only(db, current_user)
 
+    user_type = "authenticated" if isinstance(current_user, User) else "anonymous"
+    user_id = current_user.id if isinstance(current_user, User) else None
+
     logger.info("=" * 80)
     logger.info("🎭 MULTIPLE RECOMMENDATION OPTIONS GENERATION STARTED")
     logger.info("=" * 80)
-    logger.info(f"👤 User: {current_user.username} (ID: {current_user.id})")
+    logger.info(f"👤 User: {current_user.username} (ID: {current_user.id}, Type: {user_type})")
     logger.info("📋 Request Details:")
     logger.info(f"   • GitHub Username: {request.github_username}")
     logger.info(f"   • Type: {request.recommendation_type}")
@@ -179,7 +170,7 @@ async def generate_recommendation_options(
         logger.info("🎯 Starting multiple options generation process...")
         options_response = await recommendation_service.create_recommendation_options(
             db=db,
-            user_id=current_user.id,  # type: ignore # Associate with user
+            user_id=user_id,  # Can be None for anonymous users
             github_username=request.github_username,
             recommendation_type=request.recommendation_type,
             tone=request.tone,
@@ -194,7 +185,7 @@ async def generate_recommendation_options(
         )
 
         # Only increment after successful generation
-        await increment_recommendation_count(db, current_user)
+        await increment_recommendation_count(db, current_user, req)
 
         logger.info("✅ MULTIPLE OPTIONS GENERATION COMPLETED SUCCESSFULLY")
         logger.info("📊 Final Stats:")
@@ -426,19 +417,23 @@ async def revert_recommendation_to_version(
 @router.post("/create-from-option", response_model=RecommendationResponse)
 async def create_recommendation_from_option(
     request: RecommendationFromOptionRequest,
+    req: Request,
     db: AsyncSession = Depends(get_database_session),
     recommendation_service: RecommendationService = Depends(get_recommendation_service),
-    current_user: User = Depends(get_current_active_user),
+    current_user: Union[User, AnonymousUser] = Depends(get_current_user_optional),
 ) -> RecommendationResponse:
     """Create a recommendation from a selected option."""
 
     # Check limit but don't increment yet
     await check_recommendation_limit_only(db, current_user)
 
+    user_type = "authenticated" if isinstance(current_user, User) else "anonymous"
+    user_id = current_user.id if isinstance(current_user, User) else None
+
     logger.info("=" * 80)
     logger.info("🎯 RECOMMENDATION CREATION FROM SELECTED OPTION STARTED")
     logger.info("=" * 80)
-    logger.info(f"👤 User: {current_user.username} (ID: {current_user.id})")
+    logger.info(f"👤 User: {current_user.username} (ID: {current_user.id}, Type: {user_type})")
     logger.info("📋 Request Details:")
     logger.info(f"   • GitHub Username: {request.github_username}")
     logger.info(f"   • Selected Option: {request.selected_option.name}")
@@ -449,7 +444,7 @@ async def create_recommendation_from_option(
         logger.info("🎯 Starting recommendation creation from selected option...")
         recommendation = await recommendation_service.create_recommendation_from_option(
             db=db,
-            user_id=current_user.id,  # type: ignore # Associate with user
+            user_id=user_id,  # Can be None for anonymous users
             github_username=request.github_username,
             selected_option=request.selected_option.model_dump(),
             all_options=[option.model_dump() for option in request.all_options],
@@ -458,7 +453,7 @@ async def create_recommendation_from_option(
         )
 
         # Only increment after successful generation
-        await increment_recommendation_count(db, current_user)
+        await increment_recommendation_count(db, current_user, req)
 
         logger.info("✅ RECOMMENDATION CREATION FROM OPTION COMPLETED SUCCESSFULLY")
         logger.info("📊 Final Stats:")
@@ -482,19 +477,23 @@ async def create_recommendation_from_option(
 @router.post("/regenerate", response_model=RecommendationResponse)
 async def regenerate_recommendation(
     request: dict,  # Will contain original content and refinement instructions
+    req: Request,
     db: AsyncSession = Depends(get_database_session),
     recommendation_service: RecommendationService = Depends(get_recommendation_service),
-    current_user: User = Depends(get_current_active_user),
+    current_user: Union[User, AnonymousUser] = Depends(get_current_user_optional),
 ) -> RecommendationResponse:
     """Regenerate a recommendation with refinement instructions."""
 
     # Check limit but don't increment yet
     await check_recommendation_limit_only(db, current_user)
 
+    user_type = "authenticated" if isinstance(current_user, User) else "anonymous"
+    user_id = current_user.id if isinstance(current_user, User) else None
+
     logger.info("=" * 80)
     logger.info("🔄 RECOMMENDATION REGENERATION STARTED")
     logger.info("=" * 80)
-    logger.info(f"👤 User: {current_user.username} (ID: {current_user.id})")
+    logger.info(f"👤 User: {current_user.username} (ID: {current_user.id}, Type: {user_type})")
 
     try:
         original_content = request.get("original_content")
@@ -517,7 +516,7 @@ async def regenerate_recommendation(
 
         recommendation = await recommendation_service.regenerate_recommendation(
             db=db,
-            user_id=current_user.id,  # type: ignore # Associate with user
+            user_id=user_id,  # Can be None for anonymous users
             original_content=original_content,
             refinement_instructions=refinement_instructions,
             github_username=github_username,
@@ -527,7 +526,7 @@ async def regenerate_recommendation(
         )
 
         # Only increment after successful generation
-        await increment_recommendation_count(db, current_user)
+        await increment_recommendation_count(db, current_user, req)
 
         logger.info("✅ RECOMMENDATION REGENERATION COMPLETED SUCCESSFULLY")
         logger.info("📊 Final Stats:")

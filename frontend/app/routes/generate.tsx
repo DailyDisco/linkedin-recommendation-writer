@@ -16,6 +16,7 @@ import ErrorBoundary from '../components/ui/error-boundary';
 import { ContributorCard } from '../components/ui/memo-components';
 import { testRepositoryUrlParsing } from '../utils/debug-url-parser';
 import { useAuth } from '../hooks/useAuth'; // Import useAuth hook
+import { useRecommendationCount } from '../hooks/useRecommendationCount'; // Import anonymous count hook
 import { trackEngagement } from '../utils/analytics';
 
 const parseRepositoryInput = (input: string): string => {
@@ -80,6 +81,8 @@ export default function GeneratorPage() {
     userDailyLimit,
     fetchUserDetails,
   } = useAuth(); // Get auth status and user details
+
+  const { count: anonymousCount } = useRecommendationCount(); // Get anonymous usage count
 
   const [formData, setFormData] = useState({
     input_value: '', // This will be either username or repository
@@ -369,6 +372,15 @@ export default function GeneratorPage() {
                 {userDailyLimit} recommendations remaining today.
               </p>
             )}
+          {!isLoggedIn && (
+            <p className='text-sm text-gray-500'>
+              You have {3 - anonymousCount} of 3 free recommendations remaining
+              today.
+              <span className='text-blue-600 hover:underline ml-1'>
+                Sign up for 5 daily recommendations!
+              </span>
+            </p>
+          )}
         </div>
 
         <div className='grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8'>

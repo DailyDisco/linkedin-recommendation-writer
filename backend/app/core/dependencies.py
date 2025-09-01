@@ -2,14 +2,16 @@
 
 import logging
 import re
-from typing import Any, AsyncGenerator, TypeVar, cast
+from datetime import date
+from typing import Any, AsyncGenerator, TypeVar, Union, cast
 
-from fastapi import HTTPException, Request
+from fastapi import Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import AsyncSessionLocal
 from app.core.exceptions import DatabaseError
 from app.core.redis_client import get_redis
+from app.models.user import User
 from app.services.ai_service import AIService
 from app.services.github_commit_service import GitHubCommitService
 from app.services.github_repository_service import GitHubRepositoryService
@@ -178,3 +180,154 @@ class PaginationParams:
 def get_pagination_params(page: int = 1, page_size: int = 10) -> PaginationParams:
     """Dependency provider for pagination parameters."""
     return PaginationParams(page, page_size)
+
+
+# Anonymous User Support
+class AnonymousUser:
+    """Represents an anonymous user with IP-based tracking."""
+
+    def __init__(self, ip_address: str):
+        self.ip_address = ip_address
+        self.id = f"anonymous_{ip_address}"
+        self.username = f"anonymous_{ip_address}"
+        self.role = "anonymous"
+        self.daily_limit = 3  # Anonymous users get 3 generations per day
+        self.recommendation_count = 0
+        self.last_recommendation_date = None
+        self.is_active = True
+
+    def __repr__(self) -> str:
+        return f"<AnonymousUser(ip={self.ip_address}, count={self.recommendation_count}/{self.daily_limit})>"
+
+
+async def get_anonymous_user_data(request: Request) -> AnonymousUser:
+    """Get anonymous user data from Redis based on IP address."""
+    # Get client IP address
+    client_ip = request.client.host if request.client else "unknown"
+
+    # Handle localhost/development IPs
+    if client_ip in ["127.0.0.1", "localhost", "::1"]:
+        client_ip = "localhost"
+
+    logger.debug(f"Anonymous user IP: {client_ip}")
+
+    user = AnonymousUser(client_ip)
+
+    # Try to get data from Redis
+    redis = await get_redis()
+    if redis:
+        try:
+            today = date.today().isoformat()
+            redis_key = f"anonymous:{client_ip}:recommendations"
+
+            # Get current count and date
+            stored_data = await redis.hgetall(redis_key)
+
+            if stored_data:
+                stored_date = stored_data.get(b"date", b"").decode("utf-8")
+                stored_count = int(stored_data.get(b"count", b"0").decode("utf-8"))
+
+                # Reset count if it's a new day
+                if stored_date != today:
+                    user.recommendation_count = 0
+                    user.last_recommendation_date = date.today()
+                    # Update Redis with reset data
+                    await redis.hset(redis_key, mapping={"count": "0", "date": today})
+                else:
+                    user.recommendation_count = stored_count
+                    user.last_recommendation_date = date.fromisoformat(stored_date)
+            else:
+                # No data in Redis, initialize
+                user.recommendation_count = 0
+                user.last_recommendation_date = date.today()
+                await redis.hset(redis_key, mapping={"count": "0", "date": today})
+
+        except Exception as e:
+            logger.warning(f"Failed to get anonymous user data from Redis: {e}")
+            # Fall back to default values
+
+    return user
+
+
+async def get_current_user_optional(
+    request: Request,
+    db: AsyncSession = Depends(get_database_session),
+) -> Union[User, AnonymousUser]:
+    """Get current user if authenticated, otherwise return anonymous user."""
+    from app.api.v1.auth import oauth2_scheme
+
+    try:
+        # Try to get token from request
+        token = await oauth2_scheme(request)
+        if token:
+            # Import here to avoid circular imports
+            from app.api.v1.auth import get_current_user
+
+            user = await get_current_user(db=db, token=token)
+            return user
+    except Exception:
+        # Token validation failed, user is not authenticated
+        pass
+
+    # Return anonymous user
+    return await get_anonymous_user_data(request)
+
+
+async def increment_anonymous_user_count(request: Request) -> None:
+    """Increment the recommendation count for an anonymous user."""
+    client_ip = request.client.host if request.client else "unknown"
+    if client_ip in ["127.0.0.1", "localhost", "::1"]:
+        client_ip = "localhost"
+
+    redis = await get_redis()
+    if redis:
+        try:
+            today = date.today().isoformat()
+            redis_key = f"anonymous:{client_ip}:recommendations"
+
+            # Increment count
+            await redis.hincrby(redis_key, "count", 1)
+            await redis.hset(redis_key, "date", today)
+
+            logger.info(f"Anonymous user {client_ip} count incremented")
+        except Exception as e:
+            logger.warning(f"Failed to increment anonymous user count: {e}")
+
+
+async def check_generation_limit(user: Union[User, AnonymousUser], db: AsyncSession) -> None:
+    """Check generation limits for both authenticated and anonymous users."""
+    today = date.today()
+
+    # Reset count if it's a new day for authenticated users
+    if isinstance(user, User) and user.last_recommendation_date:
+        if user.last_recommendation_date.date() < today:
+            user.recommendation_count = 0  # type: ignore
+            user.last_recommendation_date = today  # type: ignore
+            await db.commit()
+            await db.refresh(user)
+
+    # Check limits
+    daily_limit = user.daily_limit
+    if user.recommendation_count >= daily_limit:
+        user_type = "anonymous" if isinstance(user, AnonymousUser) else "authenticated"
+        raise HTTPException(
+            status_code=429,  # Too Many Requests
+            detail=f"Daily generation limit ({daily_limit}) exceeded for {user_type} user. Please try again tomorrow.",
+        )
+
+
+async def increment_generation_count(user: Union[User, AnonymousUser], request: Request, db: AsyncSession) -> None:
+    """Increment generation count for both authenticated and anonymous users."""
+    if isinstance(user, User):
+        # Authenticated user - increment in database
+        user.recommendation_count += 1  # type: ignore
+        await db.commit()
+        await db.refresh(user)
+
+        daily_limit = user.daily_limit or 5  # Default to 5 for registered users
+        logger.info(f"User {user.username} (ID: {user.id}) has used {user.recommendation_count}/{daily_limit} generations today")
+    else:
+        # Anonymous user - increment in Redis
+        await increment_anonymous_user_count(request)
+
+        logger.info(f"Anonymous user {user.ip_address} has used {user.recommendation_count + 1}/{user.daily_limit} generations today")

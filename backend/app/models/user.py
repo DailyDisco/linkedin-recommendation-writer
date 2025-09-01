@@ -25,7 +25,7 @@ class User(Base):
     # Recommendation limits
     recommendation_count = Column(Integer, default=0)  # Number of recommendations created today
     last_recommendation_date = Column(DateTime, nullable=True)  # Last date a recommendation was created
-    daily_limit = Column(Integer, default=10)  # Daily recommendation limit
+    daily_limit = Column(Integer, default=5)  # Daily recommendation limit (5 for registered users)
     role = Column(String, default="free")  # User role: admin, premium, or free
 
     # Relationships
