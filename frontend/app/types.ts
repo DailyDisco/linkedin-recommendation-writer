@@ -1,56 +1,116 @@
-export interface GitHubProfileAnalysis {
-  github_username: string;
-  name: string;
+export interface ContributorInfo {
+  username: string;
+  full_name: string;
+  first_name: string;
+  last_name: string;
+  email?: string;
+  bio?: string;
+  company?: string;
+  location?: string;
   avatar_url: string;
-  bio: string;
+  contributions: number;
+  profile_url: string;
+  followers: number;
   public_repos: number;
+}
+
+export interface RepositoryInfo {
+  name: string;
+  full_name: string;
+  description?: string;
+  language?: string;
+  stars: number;
+  forks: number;
+  url: string;
+  topics: string[];
+  created_at?: string;
+  updated_at?: string;
+  owner: {
+    login: string;
+    avatar_url: string;
+    html_url: string;
+  };
+}
+
+export interface HttpError {
+  response?: {
+    status: number;
+    data?: { detail?: string; message?: string };
+  };
+  request?: unknown;
+  message?: string;
+  code?: string;
+}
+
+export interface GitHubUserData {
+  login: string;
+  id: number;
+  avatar_url: string;
+  html_url: string;
+  name?: string;
+  company?: string;
+  location?: string;
+  email?: string;
+  bio?: string;
+  public_repos: number;
+  public_gists: number;
   followers: number;
   following: number;
-  starred_repositories: number;
-  contributions_last_year: number;
-  organizations: Array<{ login: string; avatar_url: string }>;
-  top_languages: Array<{ language: string; percentage: number }>;
-  top_repositories: Array<{
-    name: string;
-    description: string;
-    stargazers_count: number;
-    forks_count: number;
-    language: string;
-    html_url: string;
-  }>;
-  analysis_summary: string;
-  skills: {
-    technical_skills: string[];
-    frameworks: string[];
-    tools: string[];
-    domains: string[];
-  };
-  starred_technologies: {
-    languages: Record<string, number>;
-    topics: string[];
-    technology_focus: Record<string, number>;
-  };
-  commit_analysis: {
-    total_commits_analyzed: number;
-    active_days: number;
-    commit_frequency: Record<string, number>;
-    top_keywords: string[];
-    primary_strength: string;
-    excellence_areas: Record<string, string>;
-  };
-  total_contributions: number;
-  average_commits_per_day: number;
-  repositories_contributed_to: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GitHubRepository {
+  id: number;
+  name: string;
+  full_name: string;
+  description?: string;
+  language?: string;
+  stargazers_count: number;
+  forks_count: number;
+  html_url: string;
+  created_at: string;
+  updated_at: string;
+  pushed_at: string;
+  size: number;
+  topics?: string[];
+}
+
+export interface LanguageStats {
+  language: string;
+  bytes: number;
+  percentage: number;
+}
+
+export interface SkillAnalysis {
+  technical_skills: string[];
+  frameworks: string[];
+  tools: string[];
+  proficiency_levels: Record<string, string>;
+}
+
+export interface CommitAnalysis {
+  total_commits: number;
+  recent_activity: number;
+  commit_frequency: string;
+  activity_trend: string;
+}
+
+export interface GitHubProfileAnalysis {
+  user_data: GitHubUserData;
+  repositories: GitHubRepository[];
+  languages: LanguageStats[];
+  skills: SkillAnalysis;
+  commit_analysis: CommitAnalysis;
+  analyzed_at: string;
+  analysis_context_type: string;
 }
 
 export interface RepositoryContributorsResponse {
-  repository_full_name: string;
+  repository: RepositoryInfo;
+  contributors: ContributorInfo[];
   total_contributors: number;
-  contributors: Array<{
-    username: string;
-    avatar_url: string;
-    contributions: number;
-  }>;
+  fetched_at: string;
 }
 
 export interface Recommendation {

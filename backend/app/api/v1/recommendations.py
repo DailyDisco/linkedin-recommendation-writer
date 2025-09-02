@@ -1,6 +1,7 @@
 """Recommendation API endpoints."""
 
 import logging
+import time
 from typing import Optional, Union
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -558,15 +559,60 @@ async def regenerate_recommendation(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
+@router.get("/test-sse")
+async def test_sse():
+    """Simple SSE test endpoint."""
+
+    async def test_stream():
+        import asyncio
+
+        for i in range(5):
+            data = f'data: {{"message": "Test message {i+1}", "timestamp": "{asyncio.get_event_loop().time()}"}}\n\n'
+            yield data
+            await asyncio.sleep(1)
+
+    return StreamingResponse(
+        test_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
+    )
+
+
 @router.get("/generate-options/stream")
 async def generate_recommendation_options_stream(
-    request: RecommendationRequest,
-    req: Request,
+    github_username: str = Query(..., min_length=1, max_length=39),
+    recommendation_type: str = Query("professional", pattern="^(professional|technical|leadership|academic|personal)$"),
+    tone: str = Query("professional", pattern="^(professional|friendly|formal|casual)$"),
+    length: str = Query("medium", pattern="^(short|medium|long)$"),
+    custom_prompt: Optional[str] = Query(None, max_length=1000),
+    target_role: Optional[str] = Query(None, max_length=200),
+    include_specific_skills: Optional[str] = Query(None),  # Comma-separated string
+    exclude_keywords: Optional[str] = Query(None),  # Comma-separated string
+    analysis_type: str = Query("profile", pattern="^(profile|repo_only)$"),
+    repository_url: Optional[str] = Query(None, max_length=500),
+    req: Request = None,
     db: AsyncSession = Depends(get_database_session),
     recommendation_service: RecommendationService = Depends(get_recommendation_service),
     current_user: Union[User, AnonymousUser] = Depends(get_current_user_optional),
 ):
     """Generate recommendation options with streaming progress updates via SSE."""
+
+    # Construct request object from query parameters
+    request = RecommendationRequest(
+        github_username=github_username,
+        recommendation_type=recommendation_type,
+        tone=tone,
+        length=length,
+        custom_prompt=custom_prompt,
+        target_role=target_role,
+        include_specific_skills=include_specific_skills.split(",") if include_specific_skills else None,
+        exclude_keywords=exclude_keywords.split(",") if exclude_keywords else None,
+        analysis_type=analysis_type,
+        repository_url=repository_url,
+    )
 
     # Check limit but don't increment yet
     await check_recommendation_limit_only(db, current_user)
@@ -580,11 +626,23 @@ async def generate_recommendation_options_stream(
 
     async def generate_stream():
         try:
-            # Get GitHub data
-            github_data = await recommendation_service._get_or_create_github_profile_data(db=db, github_username=request.github_username)
+            logger.info("🎯 SSE stream started - checking GitHub data...")
+
+            # Get GitHub data from GitHub service
+            github_user_service = get_github_service()
+            github_data = await github_user_service.analyze_github_profile(request.github_username, force_refresh=False)
+            logger.info(f"✅ GitHub data retrieved for user: {request.github_username}")
+
+            # Create AI recommendation service directly
+            from app.services.ai_recommendation_service import AIRecommendationService
+            from app.services.prompt_service import PromptService
+
+            prompt_service = PromptService()
+            ai_recommendation_service = AIRecommendationService(prompt_service)
 
             # Stream the generation process
-            async for progress_update in recommendation_service.ai_service.generate_recommendation_stream(
+            last_heartbeat = time.time()
+            async for progress_update in ai_recommendation_service.generate_recommendation_stream(
                 github_data=github_data,
                 recommendation_type=request.recommendation_type,
                 tone=request.tone,
@@ -594,6 +652,15 @@ async def generate_recommendation_options_stream(
                 specific_skills=request.include_specific_skills,
                 exclude_keywords=request.exclude_keywords,
             ):
+                logger.info(f"📡 SSE yielding progress: {progress_update.get('stage', 'Unknown')} - {progress_update.get('progress', 0)}%")
+
+                # Send heartbeat to keep connection alive
+                current_time = time.time()
+                if current_time - last_heartbeat > 10:  # Send heartbeat every 10 seconds
+                    heartbeat_data = f"data: {StreamProgressResponse(stage='Processing...', progress=progress_update.get('progress', 0), status='processing').model_dump_json()}\n\n"
+                    yield heartbeat_data
+                    last_heartbeat = current_time
+
                 # Format as SSE data
                 data = f"data: {StreamProgressResponse(**progress_update).model_dump_json()}\n\n"
                 yield data

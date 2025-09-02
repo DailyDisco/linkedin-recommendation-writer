@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef } from 'react';
 
 // Simple interface for progress updates
 interface ProgressUpdate {
@@ -75,8 +75,34 @@ export default function RecommendationModal({
       } else {
         dispatch({ type: 'SET_SHOW_LIMIT_EXCEEDED', payload: false });
       }
+
+      // Pre-warm cache by fetching initial suggestions
+      const preWarmCache = async () => {
+        try {
+          await apiClient.getPromptSuggestions({
+            github_username: contributor.username,
+            recommendation_type: state.formData.recommendation_type,
+            tone: state.formData.tone,
+            length: state.formData.length,
+          });
+        } catch (error) {
+          // Silently fail - this is just for performance optimization
+          console.warn('Failed to pre-warm cache:', error);
+        }
+      };
+
+      preWarmCache();
     }
-  }, [isOpen, isLoggedIn, anonRecommendationCount, dispatch]);
+  }, [
+    isOpen,
+    isLoggedIn,
+    anonRecommendationCount,
+    dispatch,
+    contributor.username,
+    state.formData.recommendation_type,
+    state.formData.tone,
+    state.formData.length,
+  ]);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -292,7 +318,7 @@ Key Achievements: ${state.formData.notableAchievements}
 
         dispatch({ type: 'SET_STEP', payload: 'result' });
       },
-      onError: () => { },
+      onError: () => {},
     });
   };
 
@@ -341,7 +367,10 @@ Key Achievements: ${state.formData.notableAchievements}
         if (!isLoggedIn) {
           incrementAnonCount();
         }
-        dispatch({ type: 'SET_RESULT', payload: regeneratedRecommendation as Recommendation });
+        dispatch({
+          type: 'SET_RESULT',
+          payload: regeneratedRecommendation as Recommendation,
+        });
         dispatch({ type: 'SET_REGENERATE_INSTRUCTIONS', payload: '' });
         dispatch({ type: 'SET_IS_REGENERATING', payload: false });
       },
@@ -354,36 +383,6 @@ Key Achievements: ${state.formData.notableAchievements}
   const handleReset = () => {
     reset();
   };
-
-  const handleFetchSuggestions = useCallback(async (
-    githubUsername: string,
-    recommendationType: string,
-    tone: string,
-    length: string
-  ) => {
-    if (!isLoggedIn && anonRecommendationCount >= ANONYMOUS_LIMIT) {
-      dispatch({ type: 'SET_SHOW_LIMIT_EXCEEDED', payload: true });
-      return;
-    }
-
-    dispatch({ type: 'SET_LOADING_SUGGESTIONS', payload: true });
-
-    try {
-      const suggestions = await apiClient.getPromptSuggestions({
-        github_username: githubUsername,
-        recommendation_type: recommendationType,
-        tone,
-        length,
-      });
-      dispatch({ type: 'SET_INITIAL_SUGGESTIONS', payload: suggestions });
-    } catch (error) {
-      console.error('Error fetching suggestions:', error);
-      // Set empty suggestions on error to avoid breaking the UI
-      dispatch({ type: 'SET_INITIAL_SUGGESTIONS', payload: null });
-    } finally {
-      dispatch({ type: 'SET_LOADING_SUGGESTIONS', payload: false });
-    }
-  }, [isLoggedIn, anonRecommendationCount, dispatch]);
 
   if (!isOpen) return null;
 
@@ -419,8 +418,6 @@ Key Achievements: ${state.formData.notableAchievements}
                 parsedGitHubInput={state.parsedGitHubInput}
                 isGenerating={generateOptionsMutation.isPending}
                 firstInputRef={firstInputRef}
-                initialSuggestions={state.initialSuggestions}
-                isLoadingSuggestions={state.isLoadingSuggestions}
                 onChange={(field, value) => updateFormField(field, value)}
                 onAnalysisTypeChange={type =>
                   dispatch({
@@ -428,7 +425,6 @@ Key Achievements: ${state.formData.notableAchievements}
                     payload: { analysis_type: type },
                   })
                 }
-                onFetchSuggestions={handleFetchSuggestions}
                 onSubmit={handleSubmit}
                 onCancel={onClose}
               />

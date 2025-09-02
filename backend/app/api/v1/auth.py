@@ -15,7 +15,7 @@ from app.models.user import User
 from app.schemas.user import Token, UserCreate
 
 logger = logging.getLogger(__name__)
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/login")
 
 router = APIRouter()
 
@@ -139,6 +139,13 @@ async def login_for_access_token(
 
     logger.info(f"User {user.username} logged in successfully, token generated.")
     return Token(access_token=access_token, token_type="bearer")
+
+
+@router.post("/logout")
+async def logout() -> dict:
+    """Logout endpoint - clears any server-side session data."""
+    logger.info("User logout requested")
+    return {"message": "Successfully logged out"}
 
 
 @router.post("/login", response_model=Token)

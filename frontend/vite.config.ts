@@ -30,6 +30,18 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           secure: false,
           rewrite: path => path.replace(/^\/api/, '/api/v1'),
+          configure: (proxy, _options) => {
+            // Handle SSE connections
+            proxy.on('error', (err, _req, _res) => {
+              console.log('proxy error', err);
+            });
+            proxy.on('proxyReq', (proxyReq, req, _res) => {
+              if (req.headers.accept?.includes('text/event-stream')) {
+                proxyReq.setHeader('Cache-Control', 'no-cache');
+                proxyReq.setHeader('Accept', 'text/event-stream');
+              }
+            });
+          },
         },
       },
     },

@@ -1,45 +1,16 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandItem,
-} from '@/components/ui/command';
-import { Popover, PopoverContent } from '@/components/ui/popover';
-import { AlertCircle, Loader2, Lightbulb } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { GitHubInputSection } from './form-sections/GitHubInputSection';
 import { AnalysisTypeSection } from './form-sections/AnalysisTypeSection';
 import { RecommendationSettingsSection } from './form-sections/RecommendationSettingsSection';
+
 import { PromptAssistantChat } from '../PromptAssistantChat';
-import { apiClient } from '@/services/api';
-import type {
-  ContributorInfo,
-  ParsedGitHubInput,
-  PromptSuggestionsResponse,
-} from '../../types/index';
+import type { ContributorInfo, ParsedGitHubInput } from '../../types/index';
 import type { RecommendationFormData } from '../../hooks/useRecommendationState';
-
-// Custom debounce hook
-function useDebounce(value: string, delay: number): string {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [value, delay]);
-
-  return debouncedValue;
-}
 
 interface RecommendationFormNewProps {
   contributor: ContributorInfo;
@@ -48,16 +19,8 @@ interface RecommendationFormNewProps {
   parsedGitHubInput: ParsedGitHubInput | null;
   isGenerating: boolean;
   firstInputRef: React.RefObject<HTMLTextAreaElement | null>;
-  initialSuggestions: PromptSuggestionsResponse | null;
-  isLoadingSuggestions: boolean;
   onChange: (field: string, value: string) => void;
   onAnalysisTypeChange: (type: 'profile' | 'repo_only') => void;
-  onFetchSuggestions: (
-    githubUsername: string,
-    recommendationType: string,
-    tone: string,
-    length: string
-  ) => void;
   onSubmit: (e: React.FormEvent) => void;
   onCancel: () => void;
 }
@@ -69,125 +32,11 @@ export const RecommendationFormNew: React.FC<RecommendationFormNewProps> = ({
   parsedGitHubInput,
   isGenerating,
   firstInputRef,
-  initialSuggestions,
-  isLoadingSuggestions,
   onChange,
   onAnalysisTypeChange,
-  onFetchSuggestions,
   onSubmit,
   onCancel,
 }) => {
-  // Local state for autocomplete
-  const [autocompleteOpen, setAutocompleteOpen] = useState<
-    Record<string, boolean>
-  >({});
-  const [autocompleteLoading, setAutocompleteLoading] = useState<
-    Record<string, boolean>
-  >({});
-  const [autocompleteSuggestions, setAutocompleteSuggestions] = useState<
-    Record<string, string[]>
-  >({});
-
-  // Debounced values for autocomplete
-  const debouncedSkills = useDebounce(formData.specificSkills, 500);
-  const debouncedAchievements = useDebounce(formData.notableAchievements, 500);
-
-  // Fetch suggestions when key form fields change
-  useEffect(() => {
-    if (
-      contributor.username &&
-      formData.recommendation_type &&
-      formData.tone &&
-      formData.length
-    ) {
-      onFetchSuggestions(
-        contributor.username,
-        formData.recommendation_type,
-        formData.tone,
-        formData.length
-      );
-    }
-  }, [
-    contributor.username,
-    formData.recommendation_type,
-    formData.tone,
-    formData.length,
-    onFetchSuggestions,
-  ]);
-
-  // Fetch autocomplete suggestions
-  const fetchAutocompleteSuggestions = useCallback(
-    async (
-      fieldName: 'specific_skills' | 'notable_achievements',
-      currentInput: string
-    ) => {
-      if (!currentInput.trim() || !contributor.username) return;
-
-      setAutocompleteLoading(prev => ({ ...prev, [fieldName]: true }));
-
-      try {
-        const suggestions = await apiClient.getAutocompleteSuggestions({
-          github_username: contributor.username,
-          field_name: fieldName,
-          current_input: currentInput,
-        });
-        setAutocompleteSuggestions(prev => ({
-          ...prev,
-          [fieldName]: suggestions,
-        }));
-      } catch (error) {
-        console.error('Error fetching autocomplete suggestions:', error);
-        setAutocompleteSuggestions(prev => ({ ...prev, [fieldName]: [] }));
-      } finally {
-        setAutocompleteLoading(prev => ({ ...prev, [fieldName]: false }));
-      }
-    },
-    [contributor.username]
-  );
-
-  // Effect for skills autocomplete
-  useEffect(() => {
-    if (debouncedSkills) {
-      fetchAutocompleteSuggestions('specific_skills', debouncedSkills);
-    }
-  }, [debouncedSkills, fetchAutocompleteSuggestions]);
-
-  // Effect for achievements autocomplete
-  useEffect(() => {
-    if (debouncedAchievements) {
-      fetchAutocompleteSuggestions(
-        'notable_achievements',
-        debouncedAchievements
-      );
-    }
-  }, [debouncedAchievements, fetchAutocompleteSuggestions]);
-
-  // Helper function to apply a suggestion to a form field
-  const applySuggestion = (fieldName: string, suggestion: string) => {
-    const currentValue = formData[
-      fieldName as keyof RecommendationFormData
-    ] as string;
-    const newValue = currentValue
-      ? `${currentValue}\n\n${suggestion}`
-      : suggestion;
-    onChange(fieldName, newValue);
-    setAutocompleteOpen(prev => ({ ...prev, [fieldName]: false }));
-  };
-
-  // Helper function to apply autocomplete suggestion
-  const applyAutocompleteSuggestion = (
-    fieldName: string,
-    suggestion: string
-  ) => {
-    const currentValue = formData[
-      fieldName as keyof RecommendationFormData
-    ] as string;
-    const newValue = currentValue
-      ? `${currentValue}, ${suggestion}`
-      : suggestion;
-    onChange(fieldName, newValue);
-    setAutocompleteOpen(prev => ({ ...prev, [fieldName]: false }));
-  };
   return (
     <form onSubmit={onSubmit} className='space-y-6'>
       {/* GitHub Input Section */}
@@ -258,58 +107,14 @@ export const RecommendationFormNew: React.FC<RecommendationFormNewProps> = ({
         >
           What specific skills did you observe?
         </Label>
-        <div className='relative'>
-          <Textarea
-            id='specific-skills'
-            className='w-full h-20 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500'
-            placeholder='e.g., Excellent React skills, great at debugging, strong problem-solving...'
-            value={formData.specificSkills}
-            onChange={e => onChange('specificSkills', e.target.value)}
-            onFocus={() => {
-              if (autocompleteSuggestions.specific_skills?.length > 0) {
-                setAutocompleteOpen(prev => ({
-                  ...prev,
-                  specific_skills: true,
-                }));
-              }
-            }}
-          />
-          {autocompleteLoading.specific_skills && (
-            <div className='absolute right-2 top-2'>
-              <Loader2 className='w-4 h-4 animate-spin text-gray-400' />
-            </div>
-          )}
-          <Popover
-            open={autocompleteOpen.specific_skills}
-            onOpenChange={open =>
-              setAutocompleteOpen(prev => ({ ...prev, specific_skills: open }))
-            }
-          >
-            <PopoverContent className='w-full p-0' align='start'>
-              <Command>
-                <CommandEmpty>No suggestions found.</CommandEmpty>
-                <CommandGroup>
-                  {autocompleteSuggestions.specific_skills?.map(
-                    (suggestion, index) => (
-                      <CommandItem
-                        key={index}
-                        onSelect={() =>
-                          applyAutocompleteSuggestion(
-                            'specificSkills',
-                            suggestion
-                          )
-                        }
-                        className='cursor-pointer'
-                      >
-                        {suggestion}
-                      </CommandItem>
-                    )
-                  )}
-                </CommandGroup>
-              </Command>
-            </PopoverContent>
-          </Popover>
-        </div>
+        <Textarea
+          id='specific-skills'
+          className='w-full h-20 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500'
+          placeholder='e.g., Excellent React skills, great at debugging, strong problem-solving...'
+          value={formData.specificSkills}
+          onChange={e => onChange('specificSkills', e.target.value)}
+          rows={3}
+        />
         <p className='mt-1 text-sm text-gray-600'>
           List technical skills you observed, e.g., &ldquo;React, Node.js, API
           design&rdquo; or &ldquo;Strong debugging skills, excellent code
@@ -348,61 +153,14 @@ export const RecommendationFormNew: React.FC<RecommendationFormNewProps> = ({
         >
           Notable achievements or impact? (optional)
         </Label>
-        <div className='relative'>
-          <Textarea
-            id='achievements'
-            className='w-full h-20 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500'
-            placeholder='e.g., Reduced load times by 40%, mentored junior developers...'
-            value={formData.notableAchievements}
-            onChange={e => onChange('notableAchievements', e.target.value)}
-            onFocus={() => {
-              if (autocompleteSuggestions.notable_achievements?.length > 0) {
-                setAutocompleteOpen(prev => ({
-                  ...prev,
-                  notable_achievements: true,
-                }));
-              }
-            }}
-          />
-          {autocompleteLoading.notable_achievements && (
-            <div className='absolute right-2 top-2'>
-              <Loader2 className='w-4 h-4 animate-spin text-gray-400' />
-            </div>
-          )}
-          <Popover
-            open={autocompleteOpen.notable_achievements}
-            onOpenChange={open =>
-              setAutocompleteOpen(prev => ({
-                ...prev,
-                notable_achievements: open,
-              }))
-            }
-          >
-            <PopoverContent className='w-full p-0' align='start'>
-              <Command>
-                <CommandEmpty>No suggestions found.</CommandEmpty>
-                <CommandGroup>
-                  {autocompleteSuggestions.notable_achievements?.map(
-                    (suggestion, index) => (
-                      <CommandItem
-                        key={index}
-                        onSelect={() =>
-                          applyAutocompleteSuggestion(
-                            'notableAchievements',
-                            suggestion
-                          )
-                        }
-                        className='cursor-pointer'
-                      >
-                        {suggestion}
-                      </CommandItem>
-                    )
-                  )}
-                </CommandGroup>
-              </Command>
-            </PopoverContent>
-          </Popover>
-        </div>
+        <Textarea
+          id='achievements'
+          className='w-full h-20 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500'
+          placeholder='e.g., Reduced load times by 40%, mentored junior developers...'
+          value={formData.notableAchievements}
+          onChange={e => onChange('notableAchievements', e.target.value)}
+          rows={3}
+        />
         <p className='mt-1 text-sm text-gray-600'>
           Highlight specific accomplishments or impact, e.g., &ldquo;Reduced app
           load time by 40%&rdquo; or &ldquo;Led the migration to microservices
@@ -418,128 +176,8 @@ export const RecommendationFormNew: React.FC<RecommendationFormNewProps> = ({
         onChange={onChange}
       />
 
-      {/* AI-Powered Suggestions */}
-      {(isLoadingSuggestions || initialSuggestions) && (
-        <div className='bg-blue-50 border border-blue-200 rounded-lg p-4'>
-          <div className='flex items-center space-x-2 mb-3'>
-            <Lightbulb className='w-5 h-5 text-blue-600' />
-            <h3 className='text-lg font-medium text-blue-900'>
-              AI Writing Assistant
-            </h3>
-            {isLoadingSuggestions && (
-              <Loader2 className='w-4 h-4 animate-spin text-blue-600' />
-            )}
-          </div>
-
-          {isLoadingSuggestions ? (
-            <p className='text-blue-700 text-sm'>
-              Generating personalized suggestions based on{' '}
-              {contributor.username}&rsquo;s GitHub profile...
-            </p>
-          ) : initialSuggestions ? (
-            <div className='space-y-4'>
-              <p className='text-blue-700 text-sm mb-3'>
-                Click on any suggestion below to add it to the corresponding
-                field:
-              </p>
-
-              {/* Working Relationship Suggestions */}
-              {initialSuggestions.suggested_working_relationship.length > 0 && (
-                <div>
-                  <Label className='text-sm font-medium text-blue-800 mb-2 block'>
-                    Working Relationship Examples:
-                  </Label>
-                  <div className='flex flex-wrap gap-2'>
-                    {initialSuggestions.suggested_working_relationship.map(
-                      (suggestion, index) => (
-                        <Badge
-                          key={index}
-                          variant='outline'
-                          className='cursor-pointer hover:bg-blue-100 text-xs px-2 py-1'
-                          onClick={() =>
-                            applySuggestion('workingRelationship', suggestion)
-                          }
-                        >
-                          {suggestion.length > 30
-                            ? `${suggestion.substring(0, 30)}...`
-                            : suggestion}
-                        </Badge>
-                      )
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Skills Suggestions */}
-              {initialSuggestions.suggested_specific_skills.length > 0 && (
-                <div>
-                  <Label className='text-sm font-medium text-blue-800 mb-2 block'>
-                    Skills Examples:
-                  </Label>
-                  <div className='flex flex-wrap gap-2'>
-                    {initialSuggestions.suggested_specific_skills.map(
-                      (suggestion, index) => (
-                        <Badge
-                          key={index}
-                          variant='outline'
-                          className='cursor-pointer hover:bg-blue-100 text-xs px-2 py-1'
-                          onClick={() =>
-                            applySuggestion('specificSkills', suggestion)
-                          }
-                        >
-                          {suggestion.length > 25
-                            ? `${suggestion.substring(0, 25)}...`
-                            : suggestion}
-                        </Badge>
-                      )
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Achievements Suggestions */}
-              {initialSuggestions.suggested_notable_achievements.length > 0 && (
-                <div>
-                  <Label className='text-sm font-medium text-blue-800 mb-2 block'>
-                    Achievements Examples:
-                  </Label>
-                  <div className='flex flex-wrap gap-2'>
-                    {initialSuggestions.suggested_notable_achievements.map(
-                      (suggestion, index) => (
-                        <Badge
-                          key={index}
-                          variant='outline'
-                          className='cursor-pointer hover:bg-blue-100 text-xs px-2 py-1'
-                          onClick={() =>
-                            applySuggestion('notableAchievements', suggestion)
-                          }
-                        >
-                          {suggestion.length > 30
-                            ? `${suggestion.substring(0, 30)}...`
-                            : suggestion}
-                        </Badge>
-                      )
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : null}
-        </div>
-      )}
-
       {/* Prompt Assistant Chat */}
-      <PromptAssistantChat
-        contributor={contributor}
-        formData={formData}
-        onApplyFormUpdates={updates => {
-          Object.entries(updates).forEach(([field, value]) => {
-            if (value && typeof value === 'string') {
-              onChange(field, value);
-            }
-          });
-        }}
-      />
+      <PromptAssistantChat contributor={contributor} formData={formData} />
 
       {/* Action Buttons */}
       <div className='flex justify-end space-x-3'>

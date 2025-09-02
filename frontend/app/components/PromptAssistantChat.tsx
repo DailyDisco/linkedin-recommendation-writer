@@ -17,24 +17,22 @@ interface ChatMessage {
 interface PromptAssistantChatProps {
   contributor: ContributorInfo;
   formData: RecommendationFormData;
-  onApplyFormUpdates?: (updates: Record<string, string>) => void;
 }
 
 export const PromptAssistantChat: React.FC<PromptAssistantChatProps> = ({
   contributor,
   formData,
-  onApplyFormUpdates,
 }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: 'assistant',
-      content: `Hi! I'm here to help you write a great LinkedIn recommendation for ${contributor.username}. Ask me anything about how to fill out this form or get suggestions for what to write!`,
+      content: `Hi! I'm here to help with high-level brainstorming for ${contributor.username}'s recommendation. Ask me for different angles to take, or for help understanding what makes a recommendation effective. For quick suggestions as you type, use the AI-powered text areas above.`,
       timestamp: new Date(),
     },
   ]);
   const [currentMessage, setCurrentMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isMinimized, setIsMinimized] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -87,35 +85,6 @@ export const PromptAssistantChat: React.FC<PromptAssistantChatProps> = ({
       };
 
       setMessages(prev => [...prev, assistantMessage]);
-
-      // Handle suggested form updates
-      if (response.suggested_form_updates && onApplyFormUpdates) {
-        // Show a confirmation dialog or automatically apply
-        const confirmedUpdates: Record<string, string> = {};
-
-        Object.entries(response.suggested_form_updates).forEach(
-          ([field, value]) => {
-            if (typeof value === 'string' && value.trim()) {
-              confirmedUpdates[field] = value;
-            }
-          }
-        );
-
-        if (Object.keys(confirmedUpdates).length > 0) {
-          // Add a message indicating suggestions are available
-          const suggestionMessage: ChatMessage = {
-            role: 'assistant',
-            content: `💡 I have some suggestions for your form. Click "Apply Suggestions" to add them to your form fields.`,
-            timestamp: new Date(),
-          };
-          setMessages(prev => [...prev, suggestionMessage]);
-
-          // Store suggestions for later application
-          setTimeout(() => {
-            onApplyFormUpdates(confirmedUpdates);
-          }, 1000); // Small delay to show the message first
-        }
-      }
     } catch (error) {
       console.error('Error sending message to assistant:', error);
       const errorMessage: ChatMessage = {

@@ -79,6 +79,9 @@ export const useAuthStore = create<AuthStore>()(
         },
 
         logout: () => {
+          console.log(
+            '🔐 Auth Store: Logout called, clearing authentication state'
+          );
           set({
             isAuthenticating: true,
             accessToken: null,
@@ -88,6 +91,9 @@ export const useAuthStore = create<AuthStore>()(
             userDetailsError: null,
             lastFetchTime: 0,
           });
+          console.log(
+            '🔐 Auth Store: State cleared, authentication set to false'
+          );
           set({ isAuthenticating: false });
         },
 
@@ -137,7 +143,17 @@ export const useAuthStore = create<AuthStore>()(
                 isLoadingUserDetails: false,
               });
             } catch (error: unknown) {
-              console.error('Failed to fetch user details:', error);
+              console.error(
+                '🔐 Auth Store: Failed to fetch user details:',
+                error
+              );
+              const httpError = error as HttpError;
+              console.log(
+                '🔐 Auth Store: Error status:',
+                httpError?.response?.status
+              );
+              console.log('🔐 Auth Store: Error code:', httpError?.code);
+
               set({
                 userDetailsError:
                   (error instanceof Error && error.message) ||
@@ -148,20 +164,23 @@ export const useAuthStore = create<AuthStore>()(
               // Only logout if it's an authentication error (401/403), not network issues
               // The global API interceptor will handle token removal and redirect for 401s
               if (
-                (error as HttpError)?.response?.status === 401 ||
-                (error as HttpError)?.response?.status === 403
+                httpError?.response?.status === 401 ||
+                httpError?.response?.status === 403
               ) {
-                // Let the global interceptor handle this to avoid conflicts
                 console.log(
-                  'Auth error detected, letting global interceptor handle logout'
+                  '🔐 Auth Store: Auth error detected, letting global interceptor handle logout'
                 );
               } else if (
-                (error as HttpError)?.code === 'NETWORK_ERROR' ||
-                !(error as HttpError)?.response
+                httpError?.code === 'NETWORK_ERROR' ||
+                !httpError?.response
               ) {
                 // For network errors, don't logout - just show error
                 console.log(
-                  'Network error fetching user details, keeping user logged in'
+                  '🔐 Auth Store: Network error fetching user details, keeping user logged in'
+                );
+              } else {
+                console.log(
+                  '🔐 Auth Store: Other error fetching user details, keeping user logged in'
                 );
               }
             }

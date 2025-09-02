@@ -25,7 +25,7 @@ if (typeof window !== 'undefined') {
 
 const api = axios.create({
   baseURL: apiBaseUrl,
-  timeout: 15000, // Reduced to 15 seconds for better UX
+  timeout: 120000, // Increased to 2 minutes for long-running GitHub analysis
   headers: {
     'Content-Type': 'application/json',
   },
@@ -34,7 +34,8 @@ const api = axios.create({
 // Add a request interceptor to include the auth token
 api.interceptors.request.use(
   config => {
-    // Get token from Zustand store instead of direct localStorage access
+    // Get token from Zustand store state by reading from localStorage
+    // This maintains consistency with the store while being synchronous
     const authStorage = localStorage.getItem('auth-storage');
     if (authStorage) {
       try {
@@ -48,6 +49,7 @@ api.interceptors.request.use(
         console.error('Failed to parse auth storage:', error);
       }
     }
+
     return config;
   },
   error => {
@@ -63,25 +65,94 @@ api.interceptors.response.use(
   error => {
     // Handle specific error types globally
     if (error.response?.status === 401) {
-      // Only redirect to login if the error is 401 and it's not from the login endpoint itself
-      if (error.config.url && !error.config.url.endsWith('/auth/login')) {
-        console.log(
-          'Global 401 interceptor: Redirecting to login for non-login endpoint.',
-          error.config.url,
-          error.response?.status
-        );
-        // Show toast notification before redirecting
-        toast.error('Your session has expired. Please log in again.');
-        // Handle unauthorized access - clear Zustand auth storage
-        localStorage.removeItem('auth-storage');
-        window.location.href = '/login';
-      } else {
-        console.log(
-          'Global 401 interceptor: NOT redirecting for login endpoint.',
-          error.config.url,
-          error.response?.status
-        );
-      }
+      console.log('🔐 API Interceptor: 401 error detected');
+      console.log(
+        '🔐 API Interceptor: Request URL:',
+        (error as HttpError).config?.url
+      );
+      console.log(
+        '🔐 API Interceptor: Request method:',
+        (error as HttpError).config?.method
+      );
+      console.log('🔐 API Interceptor: Error response:', error.response);
+      console.log('🔐 API Interceptor: Timestamp:', new Date().toISOString());
+
+      // Import the auth store dynamically to avoid circular dependencies
+      import('../hooks/useAuthStore')
+        .then(({ useAuthStore }) => {
+          const authStore = useAuthStore.getState();
+
+          // Check if user is logged in using the Zustand store
+          const hasToken = !!authStore.accessToken;
+          console.log('🔐 API Interceptor: Has token:', hasToken);
+          console.log(
+            '🔐 API Interceptor: Token exists:',
+            !!authStore.accessToken
+          );
+
+          // Only redirect to login if the error is 401, user has a token (is logged in),
+          // and it's not from the login endpoint itself
+          if (
+            (error as HttpError).config.url &&
+            !(error as HttpError).config.url.endsWith('/login') &&
+            hasToken
+          ) {
+            console.log(
+              'Global 401 interceptor: Redirecting to login for authenticated user.',
+              (error as HttpError).config.url,
+              (error as HttpError).response?.status
+            );
+            // Show toast notification before redirecting
+            toast.error('Your session has expired. Please log in again.');
+
+            console.log('🔐 API Interceptor: Calling store logout method');
+            // Use the proper logout method from the store instead of directly manipulating localStorage
+            authStore.logout();
+
+            // Small delay to ensure logout completes before redirect
+            setTimeout(() => {
+              console.log(
+                '🔐 API Interceptor: Redirecting to login after logout'
+              );
+              window.location.href = '/login';
+            }, 100);
+          } else {
+            console.log(
+              'Global 401 interceptor: NOT redirecting - user is anonymous or this is login endpoint.',
+              error.config.url,
+              error.response?.status,
+              'hasToken:',
+              hasToken
+            );
+          }
+        })
+        .catch(() => {
+          console.error('🔐 API Interceptor: Failed to load auth store');
+          // Fallback to basic localStorage handling if dynamic import fails
+          const authStorage = localStorage.getItem('auth-storage');
+          let hasToken = false;
+          if (authStorage) {
+            try {
+              const parsed = JSON.parse(authStorage);
+              hasToken = !!parsed?.state?.accessToken;
+            } catch {
+              // Ignore parsing errors
+            }
+          }
+
+          console.log('🔐 API Interceptor: Fallback - hasToken:', hasToken);
+
+          if (
+            (error as HttpError).config.url &&
+            !(error as HttpError).config.url.endsWith('/login') &&
+            hasToken
+          ) {
+            console.log('🔐 API Interceptor: Fallback - redirecting to login');
+            toast.error('Your session has expired. Please log in again.');
+            localStorage.removeItem('auth-storage');
+            window.location.href = '/login';
+          }
+        });
     } else if (
       error.response?.status === 503 ||
       error.response?.status === 502 ||
@@ -117,6 +188,21 @@ export const githubApi = {
       username,
       force_refresh: forceRefresh,
     });
+    return response.data;
+  },
+
+  getTaskStatus: async (
+    taskId: string
+  ): Promise<{
+    task_id: string;
+    status: string;
+    message: string;
+    username?: string;
+    started_at?: string;
+    updated_at?: string;
+    result?: GitHubProfileAnalysis;
+  }> => {
+    const response = await api.get(`/github/task/${taskId}`);
     return response.data;
   },
 
@@ -386,7 +472,10 @@ export const apiClient = {
       return response.data;
     } catch (error) {
       console.error('chatWithAssistant error:', error);
-      console.error('Error details:', error.response?.data || error.message);
+      console.error(
+        'Error details:',
+        (error as HttpError).response?.data || (error as HttpError).message
+      );
       throw error;
     }
   },

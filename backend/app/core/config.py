@@ -71,7 +71,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str = Field(
         description="Secret key for security operations",
     )
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=30, ge=1, description="Access token expiration in minutes")
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=120, ge=1, description="Access token expiration in minutes")
     JWT_ALGORITHM: str = Field(default="HS256", description="JWT algorithm")
 
     # Rate Limiting

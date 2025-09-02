@@ -1,168 +1,364 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef } from 'react';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import { apiClient } from '../services/api';
 import type { RecommendationRequest, HttpError } from '../types/index';
 
+// Type for progress data
+type ProgressData = {
+  stage: string;
+  progress: number;
+  status: string;
+  result?: unknown;
+  error?: string;
+};
+
 // Custom hook for SSE connections
 export const useSSEConnection = (
-  url: string,
+  url: string | null,
   onMessage: (data: unknown) => void,
   onError?: (error: Event) => void,
   enabled: boolean = true
 ) => {
   const eventSourceRef = useRef<EventSource | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const keepAliveIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (!enabled || !url) return;
 
-    const eventSource = new EventSource(url);
-    eventSourceRef.current = eventSource;
+    console.log('🔌 Establishing SSE connection to:', url);
 
-    eventSource.onmessage = event => {
-      try {
-        const data = JSON.parse(event.data);
-        onMessage(data);
-      } catch (error) {
-        console.error('Failed to parse SSE message:', error);
-      }
+    const connect = () => {
+      const eventSource = new EventSource(url);
+      eventSourceRef.current = eventSource;
+
+      eventSource.onopen = () => {
+        console.log('🔌 SSE connection opened successfully');
+        // Start keep-alive ping
+        keepAliveIntervalRef.current = setInterval(() => {
+          if (eventSource.readyState === EventSource.OPEN) {
+            console.log('🔄 SSE keep-alive ping');
+          }
+        }, 30000); // Ping every 30 seconds
+      };
+
+      eventSource.onmessage = event => {
+        try {
+          console.log('📨 SSE message received:', event.data);
+          const data = JSON.parse(event.data);
+          onMessage(data);
+        } catch (error) {
+          console.error(
+            '❌ Failed to parse SSE message:',
+            error,
+            'Raw data:',
+            event.data
+          );
+        }
+      };
+
+      eventSource.onerror = error => {
+        console.error('❌ SSE connection error:', error);
+        console.log('SSE ready state:', eventSource.readyState);
+
+        // Clear keep-alive
+        if (keepAliveIntervalRef.current) {
+          clearInterval(keepAliveIntervalRef.current);
+          keepAliveIntervalRef.current = null;
+        }
+
+        // Only call onError if the connection is actually closed
+        if (eventSource.readyState === EventSource.CLOSED) {
+          console.log('🔌 SSE connection closed, calling onError');
+          if (onError) {
+            onError(error);
+          }
+        }
+      };
     };
 
-    eventSource.onerror = error => {
-      console.error('SSE connection error:', error);
-      if (onError) {
-        onError(error);
-      }
-    };
+    connect();
 
     return () => {
-      eventSource.close();
-      eventSourceRef.current = null;
+      console.log('🔌 Cleaning up SSE connection');
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+      if (keepAliveIntervalRef.current) {
+        clearInterval(keepAliveIntervalRef.current);
+        keepAliveIntervalRef.current = null;
+      }
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
     };
   }, [url, enabled, onMessage, onError]);
 
-  const disconnect = () => {
+  const disconnect = useCallback(() => {
+    console.log('🔌 Manually disconnecting SSE connection');
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
       eventSourceRef.current = null;
     }
-  };
+    if (keepAliveIntervalRef.current) {
+      clearInterval(keepAliveIntervalRef.current);
+      keepAliveIntervalRef.current = null;
+    }
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+  }, []);
 
   return { disconnect };
+};
+
+// Simple SSE test hook
+export const useSSETest = () => {
+  const [messages, setMessages] = useState<string[]>([]);
+
+  const testSSE = useCallback(() => {
+    const eventSource = new EventSource('/api/test-sse');
+
+    eventSource.onmessage = event => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log('SSE Test received:', data);
+        setMessages(prev => [...prev, data.message]);
+      } catch (error) {
+        console.error('Failed to parse SSE test message:', error);
+      }
+    };
+
+    eventSource.onerror = error => {
+      console.error('SSE Test error:', error);
+    };
+
+    return () => {
+      eventSource.close();
+    };
+  }, []);
+
+  return { testSSE, messages };
 };
 
 // Hook for generating recommendation options (streaming)
 export const useGenerateRecommendationOptionsStream = () => {
   const queryClient = useQueryClient();
+  const [streamUrl, setStreamUrl] = useState<string | null>(null);
+  const [activeOnProgress, setActiveOnProgress] = useState<
+    ((progress: ProgressData) => void) | null
+  >(null);
+  const [activeOnError, setActiveOnError] = useState<
+    ((error: string) => void) | null
+  >(null);
+  const [activeOnComplete, setActiveOnComplete] = useState<
+    ((result: unknown) => void) | null
+  >(null);
+  const [currentRequest, setCurrentRequest] =
+    useState<RecommendationRequest | null>(null);
+  const disconnectRef = useRef<(() => void) | null>(null);
+  const retryCountRef = useRef<number>(0);
+  const maxRetries = 3;
 
-  const generate = (
-    request: RecommendationRequest,
-    onProgress: (progress: {
-      stage: string;
-      progress: number;
-      status: string;
-      result?: unknown;
-      error?: string;
-    }) => void,
-    onComplete: (result: unknown) => void,
-    onError: (error: string) => void
-  ) => {
-    // Build query string for the streaming endpoint
-    const params = new URLSearchParams({
-      github_username: request.github_username,
-      recommendation_type: request.recommendation_type,
-      tone: request.tone,
-      length: request.length,
-    });
+  // Define callbacks
+  const handleMessage = useCallback(
+    (data: unknown) => {
+      // Reset retry count on successful message
+      retryCountRef.current = 0;
 
-    if (request.custom_prompt) {
-      params.append('custom_prompt', request.custom_prompt);
-    }
-    if (request.target_role) {
-      params.append('target_role', request.target_role);
-    }
-    if (request.include_specific_skills?.length) {
-      params.append(
-        'include_specific_skills',
-        request.include_specific_skills.join(',')
+      if (!activeOnProgress) return;
+
+      activeOnProgress(data as ProgressData);
+
+      const progressData = data as {
+        stage: string;
+        progress: number;
+        status: string;
+        result?: unknown;
+        error?: string;
+      };
+
+      if (
+        progressData.status === 'complete' &&
+        progressData.result &&
+        activeOnComplete &&
+        currentRequest
+      ) {
+        // Cache the result
+        queryClient.setQueryData(
+          ['recommendation-options', currentRequest.github_username],
+          progressData.result
+        );
+
+        // Skip prefetch for now to avoid 401 issues after successful generation
+        // TODO: Re-enable prefetch when token expiry issues are resolved
+        console.log(
+          '🔄 Skipping recommendation prefetch to avoid 401 logout issue'
+        );
+
+        activeOnComplete(progressData.result);
+        toast.success('Recommendation options generated successfully!');
+        disconnectRef.current?.();
+      } else if (progressData.status === 'error' && activeOnError) {
+        activeOnError(
+          progressData.error || 'An error occurred during generation'
+        );
+        toast.error(
+          progressData.error || 'Failed to generate recommendation options'
+        );
+        disconnectRef.current?.();
+      }
+    },
+    [
+      activeOnProgress,
+      activeOnComplete,
+      activeOnError,
+      currentRequest,
+      queryClient,
+    ]
+  );
+
+  const handleError = useCallback(
+    (errorEvent: Event) => {
+      console.error('SSE connection error in generate:', errorEvent);
+      console.log(
+        'SSE ready state:',
+        (errorEvent.target as EventSource)?.readyState
       );
-    }
-    if (request.exclude_keywords?.length) {
-      params.append('exclude_keywords', request.exclude_keywords.join(','));
-    }
-    if (request.analysis_type) {
-      params.append('analysis_type', request.analysis_type);
-    }
-    if (request.repository_url) {
-      params.append('repository_url', request.repository_url);
-    }
+      console.log('Retry count:', retryCountRef.current);
 
-    const url = `${apiClient.baseURL}/recommendations/generate-options/stream?${params.toString()}`;
+      // Don't immediately call onError - wait a bit to see if it's a temporary issue
+      setTimeout(() => {
+        const eventSource = errorEvent.target as EventSource;
+        if (eventSource?.readyState === EventSource.CLOSED) {
+          console.error('SSE connection permanently closed');
 
-    // Create SSE connection directly without using a hook
-    const eventSource = new EventSource(url);
-    let isComplete = false;
+          // Try to reconnect if we haven't exceeded max retries
+          if (retryCountRef.current < maxRetries && currentRequest) {
+            retryCountRef.current += 1;
+            console.log(
+              `Attempting retry ${retryCountRef.current}/${maxRetries}`
+            );
 
-    const disconnect = () => {
-      if (eventSource && eventSource.readyState !== EventSource.CLOSED) {
-        eventSource.close();
-      }
-    };
+            // Reconnect after a delay
+            setTimeout(() => {
+              // Build the same URL for retry
+              const params = new URLSearchParams({
+                github_username: currentRequest.github_username,
+                recommendation_type: currentRequest.recommendation_type,
+                tone: currentRequest.tone,
+                length: currentRequest.length,
+              });
 
-    eventSource.onmessage = event => {
-      try {
-        const data = JSON.parse(event.data);
-        onProgress(data);
+              if (currentRequest.custom_prompt) {
+                params.append('custom_prompt', currentRequest.custom_prompt);
+              }
+              if (currentRequest.target_role) {
+                params.append('target_role', currentRequest.target_role);
+              }
+              if (currentRequest.include_specific_skills?.length) {
+                params.append(
+                  'include_specific_skills',
+                  currentRequest.include_specific_skills.join(',')
+                );
+              }
 
-        if (data.status === 'complete' && data.result && !isComplete) {
-          isComplete = true;
-          // Cache the result
-          queryClient.setQueryData(
-            ['recommendation-options', request.github_username],
-            data.result,
-            { staleTime: 5 * 60 * 1000 }
-          );
+              const retryUrl = `/api/recommendations/generate-options/stream?${params.toString()}`;
+              console.log('Retrying with URL:', retryUrl);
 
-          // Prefetch recommendations
-          queryClient.prefetchQuery({
-            queryKey: ['user-recommendations', request.github_username],
-            queryFn: () =>
-              apiClient.getRecommendations({
-                github_username: request.github_username,
-              }),
-            staleTime: 2 * 60 * 1000,
-          });
-
-          onComplete(data.result);
-          toast.success('Recommendation options generated successfully!');
-          disconnect();
-        } else if (data.status === 'error') {
-          onError(data.error || 'An error occurred during generation');
-          toast.error(
-            data.error || 'Failed to generate recommendation options'
-          );
-          disconnect();
+              // Set the retry URL to trigger reconnection
+              setStreamUrl(retryUrl);
+            }, 1000 * retryCountRef.current); // Exponential backoff
+          } else {
+            console.error('Max retries exceeded, giving up');
+            if (activeOnError) {
+              activeOnError('Connection failed after retries');
+              toast.error('Connection failed. Please try again.');
+            }
+            disconnectRef.current?.();
+          }
         }
-      } catch (error) {
-        console.error('Failed to parse SSE message:', error);
-        onError('Failed to parse server response');
-        disconnect();
+      }, 2000); // Wait 2 seconds before declaring the connection dead
+    },
+    [activeOnError, currentRequest, maxRetries]
+  );
+
+  const { disconnect: actualDisconnect } = useSSEConnection(
+    streamUrl,
+    handleMessage,
+    handleError,
+    !!streamUrl
+  );
+  disconnectRef.current = actualDisconnect;
+
+  const generate = useCallback(
+    (
+      request: RecommendationRequest,
+      onProgress: (progress: {
+        stage: string;
+        progress: number;
+        status: string;
+        result?: unknown;
+        error?: string;
+      }) => void,
+      onComplete: (result: unknown) => void,
+      onError: (error: string) => void
+    ) => {
+      // Disconnect any existing connection
+      disconnectRef.current?.();
+
+      // Reset retry count for new generation
+      retryCountRef.current = 0;
+
+      // Set up new callbacks and request
+      setActiveOnProgress(() => onProgress);
+      setActiveOnComplete(() => onComplete);
+      setActiveOnError(() => onError);
+      setCurrentRequest(request);
+
+      // Build query string for the streaming endpoint
+      const params = new URLSearchParams({
+        github_username: request.github_username,
+        recommendation_type: request.recommendation_type,
+        tone: request.tone,
+        length: request.length,
+      });
+
+      if (request.custom_prompt) {
+        params.append('custom_prompt', request.custom_prompt);
       }
-    };
-
-    eventSource.onerror = error => {
-      console.error('SSE connection error:', error);
-      if (!isComplete) {
-        onError('Connection failed');
-        toast.error('Connection failed. Please try again.');
-        disconnect();
+      if (request.target_role) {
+        params.append('target_role', request.target_role);
       }
-    };
+      if (request.include_specific_skills?.length) {
+        params.append(
+          'include_specific_skills',
+          request.include_specific_skills.join(',')
+        );
+      }
+      if (request.exclude_keywords?.length) {
+        params.append('exclude_keywords', request.exclude_keywords.join(','));
+      }
+      if (request.analysis_type) {
+        params.append('analysis_type', request.analysis_type);
+      }
+      if (request.repository_url) {
+        params.append('repository_url', request.repository_url);
+      }
 
-    return { disconnect };
-  };
+      const newStreamUrl = `/api/recommendations/generate-options/stream?${params.toString()}`;
+      setStreamUrl(newStreamUrl);
 
-  return { generate };
+      return () => disconnectRef.current?.();
+    },
+    []
+  );
+
+  return { generate, disconnect: () => disconnectRef.current?.() };
 };
 
 // Hook for generating recommendation options (legacy non-streaming)
@@ -178,21 +374,14 @@ export const useGenerateRecommendationOptions = () => {
       // Cache the generated options for this user
       queryClient.setQueryData(
         ['recommendation-options', variables.github_username],
-        data,
-        {
-          staleTime: 5 * 60 * 1000, // 5 minutes
-        }
+        data
       );
 
-      // Prefetch recommendations for this user
-      queryClient.prefetchQuery({
-        queryKey: ['user-recommendations', variables.github_username],
-        queryFn: () =>
-          apiClient.getRecommendations({
-            github_username: variables.github_username,
-          }),
-        staleTime: 2 * 60 * 1000, // 2 minutes
-      });
+      // Skip prefetch for now to avoid 401 issues after successful generation
+      // TODO: Re-enable prefetch when token expiry issues are resolved
+      console.log(
+        '🔄 Skipping recommendation prefetch to avoid 401 logout issue'
+      );
 
       toast.success('Recommendation options generated successfully!');
     },
@@ -260,22 +449,19 @@ export const useCreateRecommendationFromOption = () => {
       tone: string;
       length: string;
     }) => {
-      const response = await apiClient.createFromOption(
-        params.github_username,
-        {
+      const response = await apiClient.createFromOption({
+        github_username: params.github_username,
+        selected_option: {
           ...params.option,
           generation_parameters: params.option.generation_parameters || {},
         },
-        params.options.map(opt => ({
+        all_options: params.options.map(opt => ({
           ...opt,
           generation_parameters: opt.generation_parameters || {},
         })),
-        params.analysis_type,
-        params.repository_url,
-        params.recommendation_type,
-        params.tone,
-        params.length
-      );
+        analysis_context_type: params.analysis_type,
+        repository_url: params.repository_url,
+      });
       return response;
     },
     onSuccess: (data, variables) => {
@@ -328,124 +514,175 @@ export const useCreateRecommendationFromOption = () => {
 // Hook for regenerating recommendation (streaming)
 export const useRegenerateRecommendationStream = () => {
   const queryClient = useQueryClient();
+  const [streamUrl, setStreamUrl] = useState<string | null>(null);
+  const [activeOnProgress, setActiveOnProgress] = useState<
+    ((progress: ProgressData) => void) | null
+  >(null);
+  const [activeOnError, setActiveOnError] = useState<
+    ((error: string) => void) | null
+  >(null);
+  const [activeOnComplete, setActiveOnComplete] = useState<
+    ((result: unknown) => void) | null
+  >(null);
+  const [currentParams, setCurrentParams] = useState<{
+    original_content: string;
+    refinement_instructions: string;
+    github_username: string;
+    recommendation_type?: string;
+    tone?: string;
+    length?: string;
+    dynamic_tone?: string;
+    dynamic_length?: string;
+    include_keywords?: string[];
+    exclude_keywords?: string[];
+  } | null>(null);
+  const disconnectRef = useRef<(() => void) | null>(null);
 
-  const regenerate = (
-    params: {
-      original_content: string;
-      refinement_instructions: string;
-      github_username: string;
-      recommendation_type?: string;
-      tone?: string;
-      length?: string;
-      dynamic_tone?: string;
-      dynamic_length?: string;
-      include_keywords?: string[];
-      exclude_keywords?: string[];
-    },
-    onProgress: (progress: {
-      stage: string;
-      progress: number;
-      status: string;
-      result?: unknown;
-      error?: string;
-    }) => void,
-    onComplete: (result: unknown) => void,
-    onError: (error: string) => void
-  ) => {
-    // Note: SSE doesn't support POST body directly, so we're not using requestBody
-    // In a real implementation, you might need to establish the SSE connection first,
-    // then send the POST request to trigger the streaming
+  // Define callbacks
+  const handleMessage = useCallback(
+    (data: unknown) => {
+      if (!activeOnProgress) return;
 
-    const url = `${apiClient.baseURL}/recommendations/regenerate/stream`;
+      activeOnProgress(data as ProgressData);
 
-    // Create SSE connection directly without using a hook
-    const eventSource = new EventSource(url);
-    let isComplete = false;
+      const progressData = data as {
+        stage: string;
+        progress: number;
+        status: string;
+        result?: unknown;
+        error?: string;
+      };
 
-    const disconnect = () => {
-      if (eventSource && eventSource.readyState !== EventSource.CLOSED) {
-        eventSource.close();
-      }
-    };
+      if (
+        progressData.status === 'complete' &&
+        progressData.result &&
+        activeOnComplete &&
+        currentParams
+      ) {
+        // Update cached recommendation
+        queryClient.setQueryData(
+          ['recommendation', (progressData.result as { id: number }).id],
+          progressData.result
+        );
 
-    eventSource.onmessage = event => {
-      try {
-        const data = JSON.parse(event.data);
-        onProgress(data);
-
-        if (data.status === 'complete' && data.result && !isComplete) {
-          isComplete = true;
-          // Update cached recommendation
-          queryClient.setQueryData(
-            ['recommendation', data.result.id],
-            data.result
-          );
-
-          // Update in user's recommendations list
-          queryClient.setQueryData(
-            ['user-recommendations', params.github_username],
-            (
-              oldData:
-                | {
-                    recommendations: unknown[];
-                    total: number;
-                    page: number;
-                    page_size: number;
-                  }
-                | undefined
-            ) => {
-              if (!oldData)
-                return {
-                  recommendations: [data.result],
-                  total: 1,
-                  page: 1,
-                  page_size: 10,
-                };
-
+        // Update in user's recommendations list
+        queryClient.setQueryData(
+          ['user-recommendations', currentParams.github_username],
+          (
+            oldData:
+              | {
+                  recommendations: unknown[];
+                  total: number;
+                  page: number;
+                  page_size: number;
+                }
+              | undefined
+          ) => {
+            if (!oldData)
               return {
-                ...oldData,
-                recommendations: oldData.recommendations.map(
-                  (rec: { id: unknown }) =>
-                    rec.id === (data.result as { id: unknown }).id
-                      ? data.result
-                      : rec
-                ),
+                recommendations: [progressData.result],
+                total: 1,
+                page: 1,
+                page_size: 10,
               };
-            }
-          );
 
-          onComplete(data.result);
-          toast.success('Recommendation refined successfully!');
-          disconnect();
-        } else if (data.status === 'error') {
-          onError(data.error || 'An error occurred during refinement');
-          toast.error(data.error || 'Failed to refine recommendation');
-          disconnect();
-        }
-      } catch (error) {
-        console.error('Failed to parse SSE message:', error);
-        onError('Failed to parse server response');
-        disconnect();
+            return {
+              ...oldData,
+              recommendations: oldData.recommendations.map((rec: unknown) =>
+                (rec as { id: unknown }).id ===
+                (progressData.result as { id: unknown }).id
+                  ? progressData.result
+                  : rec
+              ),
+            };
+          }
+        );
+
+        activeOnComplete(progressData.result);
+        toast.success('Recommendation refined successfully!');
+        disconnectRef.current?.();
+      } else if (progressData.status === 'error' && activeOnError) {
+        activeOnError(
+          progressData.error || 'An error occurred during refinement'
+        );
+        toast.error(progressData.error || 'Failed to refine recommendation');
+        disconnectRef.current?.();
       }
-    };
+    },
+    [
+      activeOnProgress,
+      activeOnComplete,
+      activeOnError,
+      currentParams,
+      queryClient,
+    ]
+  );
 
-    eventSource.onerror = error => {
-      console.error('SSE connection error:', error);
-      if (!isComplete) {
-        onError('Connection failed');
+  const handleError = useCallback(
+    (errorEvent: Event) => {
+      console.error('SSE connection error in regenerate:', errorEvent);
+      if (activeOnError) {
+        activeOnError('Connection failed');
         toast.error('Connection failed. Please try again.');
-        disconnect();
       }
-    };
+      disconnectRef.current?.();
+    },
+    [activeOnError]
+  );
 
-    // Note: SSE doesn't support POST body directly, so we're not using requestBody
-    // In a real implementation, you might need to establish the SSE connection first,
-    // then send the POST request to trigger the streaming
+  const { disconnect: actualDisconnect } = useSSEConnection(
+    streamUrl,
+    handleMessage,
+    handleError,
+    !!streamUrl
+  );
+  disconnectRef.current = actualDisconnect;
 
-    return { disconnect };
-  };
+  const regenerate = useCallback(
+    (
+      params: {
+        original_content: string;
+        refinement_instructions: string;
+        github_username: string;
+        recommendation_type?: string;
+        tone?: string;
+        length?: string;
+        dynamic_tone?: string;
+        dynamic_length?: string;
+        include_keywords?: string[];
+        exclude_keywords?: string[];
+      },
+      onProgress: (progress: {
+        stage: string;
+        progress: number;
+        status: string;
+        result?: unknown;
+        error?: string;
+      }) => void,
+      onComplete: (result: unknown) => void,
+      onError: (error: string) => void
+    ) => {
+      // Disconnect any existing connection
+      disconnectRef.current?.();
 
-  return { regenerate };
+      // Set up new callbacks and params
+      setActiveOnProgress(() => onProgress);
+      setActiveOnComplete(() => onComplete);
+      setActiveOnError(() => onError);
+      setCurrentParams(params);
+
+      // Note: SSE doesn't support POST body directly, so we're not using requestBody
+      // In a real implementation, you might need to establish the SSE connection first,
+      // then send the POST request to trigger the streaming
+      const newStreamUrl = `/api/recommendations/regenerate/stream`;
+      setStreamUrl(newStreamUrl);
+
+      return () => disconnectRef.current?.();
+    },
+    []
+  );
+
+  return { regenerate, disconnect: () => disconnectRef.current?.() };
 };
 
 // Hook for regenerating recommendation (legacy non-streaming)
@@ -525,7 +762,6 @@ export const useUserRecommendations = (
         page: 1,
         limit: 10,
       }),
-    staleTime: 2 * 60 * 1000, // 2 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
     enabled: enabled && !!githubUsername,
   });
@@ -539,7 +775,7 @@ export const useRecommendation = (
   return useQuery({
     queryKey: ['recommendation', recommendationId],
     queryFn: () => apiClient.getRecommendation(recommendationId!),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 5 * 60 * 1000, // 5 minutes
     enabled: enabled && !!recommendationId,
   });
 };

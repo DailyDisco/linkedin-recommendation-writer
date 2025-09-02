@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Github, Loader2, Users, User } from 'lucide-react';
+import { Link } from 'react-router';
 import { toast } from 'sonner';
 import { githubApi } from '../services/api';
 import type { ContributorInfo, HttpError, RepositoryInfo } from '../types';
@@ -11,6 +12,7 @@ declare global {
   }
 }
 import RecommendationModal from '../components/RecommendationModal';
+import RegistrationModal from '../components/RegistrationModal';
 import { ContributorSkeleton } from '../components/ui/loading-skeleton';
 import ErrorBoundary from '../components/ui/error-boundary';
 import { ContributorCard } from '../components/ui/memo-components';
@@ -67,6 +69,9 @@ const parseRepositoryInput = (input: string): string => {
 export default function GeneratorPage() {
   const [mode, setMode] = useState<'user' | 'repository'>('repository');
   const [isLoading, setIsLoading] = useState(false);
+  const [isBackgroundProcessing, setIsBackgroundProcessing] = useState(false);
+  const [backgroundProcessingMessage, setBackgroundProcessingMessage] =
+    useState('');
   const [contributors, setContributors] = useState<ContributorInfo[]>([]);
   const [repositoryInfo, setRepositoryInfo] = useState<RepositoryInfo | null>(
     null
@@ -74,9 +79,13 @@ export default function GeneratorPage() {
   const [selectedContributor, setSelectedContributor] =
     useState<ContributorInfo | null>(null);
   const [showRecommendationModal, setShowRecommendationModal] = useState(false);
+  const [showRegistrationModal, setShowRegistrationModal] = useState(false);
+  const [hasDismissedRegistrationModal, setHasDismissedRegistrationModal] =
+    useState(false);
 
   const {
     isLoggedIn,
+    userDetails,
     userRecommendationCount,
     userDailyLimit,
     fetchUserDetails,
@@ -103,11 +112,53 @@ export default function GeneratorPage() {
     }
   }, []);
 
-  // Fetch user details when the component mounts
+  // Fetch user details when the component mounts and reset dismissal on new day
   useEffect(() => {
-    fetchUserDetails();
+    console.log(
+      '🔐 Generate page: Component mounted, fetching user details...'
+    );
+    console.log('🔐 Generate page: isLoggedIn =', isLoggedIn);
+    console.log('🔐 Generate page: userDetails =', userDetails);
+
+    // Only fetch user details if user is logged in and we don't have cached data
+    if (isLoggedIn && !userDetails) {
+      console.log(
+        '🔐 Generate page: User is logged in but no cached data, fetching...'
+      );
+      fetchUserDetails();
+    } else if (isLoggedIn && userDetails) {
+      console.log(
+        '🔐 Generate page: User is logged in with cached data, skipping fetch'
+      );
+    } else {
+      console.log('🔐 Generate page: User is not logged in, skipping fetch');
+    }
+
+    // Reset dismissal flag on new day
+    const storedDate = localStorage.getItem('anonRecommendationDate');
+    const today = new Date().toDateString();
+    if (storedDate !== today) {
+      setHasDismissedRegistrationModal(false);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Remove fetchUserDetails from dependencies to prevent infinite loop
+
+  // Show registration modal when anonymous user reaches 0 recommendations
+  useEffect(() => {
+    if (
+      !isLoggedIn &&
+      anonymousCount >= 3 &&
+      !showRegistrationModal &&
+      !hasDismissedRegistrationModal
+    ) {
+      setShowRegistrationModal(true);
+    }
+  }, [
+    isLoggedIn,
+    anonymousCount,
+    showRegistrationModal,
+    hasDismissedRegistrationModal,
+  ]);
 
   const handleGetUsers = async () => {
     if (!formData.input_value.trim()) {
@@ -168,24 +219,23 @@ export default function GeneratorPage() {
         });
 
         setContributors(result.contributors);
-        // Convert SimpleRepositoryInfo to RepositoryInfo format
+        // Convert repository data to RepositoryInfo format
         const repoInfo: RepositoryInfo = {
           name: result.repository.name,
           full_name: result.repository.full_name,
-          description: result.repository.description ?? null,
-          html_url: result.repository.url,
-          language: result.repository.language ?? null,
-          stargazers_count: result.repository.stars,
-          forks_count: result.repository.forks,
-          open_issues_count: 0, // Default to 0 if not available
-          created_at: result.repository.created_at ?? '',
-          updated_at: result.repository.updated_at ?? '',
-          topics: result.repository.topics ?? [],
+          description: result.repository.description || undefined,
+          language: result.repository.language || undefined,
+          stars: result.repository.stars,
+          forks: result.repository.forks,
+          url: result.repository.url,
+          created_at: result.repository.created_at || undefined,
+          updated_at: result.repository.updated_at || undefined,
+          topics: result.repository.topics || [],
           owner: result.repository.owner
             ? {
                 login: result.repository.owner.login,
-                avatar_url: result.repository.owner.avatar_url ?? '',
-                html_url: result.repository.owner.html_url ?? '',
+                avatar_url: result.repository.owner.avatar_url || '',
+                html_url: result.repository.owner.html_url || '',
               }
             : {
                 login: result.repository.full_name.split('/')[0],
@@ -212,56 +262,155 @@ export default function GeneratorPage() {
         // Handle user mode
         const username = formData.input_value.trim();
         const result = await githubApi.analyzeProfile(username);
-        // Extract user data from the nested response structure
-        const userData = result.user_data;
-        // Convert single user to contributor format for consistency
-        setContributors([
-          {
-            username: userData.github_username || userData.login || '',
-            full_name:
-              userData.full_name ||
-              userData.name ||
-              userData.github_username ||
-              userData.login ||
-              '',
-            first_name:
-              (userData.full_name || userData.name)?.split(' ')[0] || '',
-            last_name:
-              (userData.full_name || userData.name)
-                ?.split(' ')
-                .slice(1)
-                .join(' ') || '',
-            email: userData.email,
-            bio: userData.bio,
-            company: userData.company,
-            location: userData.location,
-            avatar_url: userData.avatar_url || '',
-            contributions: userData.public_repos || 0,
-            profile_url: `https://github.com/${userData.github_username || userData.login}`,
-            followers: userData.followers || 0,
-            public_repos: userData.public_repos || 0,
-          },
-        ]);
 
-        // Track successful GitHub user profile analysis
-        trackEngagement.githubProfileAnalyzed({
-          repositoriesCount: userData.public_repos || 0,
-          languagesCount: 0, // We don't have language data for user profiles
-          hasRecentActivity: userData.updated_at
-            ? new Date(userData.updated_at) >
-              new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-            : false,
-        });
+        // Check if background processing is in progress
+        if (result.user_data?.processing && result.user_data?.task_id) {
+          const taskId = result.user_data.task_id;
 
-        toast.success(
-          `Found GitHub profile for ${userData.github_username || userData.login || 'user'}!`
-        );
+          console.log(
+            '🎯 FRONTEND: Background processing detected, polling for task:',
+            taskId
+          );
+
+          // Set background processing state
+          setIsBackgroundProcessing(true);
+          setBackgroundProcessingMessage(
+            'Initializing... Analyzing GitHub profile and creating multiple options...'
+          );
+
+          // Poll for task completion
+          let taskResult = await githubApi.getTaskStatus(taskId);
+          let attempts = 0;
+          const maxAttempts = 60; // 60 seconds max
+
+          while (taskResult.status === 'processing' && attempts < maxAttempts) {
+            console.log(
+              `⏳ FRONTEND: Task ${taskId} still processing... (${attempts + 1}/${maxAttempts})`
+            );
+
+            // Update progress message
+            setBackgroundProcessingMessage(
+              `Analyzing DailyDisco's GitHub profile and creating multiple options... (${attempts + 1}/${maxAttempts})`
+            );
+
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+            taskResult = await githubApi.getTaskStatus(taskId);
+            attempts++;
+          }
+
+          // Clear background processing state
+          setIsBackgroundProcessing(false);
+          setBackgroundProcessingMessage('');
+
+          if (taskResult.status === 'completed' && taskResult.result) {
+            console.log('✅ FRONTEND: Task completed successfully');
+            // Use the completed analysis result
+            const analysisResult = taskResult.result;
+            const userData = analysisResult.user_data;
+
+            // Convert single user to contributor format for consistency
+            setContributors([
+              {
+                username: userData.github_username || userData.login || '',
+                full_name:
+                  userData.full_name ||
+                  userData.name ||
+                  userData.github_username ||
+                  userData.login ||
+                  '',
+                first_name:
+                  (userData.full_name || userData.name)?.split(' ')[0] || '',
+                last_name:
+                  (userData.full_name || userData.name)
+                    ?.split(' ')
+                    .slice(1)
+                    .join(' ') || '',
+                email: userData.email,
+                bio: userData.bio,
+                company: userData.company,
+                location: userData.location,
+                avatar_url: userData.avatar_url || '',
+                contributions: userData.public_repos || 0,
+                profile_url: `https://github.com/${userData.github_username || userData.login}`,
+                followers: userData.followers || 0,
+                public_repos: userData.public_repos || 0,
+              },
+            ]);
+
+            // Track successful GitHub user profile analysis
+            trackEngagement.githubProfileAnalyzed({
+              repositoriesCount: userData.public_repos || 0,
+              languagesCount: 0, // We don't have language data for user profiles
+              hasRecentActivity: userData.updated_at
+                ? new Date(userData.updated_at) >
+                  new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+                : false,
+            });
+
+            toast.success(
+              `Found GitHub profile for ${userData.github_username || userData.login || 'user'}!`
+            );
+          } else {
+            console.error('❌ FRONTEND: Task failed or timed out:', taskResult);
+            setIsBackgroundProcessing(false);
+            setBackgroundProcessingMessage('');
+            toast.error(
+              'GitHub profile analysis failed or timed out. Please try again.'
+            );
+            return;
+          }
+        } else {
+          // Direct response (not background processing)
+          const userData = result.user_data;
+
+          // Convert single user to contributor format for consistency
+          setContributors([
+            {
+              username: userData.github_username || userData.login || '',
+              full_name:
+                userData.full_name ||
+                userData.name ||
+                userData.github_username ||
+                userData.login ||
+                '',
+              first_name:
+                (userData.full_name || userData.name)?.split(' ')[0] || '',
+              last_name:
+                (userData.full_name || userData.name)
+                  ?.split(' ')
+                  .slice(1)
+                  .join(' ') || '',
+              email: userData.email,
+              bio: userData.bio,
+              company: userData.company,
+              location: userData.location,
+              avatar_url: userData.avatar_url || '',
+              contributions: userData.public_repos || 0,
+              profile_url: `https://github.com/${userData.github_username || userData.login}`,
+              followers: userData.followers || 0,
+              public_repos: userData.public_repos || 0,
+            },
+          ]);
+
+          // Track successful GitHub user profile analysis
+          trackEngagement.githubProfileAnalyzed({
+            repositoriesCount: userData.public_repos || 0,
+            languagesCount: 0, // We don't have language data for user profiles
+            hasRecentActivity: userData.updated_at
+              ? new Date(userData.updated_at) >
+                new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+              : false,
+          });
+
+          toast.success(
+            `Found GitHub profile for ${userData.github_username || userData.login || 'user'}!`
+          );
+        }
       }
     } catch (err: unknown) {
       const error = err as HttpError;
       console.error('💥 FRONTEND: API request failed:', {
         status: error.response?.status,
-        statusText: error.response?.statusText,
         data: error.response?.data,
         message: error.message,
         mode: mode,
@@ -333,6 +482,12 @@ export default function GeneratorPage() {
 
   const handleWriteRecommendation = useCallback(
     (contributor: ContributorInfo) => {
+      // Check if anonymous user has reached the limit
+      if (!isLoggedIn && anonymousCount >= 3) {
+        setShowRegistrationModal(true);
+        return;
+      }
+
       // Track when user clicks "Write Recommendation"
       trackEngagement.navigationClick(
         'write_recommendation',
@@ -342,8 +497,26 @@ export default function GeneratorPage() {
       setSelectedContributor(contributor);
       setShowRecommendationModal(true);
     },
-    []
+    [isLoggedIn, anonymousCount]
   );
+
+  // Reset dismissal flag when user navigates away and comes back (for new session)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // Check if it's a new day when user returns
+        const storedDate = localStorage.getItem('anonRecommendationDate');
+        const today = new Date().toDateString();
+        if (storedDate !== today) {
+          setHasDismissedRegistrationModal(false);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () =>
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
 
   // Memoize expensive computations
   const parsedContributors = useMemo(() => {
@@ -377,9 +550,12 @@ export default function GeneratorPage() {
             <p className='text-sm text-gray-500'>
               You have {3 - anonymousCount} of 3 free recommendations remaining
               today.
-              <span className='text-blue-600 hover:underline ml-1'>
+              <Link
+                to='/register'
+                className='text-blue-600 hover:text-blue-700 hover:underline ml-1 font-medium transition-colors'
+              >
                 Sign up for 5 daily recommendations!
-              </span>
+              </Link>
             </p>
           )}
         </div>
@@ -480,15 +656,19 @@ export default function GeneratorPage() {
 
                 <button
                   type='submit'
-                  disabled={isLoading || !formData.input_value}
+                  disabled={
+                    isLoading || isBackgroundProcessing || !formData.input_value
+                  }
                   className='inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-blue-600 text-white shadow hover:bg-blue-700 active:bg-blue-800 h-9 px-4 py-2 w-full'
                 >
-                  {isLoading ? (
+                  {isLoading || isBackgroundProcessing ? (
                     <>
                       <Loader2 className='w-4 h-4 mr-2 animate-spin' />
-                      {mode === 'repository'
-                        ? 'Getting Contributors...'
-                        : 'Getting User...'}
+                      {isBackgroundProcessing
+                        ? backgroundProcessingMessage || 'Processing...'
+                        : mode === 'repository'
+                          ? 'Getting Contributors...'
+                          : 'Getting User...'}
                     </>
                   ) : (
                     <>
@@ -527,8 +707,8 @@ export default function GeneratorPage() {
                         {repositoryInfo.description}
                       </p>
                       <div className='flex items-center space-x-4 mt-2 text-sm text-gray-500'>
-                        <span>⭐ {repositoryInfo.stargazers_count}</span>
-                        <span>🍴 {repositoryInfo.forks_count}</span>
+                        <span>⭐ {repositoryInfo.stars}</span>
+                        <span>🍴 {repositoryInfo.forks}</span>
                         <span>💻 {repositoryInfo.language}</span>
                       </div>
                     </div>
@@ -569,6 +749,15 @@ export default function GeneratorPage() {
             </div>
           </div>
         </div>
+
+        {/* Registration Modal */}
+        <RegistrationModal
+          isOpen={showRegistrationModal}
+          onClose={() => {
+            setShowRegistrationModal(false);
+            setHasDismissedRegistrationModal(true);
+          }}
+        />
 
         {/* Recommendation Modal */}
         {selectedContributor && (
