@@ -84,8 +84,8 @@ export default function RegistrationModal({
             </h3>
 
             <p className='text-gray-600 mb-6'>
-              You&apos;ve used all your free recommendations for today. Sign up now
-              to get 5 recommendations per day and unlock premium features!
+              You&apos;ve used all your free recommendations for today. Sign up
+              now to get 5 recommendations per day and unlock premium features!
             </p>
 
             <div className='bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-4 mb-6 border border-blue-200'>
