@@ -7,4 +7,3 @@ This package contains all the business logic services organized by domain:
 - Analysis services: Profile and skill analysis functionality
 - Infrastructure services: Database, monitoring, and system services
 """
-

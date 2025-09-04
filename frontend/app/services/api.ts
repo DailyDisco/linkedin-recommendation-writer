@@ -359,6 +359,7 @@ export const apiClient = {
     all_options: RecommendationOption[];
     analysis_context_type?: string;
     repository_url?: string;
+    force_refresh?: boolean;
   }) {
     const response = await api.post(
       '/recommendations/create-from-option',

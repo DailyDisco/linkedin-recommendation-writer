@@ -82,16 +82,23 @@ export default function RecommendationModal({
 
       // Set initial input value based on props
       if (initialInputValue) {
-        dispatch({ type: 'UPDATE_FORM', payload: { github_input: initialInputValue } });
+        dispatch({
+          type: 'UPDATE_FORM',
+          payload: { github_input: initialInputValue },
+        });
         if (mode === 'repository') {
           dispatch({
-            type: 'UPDATE_FORM', payload: {
+            type: 'UPDATE_FORM',
+            payload: {
               analysis_type: 'repo_only',
-              repository_url: initialInputValue
-            }
+              repository_url: initialInputValue,
+            },
           });
         } else if (mode === 'user') {
-          dispatch({ type: 'UPDATE_FORM', payload: { analysis_type: 'profile' } });
+          dispatch({
+            type: 'UPDATE_FORM',
+            payload: { analysis_type: 'profile' },
+          });
         }
       }
 
@@ -340,7 +347,7 @@ Key Achievements: ${state.formData.notableAchievements}
 
         dispatch({ type: 'SET_STEP', payload: 'result' });
       },
-      onError: () => { },
+      onError: () => {},
     });
   };
 

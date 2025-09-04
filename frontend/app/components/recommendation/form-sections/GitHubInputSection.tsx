@@ -28,28 +28,29 @@ export const GitHubInputSection: React.FC<GitHubInputSectionProps> = ({
       >
         {initialInputValue
           ? `Analyzing ${mode === 'repository' ? 'Repository' : 'User Profile'} *`
-          : 'GitHub Username or Repository URL *'
-        }
+          : 'GitHub Username or Repository URL *'}
       </label>
       <Input
         id='github-input'
         type='text'
         required
         readOnly={!!initialInputValue}
-        className={`w-full ${initialInputValue
-            ? 'bg-gray-50 text-gray-700 cursor-not-allowed'
-            : ''
-          } ${errors.github_input
+        className={`w-full ${
+          initialInputValue ? 'bg-gray-50 text-gray-700 cursor-not-allowed' : ''
+        } ${
+          errors.github_input
             ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
             : 'border-gray-300'
-          }`}
+        }`}
         placeholder={
           initialInputValue
             ? 'Auto-populated from your search'
             : 'e.g., johnsmith or https://github.com/johnsmith/myproject'
         }
         value={githubInput}
-        onChange={e => !initialInputValue && onChange('github_input', e.target.value)}
+        onChange={e =>
+          !initialInputValue && onChange('github_input', e.target.value)
+        }
         aria-describedby={
           errors.github_input ? 'github-input-error' : undefined
         }
@@ -59,8 +60,7 @@ export const GitHubInputSection: React.FC<GitHubInputSectionProps> = ({
           🔗 This field is auto-populated from your repository/user search.
           {mode === 'repository'
             ? ' The AI will focus only on contributions to this repository.'
-            : ' The AI will analyze the full user profile.'
-          }
+            : ' The AI will analyze the full user profile.'}
         </p>
       )}
       {errors.github_input && (
