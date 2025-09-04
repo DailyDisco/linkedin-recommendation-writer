@@ -351,14 +351,16 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className='space-y-3'>
+          <div className='text-center'>
             <div className='w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center'>
               <FileText className='w-6 h-6 text-green-600' />
             </div>
-            <h3 className='font-semibold text-gray-900'>README Generation</h3>
+            <h3 className='font-semibold text-gray-900'>
+              Documentation Insights
+            </h3>
             <p className='text-sm text-gray-600'>
-              Automatically generate professional README files for GitHub
-              repositories using AI analysis
+              Extract valuable insights from your GitHub repositories and
+              present them in professional recommendations
             </p>
           </div>
 

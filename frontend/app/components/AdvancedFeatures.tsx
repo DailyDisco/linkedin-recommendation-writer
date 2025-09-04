@@ -2,18 +2,12 @@ import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
-import { FileText, Target, Lightbulb, TrendingUp } from 'lucide-react';
-import { ReadmeGenerator } from './ReadmeGenerator';
+import { Target, Lightbulb, TrendingUp } from 'lucide-react';
 import { SkillGapAnalysis } from './SkillGapAnalysis';
-import type { ReadmeGenerationData, SkillAnalysisData } from '../types/index';
+import type { SkillAnalysisData } from '../types/index';
 
 interface AdvancedFeaturesProps {
   // API functions that would be passed from parent
-  onGenerateReadme: (data: ReadmeGenerationData) => Promise<{
-    repository_name: string;
-    generated_content: string;
-    sections: Record<string, string>;
-  }>;
   onAnalyzeSkills: (data: SkillAnalysisData) => Promise<{
     overall_match_score: number;
     skill_analysis: Array<{
@@ -31,13 +25,6 @@ interface AdvancedFeaturesProps {
 
 const FEATURES = [
   {
-    id: 'readme-generator',
-    title: 'README Generator',
-    description: 'Create professional READMEs from repository analysis',
-    icon: FileText,
-    component: ReadmeGenerator,
-  },
-  {
     id: 'skill-gap-analysis',
     title: 'Skill Gap Analysis',
     description:
@@ -48,15 +35,12 @@ const FEATURES = [
 ];
 
 export const AdvancedFeatures: React.FC<AdvancedFeaturesProps> = ({
-  onGenerateReadme,
   onAnalyzeSkills,
 }) => {
   const [activeFeature, setActiveFeature] = useState(FEATURES[0].id);
 
   const renderFeatureComponent = (feature: (typeof FEATURES)[0]) => {
     switch (feature.id) {
-      case 'readme-generator':
-        return <ReadmeGenerator onGenerate={onGenerateReadme} />;
       case 'skill-gap-analysis':
         return <SkillGapAnalysis onAnalyze={onAnalyzeSkills} />;
     }
@@ -70,7 +54,7 @@ export const AdvancedFeatures: React.FC<AdvancedFeaturesProps> = ({
         onValueChange={setActiveFeature}
         className='w-full'
       >
-        <TabsList className='grid w-full grid-cols-2'>
+        <TabsList className='grid w-full grid-cols-1'>
           {FEATURES.map(feature => {
             const Icon = feature.icon;
             return (
@@ -111,16 +95,13 @@ export const AdvancedFeatures: React.FC<AdvancedFeaturesProps> = ({
                   Get the most out of these AI tools by following this simple
                   process:
                 </p>
-                <ol className='text-sm text-muted-foreground space-y-2 list-decimal list-inside'>
-                  <li>
-                    <strong>Start with Skill Gap Analysis</strong> - Understand
-                    your current skill profile
-                  </li>
-                  <li>
-                    <strong>Generate READMEs</strong> - Create professional
-                    documentation for your projects
-                  </li>
-                </ol>
+                <div className='text-sm text-muted-foreground'>
+                  <p>
+                    <strong>Use Skill Gap Analysis</strong> to understand your
+                    current skill profile and identify areas for growth based on
+                    your target role.
+                  </p>
+                </div>
               </div>
             </div>
           </div>

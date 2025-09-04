@@ -288,9 +288,14 @@ export default function GeneratorPage() {
               `⏳ FRONTEND: Task ${taskId} still processing... (${attempts + 1}/${maxAttempts})`
             );
 
-            // Update progress message
+            // Update progress message using the actual username
+            const displayName =
+              (userData.full_name || userData.name)?.split(' ')[0] ||
+              userData.github_username ||
+              userData.login ||
+              formData.input_value;
             setBackgroundProcessingMessage(
-              `Analyzing DailyDisco's GitHub profile and creating multiple options... (${attempts + 1}/${maxAttempts})`
+              `Analyzing ${displayName}'s GitHub profile and creating multiple options... (${attempts + 1}/${maxAttempts})`
             );
 
             await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second

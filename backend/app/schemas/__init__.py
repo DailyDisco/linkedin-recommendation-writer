@@ -3,8 +3,6 @@
 from .github import GitHubAnalysisRequest, GitHubProfileResponse, LanguageStats, SkillAnalysis
 from .recommendation import (
     KeywordRefinementRequest,
-    ReadmeGenerationRequest,
-    ReadmeGenerationResponse,
     RecommendationCreate,
     RecommendationFromOptionRequest,
     RecommendationListResponse,
@@ -30,8 +28,6 @@ __all__ = [
     "RecommendationOptionsResponse",
     "RecommendationRequest",
     "RecommendationResponse",
-    "ReadmeGenerationRequest",
-    "ReadmeGenerationResponse",
     "Token",
     "TokenData",
     "UserCreate",

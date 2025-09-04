@@ -27,7 +27,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { apiClient } from '@/services/api';
-import type { ReadmeGenerationData, SkillAnalysisData } from '../types/index';
+import type { SkillAnalysisData } from '../types/index';
 import { PleaseSignInOrRegister } from '../components/PleaseSignInOrRegister';
 import { Link } from 'react-router';
 import { trackEngagement } from '../utils/analytics';
@@ -79,17 +79,6 @@ export default function UserProfilePage() {
   if (!isLoggedIn) {
     return <PleaseSignInOrRegister />;
   }
-
-  const handleReadmeGeneration = async (data: ReadmeGenerationData) => {
-    try {
-      const response = await apiClient.generateReadme(data);
-      console.log('README generation successful:', response);
-      return response;
-    } catch (error) {
-      console.error('README generation failed:', error);
-      throw error;
-    }
-  };
 
   const handleSkillAnalysis = async (data: SkillAnalysisData) => {
     try {
@@ -414,10 +403,7 @@ export default function UserProfilePage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <AdvancedFeatures
-            onGenerateReadme={handleReadmeGeneration}
-            onAnalyzeSkills={handleSkillAnalysis}
-          />
+          <AdvancedFeatures onAnalyzeSkills={handleSkillAnalysis} />
         </CardContent>
       </Card>
     </div>

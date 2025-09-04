@@ -411,16 +411,6 @@ export const apiClient = {
     return response.data;
   },
 
-  async generateReadme(data: {
-    repository_full_name: string;
-    style?: string;
-    include_sections?: string[];
-    target_audience?: string;
-  }) {
-    const response = await api.post('/recommendations/generate-readme', data);
-    return response.data;
-  },
-
   async analyzeSkillGaps(data: {
     github_username: string;
     target_role: string;

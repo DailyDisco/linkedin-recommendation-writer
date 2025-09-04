@@ -308,13 +308,6 @@ export interface FilterState {
   };
 }
 
-export interface ReadmeGenerationData {
-  repository_full_name: string;
-  style?: string;
-  include_sections?: string[];
-  target_audience?: string;
-}
-
 export interface SkillAnalysisData {
   github_username: string;
   target_role: string;
