@@ -75,10 +75,11 @@ export const RecommendationFormNew: React.FC<RecommendationFormNewProps> = ({
           id='working-relationship'
           ref={firstInputRef}
           required
-          className={`w-full h-20 px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${errors.workingRelationship
-            ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
-            : 'border-gray-300'
-            }`}
+          className={`w-full h-20 px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${
+            errors.workingRelationship
+              ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
+              : 'border-gray-300'
+          }`}
           placeholder='e.g., We collaborated on the frontend development team for 8 months...'
           value={formData.workingRelationship}
           onChange={e => onChange('workingRelationship', e.target.value)}
