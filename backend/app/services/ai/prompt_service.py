@@ -1,13 +1,19 @@
-"""AI Prompt Service for building and formatting prompts."""
+"""AI Prompt Service for building and formatting prompts with natural human storytelling."""
 
 import logging
 from typing import Any, Dict, List, Optional
+
+from app.services.ai.human_story_generator import HumanStoryGenerator
 
 logger = logging.getLogger(__name__)
 
 
 class PromptService:
-    """Service for building and formatting AI prompts."""
+    """Service for building and formatting AI prompts with natural human storytelling."""
+
+    def __init__(self):
+        """Initialize prompt service with human story generator."""
+        self.story_generator = HumanStoryGenerator()
 
     def build_prompt(
         self,
@@ -23,6 +29,7 @@ class PromptService:
         focus_weights: Optional[Dict[str, float]] = None,
         analysis_context_type: str = "profile",
         repository_url: Optional[str] = None,
+        display_name: Optional[str] = None,  # New parameter
     ) -> str:
         """Build the AI generation prompt."""
 
@@ -32,18 +39,40 @@ class PromptService:
         commit_analysis = github_data.get("commit_analysis", {})
         repository_info = github_data.get("repository_info", {})
 
-        # Safely get username: always prioritize the person's GitHub username from user_data
-        base_username = user_data.get("github_username")
-        if not base_username and repository_info:
-            # Only use repository owner as fallback if we don't have user_data
-            base_username = repository_info.get("owner", {}).get("login")
-        if not base_username:  # Final fallback
-            base_username = "the developer"
+        # Determine the reference name for the person
+        if display_name:  # Prioritize display_name if provided
+            person_reference = display_name
+        else:
+            # Extract first name for more personal recommendations
+            first_name = self._extract_first_name(user_data.get("full_name", ""))
 
-        # Base prompt structure
+            # If no first name from full_name, try to extract from username
+            if not first_name:
+                base_username = user_data.get("github_username")
+                if not base_username and repository_info:
+                    # Only use repository owner as fallback if we don't have user_data
+                    base_username = repository_info.get("owner", {}).get("login")
+
+                if base_username:
+                    # Try to extract a name from username pattern
+                    extracted_name = self._extract_name_from_username(base_username)
+                    person_reference = extracted_name if extracted_name else base_username
+                else:
+                    person_reference = "the developer"
+            else:
+                person_reference = first_name
+
+        # Build human narrative sections using story generator
+        narrative_sections = self.story_generator.build_human_prompt_sections(github_data, analysis_context_type, display_name=person_reference)
+
+        # Base prompt structure with storytelling approach
         prompt_parts = [
-            f"Write a {length} LinkedIn recommendation for {base_username}.",
+            narrative_sections["opening"][0].format(name=person_reference),  # Use opening from story generator
             f"Make it {tone} and suitable for {recommendation_type} purposes.",
+            "",
+            f"CRITICAL: Use '{person_reference}' as the person's name throughout the entire recommendation.",
+            f"NEVER use placeholders like '[Colleague's Name]', '[Name]', or '[Person]' - always use '{person_reference}'.",
+            f"Write the recommendation as if you know {person_reference} personally and have worked with them directly.",
         ]
 
         if target_role:
@@ -179,25 +208,30 @@ class PromptService:
                         if patterns.get("most_active_month"):
                             prompt_parts.append(f"- Most active development period: {patterns['most_active_month']}")
 
-                # Add contributor commit summary for better recommendations (without mentioning repository name)
+                # Add human story elements from contributor summary
                 contributor_summary = github_data.get("contributor_commit_summary", {})
                 if contributor_summary and contributor_summary.get("total_commits", 0) > 0:
-                    logger.info("🔍 PROMPT SERVICE: Adding contributor commit summary to prompt")
+                    logger.info("🔍 PROMPT SERVICE: Adding human story elements from contributor summary")
                     prompt_parts.append("")
-                    prompt_parts.append("CONTRIBUTOR'S TECHNICAL CONTRIBUTIONS AND ACHIEVEMENTS:")
-                    prompt_parts.append(f"- Total commits: {contributor_summary.get('total_commits', 0)}")
-                    prompt_parts.append(f"- Pull requests: {contributor_summary.get('total_prs', 0)}")
+                    prompt_parts.append("PERSONAL OBSERVATIONS ABOUT THEIR WORK:")
 
-                    # Add technical focus areas
+                    # Convert technical data to human stories
+                    stories = self.story_generator.convert_technical_to_story(github_data, context_type)
+                    personality_traits = self.story_generator.infer_personality_traits(github_data.get("commit_analysis", {}))
+
+                    # Add personality insights
+                    if personality_traits:
+                        for trait in personality_traits[:2]:
+                            prompt_parts.append(f"- {trait['description']}")
+
+                    # Add collaboration examples
+                    if stories["collaboration_examples"]:
+                        for example in stories["collaboration_examples"][:2]:
+                            prompt_parts.append(f"- {example}")
+
+                    # Extract summary data
                     summary_data = contributor_summary.get("summary", {})
                     technical_focus = summary_data.get("technical_focus", [])
-                    if technical_focus:
-                        prompt_parts.append(f"- Technical focus areas: {', '.join(technical_focus[:3])}")
-
-                    # Add key achievements
-                    key_achievements = summary_data.get("key_achievements", [])
-                    if key_achievements:
-                        prompt_parts.append(f"- Key achievements: {', '.join(key_achievements[:2])}")
 
                     # Add work patterns
                     work_patterns = summary_data.get("work_patterns", [])
@@ -223,17 +257,16 @@ class PromptService:
                     )
 
                 prompt_parts.append("")
-                prompt_parts.append("IMPORTANT GUIDELINES:")
-                prompt_parts.append("- Focus exclusively on the technical contributions and achievements shown above")
-                prompt_parts.append("- Use the contributor's technical focus areas and achievements to highlight their expertise")
-                prompt_parts.append("- Emphasize their problem-solving approach and collaboration patterns")
-                prompt_parts.append("- Highlight their consistent work patterns and code quality indicators")
-                prompt_parts.append("- If information is limited, focus on the specific technical achievements provided")
-                prompt_parts.append("- Stay focused on their demonstrated technical capabilities and contributions")
-                prompt_parts.append("- Absolutely no mention of general user profile aspects like overall bio, company, or location")
-                prompt_parts.append("- Do not reference overall follower counts or general repository statistics")
-                prompt_parts.append("- Use only the technical information provided above - do not infer or assume additional technologies")
-                prompt_parts.append("- Emphasize their practical technical achievements and collaborative approach")
+                prompt_parts.append("STORYTELLING GUIDELINES:")
+                prompt_parts.append("- Write as someone who has genuinely worked with this person")
+                prompt_parts.append("- Use phrases like 'I've seen them...', 'They have a knack for...', 'What I appreciate most is...'")
+                prompt_parts.append("- Focus on personal observations and specific examples from their work")
+                prompt_parts.append("- Emphasize their character traits and working style, not just technical skills")
+                prompt_parts.append("- Tell a story about their contributions, don't list technical metrics")
+                prompt_parts.append("- Make it sound like a genuine colleague endorsement")
+                prompt_parts.append("- NEVER mention commit numbers, PR counts, or technical IDs")
+                prompt_parts.append("- Transform technical achievements into workplace stories")
+                prompt_parts.append("- Focus on outcomes and impact, not process metrics")
 
                 # LOG THE COMPLETE PROMPT FOR DEBUGGING
                 final_prompt = "\n".join(prompt_parts)
@@ -295,58 +328,46 @@ class PromptService:
                     prompt_parts.append(f"- Active in organizations: {', '.join(org_names)}")
                     prompt_parts.append("- Demonstrates community involvement and collaboration skills")
 
-        # Add technical skills based on standardized analysis context
-        # This section handles skills for contexts that haven't been fully handled by the repo_only block above
+        # Add human-friendly technical context for profile mode
         if context_type == "profile":
-            # Profile-based skills
-            if languages:
-                top_languages = [getattr(lang, "language", "") for lang in languages[:5]]
-                prompt_parts.append(f"- Programming languages they work with: {', '.join(top_languages)}")
+            prompt_parts.append("")
+            prompt_parts.append("NATURAL OBSERVATIONS ABOUT THEIR TECHNICAL ABILITIES:")
 
-            if skills.get("technical_skills"):
-                prompt_parts.append(f"- Technical skills: {', '.join(skills['technical_skills'][:10])}")
+            # Use story generator for natural technical descriptions
+            stories = self.story_generator.convert_technical_to_story(github_data, context_type)
+            if stories["technical_examples"]:
+                for example in stories["technical_examples"][:3]:
+                    prompt_parts.append(f"- {example}")
 
-            if skills.get("frameworks"):
-                prompt_parts.append(f"- Frameworks and tools: {', '.join(skills['frameworks'])}")
+            # Add personality and collaboration insights
+            if stories["personality_insights"]:
+                prompt_parts.append("")
+                prompt_parts.append("PERSONAL QUALITIES I'VE NOTICED:")
+                for insight in stories["personality_insights"][:2]:
+                    prompt_parts.append(f"- {insight}")
 
-            if skills.get("domains"):
-                prompt_parts.append(f"- Areas they specialize in: {', '.join(skills['domains'])}")
-
-            # Add commit analysis insights with specific examples for profile
+            # Add natural commit analysis insights for profile
             if commit_analysis and commit_analysis.get("total_commits", 0) > 0:
-                prompt_parts.append("\nWhat their overall coding work shows:")
-                specific_examples = self._extract_commit_examples(commit_analysis)
-                if specific_examples:
-                    prompt_parts.append("\nSpecific examples of their work:")
-                    for example in specific_examples[:3]:  # Limit to 3 examples
+                prompt_parts.append("\nWHAT I'VE OBSERVED FROM THEIR OVERALL WORK:")
+
+                # Use story generator to create natural examples
+                stories = self.story_generator.convert_technical_to_story(github_data, context_type)
+                personality_traits = self.story_generator.infer_personality_traits(commit_analysis)
+
+                # Add achievements as natural observations
+                if stories["achievements"]:
+                    for achievement in stories["achievements"][:2]:
+                        prompt_parts.append(f"- {achievement}")
+
+                # Add personality insights
+                if personality_traits:
+                    for trait in personality_traits[:2]:
+                        prompt_parts.append(f"- {trait['description']}")
+
+                # Add collaboration examples
+                if stories["collaboration_examples"]:
+                    for example in stories["collaboration_examples"][:1]:
                         prompt_parts.append(f"- {example}")
-
-                excellence_areas = commit_analysis.get("excellence_areas", {})
-                if excellence_areas.get("primary_strength"):
-                    primary_strength = excellence_areas["primary_strength"].replace("_", " ").title()
-                    prompt_parts.append(f"- Primary strength: {primary_strength}")
-
-                # Add conventional commit insights
-                conventional_analysis = commit_analysis.get("conventional_commit_analysis", {})
-                if conventional_analysis and conventional_analysis.get("quality_score", 0) > 60:
-                    prompt_parts.append("- Uses professional commit message standards (conventional commits)")
-                    prompt_parts.append("- Demonstrates attention to code quality and documentation")
-
-                patterns = excellence_areas.get("patterns", {})
-                if patterns:
-                    top_patterns = list(patterns.keys())[:2]
-                    pattern_str = ", ".join([p.replace("_", " ").title() for p in top_patterns])
-                    prompt_parts.append(f"- How they approach development: {pattern_str}")
-
-                tech_contributions = commit_analysis.get("technical_contributions", {})
-                if tech_contributions:
-                    top_contributions = sorted(
-                        tech_contributions.items(),
-                        key=lambda x: x[1],
-                        reverse=True,
-                    )[:2]
-                    contrib_str = ", ".join([contrib[0].replace("_", " ").title() for contrib in top_contributions])
-                    prompt_parts.append(f"- Technical areas they focus on: {contrib_str}")
 
         elif context_type == "repository_contributor":
             # Repository-contributor context - blend repository and profile data
@@ -417,78 +438,73 @@ class PromptService:
         if custom_prompt:
             prompt_parts.append(f"\nAdditional information to include: {custom_prompt}")
 
-        # Add context-specific guidelines for focused recommendations
+        # Add context-specific storytelling guidelines
         if context_type == "repo_only":
             prompt_parts.extend(
                 [
                     "",
-                    "FOCUSED RECOMMENDATION GUIDELINES:",
-                    "- Focus on the specific technical contributions and achievements detailed above",
-                    "- Use the technical focus areas and key achievements to highlight their expertise",
-                    "- Emphasize their demonstrated problem-solving and collaboration patterns",
-                    "- Highlight their consistent work patterns and technical approach",
-                    "- If information is limited, focus on the specific achievements provided",
-                    "- Stay focused on their technical capabilities and contributions shown",
-                    "- Do not reference other projects or general profile information",
-                    "- Use only the technologies and skills explicitly mentioned above",
-                    "- Emphasize practical technical achievements and collaborative approach",
+                    "HUMAN STORYTELLING APPROACH:",
+                    "- Write as if you worked alongside them on this specific project",
+                    "- Use personal observations: 'I watched them...', 'They consistently...'",
+                    "- Turn technical achievements into workplace stories",
+                    "- Focus on character traits revealed through their work",
+                    "- Describe the impact of their contributions, not the process",
+                    "- Make it feel like a genuine colleague endorsement",
+                    "- Avoid any technical jargon, metrics, or commit references",
+                    "- Tell stories about what they accomplished, not how they coded",
+                    "- Emphasize their reliability, problem-solving, and collaboration",
                 ]
             )
 
-        # Add guidelines based on length
+        # Add natural formatting and storytelling guidelines
         base_guidelines = [
-            "\nCRITICAL FORMATTING INSTRUCTIONS:",
-            "- Write in first person as someone who has worked with this developer",
-            "- **MANDATORY**: Structure your response with clear paragraph breaks using DOUBLE NEWLINES",
+            "\nNATURAL RECOMMENDATION WRITING INSTRUCTIONS:",
+            "- Write as a colleague who genuinely knows and respects this person",
+            "- Use conversational, warm language with personal observations",
+            "- **MANDATORY**: Structure with clear paragraph breaks using DOUBLE NEWLINES",
             "- **FORMAT REQUIREMENT**: Each paragraph MUST be separated by exactly TWO newline characters (\\n\\n)",
-            "- **PARAGRAPH STRUCTURE**: Create 3-4 distinct paragraphs, each containing 2-4 complete sentences",
-            "- **DO NOT** create single-line breaks within paragraphs - only double newlines between paragraphs",
-            "- **EXAMPLE FORMAT**:",
-            "  Paragraph 1 content here with complete thoughts.\\n\\n",
-            "  Paragraph 2 content here with different focus.\\n\\n",
-            "  Paragraph 3 content here with final thoughts.\\n\\n",
-            "- **VERIFICATION**: Ensure there are exactly 2+ blank lines between each paragraph block",
+            "- **PARAGRAPH STRUCTURE**: Create 3-4 distinct paragraphs telling a cohesive story",
+            "- **STORYTELLING FLOW**: Opening impression → Specific examples → Character qualities → Strong endorsement",
+            "- **NATURAL LANGUAGE**: Use 'I've seen...', 'They consistently...', 'What impresses me...' style phrasing",
+            "- **AVOID**: Technical metrics, commit counts, PR numbers, or any robotic language",
+            "- **FOCUS**: Personal qualities, work impact, and genuine professional admiration",
         ]
 
-        # Add context-specific guidelines
+        # Add context-specific natural writing guidelines
         if context_type == "repo_only":
             base_guidelines.extend(
                 [
-                    "- Be specific about technical achievements and skills demonstrated in the work above",
-                    "- Use natural, conversational language, like you're talking to a colleague",
-                    "- Focus on technical competence and collaborative abilities shown in their contributions",
-                    "- Provide specific examples and positive anecdotes from their technical work",
-                    "- Emphasize their problem-solving approach and technical expertise demonstrated",
-                    "- Highlight their consistent work patterns and attention to detail",
-                    "- Focus on their technical skills and collaborative abilities as shown above",
-                    "- **CRITICAL FORMATTING REQUIREMENT**: You MUST separate paragraphs with DOUBLE LINE BREAKS",
-                    "- **MANDATORY**: Use exactly TWO newline characters (\\n\\n) between each paragraph",
-                    "- **STRICT RULE**: NO single line breaks within paragraphs - ONLY double newlines between paragraphs",
-                    "- **OUTPUT FORMAT**: Paragraph1 text here.\\n\\nParagraph2 text here.\\n\\nParagraph3 text here.",
-                    "- **VERIFICATION STEP**: Count your newlines - there should be exactly 2 blank lines between paragraphs",
-                    "- **PARAGRAPH COUNT**: Create exactly 3 paragraphs for optimal readability",
+                    "- Write about specific project work with genuine enthusiasm and respect",
+                    "- Use storytelling: 'During their work on this project, I noticed...'",
+                    "- Transform technical skills into character observations",
+                    "- Share personal anecdotes about their working style and reliability",
+                    "- Describe the positive impact they had on the project outcome",
+                    "- Highlight their problem-solving mindset and collaborative spirit",
+                    "- Make every sentence sound like something a real colleague would say",
+                    "- **HUMAN TONE**: Write with warmth, respect, and genuine professional admiration",
+                    "- **STORY STRUCTURE**: Opening connection → Specific examples → Character traits → Strong endorsement",
+                    "- **NATURAL PHRASING**: 'I've had the pleasure...', 'What stands out...', 'They consistently...'",
+                    "- **PARAGRAPH COUNT**: Create exactly 3 compelling paragraphs",
                     f"- Target length: {self._get_length_guideline(length)} words",
-                    "- Do not include any placeholders or template text",
-                    "- Make it sound natural and personal, like a real recommendation",
+                    "- Write as if recommending a valued colleague to a friend",
                 ]
             )
         else:
             base_guidelines.extend(
                 [
-                    "- Be specific about technical achievements and skills",
-                    "- Use natural, conversational language, like you're talking to a colleague.",
-                    "- Focus on both technical competence and collaborative abilities, providing specific examples and positive anecdotes from their work.",
-                    "- DO NOT mention any company names, employers, or employment history",
-                    "- Focus on technical skills and collaborative abilities only",
-                    "- **CRITICAL FORMATTING REQUIREMENT**: You MUST separate paragraphs with DOUBLE LINE BREAKS",
-                    "- **MANDATORY**: Use exactly TWO newline characters (\\n\\n) between each paragraph",
-                    "- **STRICT RULE**: NO single line breaks within paragraphs - ONLY double newlines between paragraphs",
-                    "- **OUTPUT FORMAT**: Paragraph1 text here.\\n\\nParagraph2 text here.\\n\\nParagraph3 text here.",
-                    "- **VERIFICATION STEP**: Count your newlines - there should be exactly 2 blank lines between paragraphs",
-                    "- **PARAGRAPH COUNT**: Create exactly 3 paragraphs for optimal readability",
+                    "- Write with genuine professional admiration and personal connection",
+                    "- Share specific stories and examples from your working relationship",
+                    "- Focus on character qualities revealed through their technical work",
+                    "- Describe the positive impact they've had on projects and teams",
+                    "- DO NOT mention company names, employers, or employment history",
+                    "- Transform technical skills into personal qualities and work style",
+                    "- **AUTHENTIC VOICE**: Write as someone who truly values this person's contributions",
+                    "- **PERSONAL TOUCH**: Use phrases like 'I've always admired...', 'Time and again...'",
+                    "- **STORY-DRIVEN**: Each paragraph should tell part of their professional story",
+                    "- **WARM TONE**: Professional but personal, like recommending a respected friend",
+                    "- **PARAGRAPH COUNT**: Create exactly 3 engaging paragraphs",
                     f"- Target length: {self._get_length_guideline(length)} words",
-                    "- Do not include any placeholders or template text",
-                    "- Make it sound natural and personal, like a real recommendation",
+                    "- Write as if you genuinely want to help them succeed",
                 ]
             )
 
@@ -716,12 +732,20 @@ Create a recommendation that really highlights their {focus_formatted} skills wh
         user_data = github_data.get("user_data", {})
         repository_info = github_data.get("repository_info", {})
 
-        username = user_data.get("github_username")
-        if not username and repository_info:
-            # Only use repository owner as fallback if we don't have user_data
-            username = repository_info.get("owner", {}).get("login")
-        if not username:
-            username = "the developer"
+        # Extract first name for more personal references
+        first_name = self._extract_first_name(user_data.get("full_name", ""))
+
+        # Fallback to username if no first name available
+        if not first_name:
+            username = user_data.get("github_username")
+            if not username and repository_info:
+                # Only use repository owner as fallback if we don't have user_data
+                username = repository_info.get("owner", {}).get("login")
+            if not username:
+                username = "the developer"
+            person_reference = username
+        else:
+            person_reference = first_name
 
         target_length = self._get_length_guideline(length)
 
@@ -743,7 +767,7 @@ WHAT TO CHANGE:
 {refinement_instructions}
 
 DETAILS:
-- Person: {username}
+- Person: {person_reference}
 - Type: {recommendation_type}
 - Tone: {tone}
 - Target Length: {target_length} words{exclude_section}
@@ -1045,7 +1069,7 @@ Just give me the updated recommendation text, nothing else.
 
         return "\n".join(prompt_parts)
 
-    def extract_title(self, content: str, username: str) -> str:
+    def extract_title(self, content: str, username: str, first_name: Optional[str] = None, display_name: Optional[str] = None) -> str:
         """Extract or generate a title for the recommendation."""
         # Simple title extraction - could be enhanced
         if content:
@@ -1053,7 +1077,9 @@ Just give me the updated recommendation text, nothing else.
             if len(first_sentence) < 100:
                 return first_sentence.strip()
 
-        return f"Professional Recommendation for {username}"
+        # Use display_name if provided, else first name if available, otherwise fall back to username
+        person_name = display_name if display_name else (first_name if first_name else username)
+        return f"Professional Recommendation for {person_name}"
 
     def _contains_profile_data(self, data: Dict[str, Any]) -> bool:
         """Check if data contains general profile information that should be excluded in repo_only mode."""
@@ -1192,3 +1218,40 @@ Just give me the updated recommendation text, nothing else.
                 validation_result["warnings"].append(f"Potential profile header '{header}' found in main content")
 
         return validation_result
+
+    def _extract_first_name(self, full_name: str) -> str:
+        """Extract first name from full name."""
+        if not full_name:
+            return ""
+        parts = full_name.strip().split()
+        return parts[0] if parts else ""
+
+    def _extract_name_from_username(self, username: str) -> str:
+        """Extract a likely first name from username patterns."""
+        if not username:
+            return ""
+
+        # Common patterns: DailyDisco -> Diego, JohnSmith123 -> John, etc.
+        username_lower = username.lower()
+
+        # Check for common name patterns in usernames
+        name_patterns = {"john": "John", "jane": "Jane", "mike": "Mike", "michael": "Michael", "chris": "Chris", "christopher": "Christopher", "alex": "Alex", "alexander": "Alexander"}
+
+        # Direct match
+        if username_lower in name_patterns:
+            return name_patterns[username_lower]
+
+        # Check if username starts with a known name
+        for pattern, name in name_patterns.items():
+            if username_lower.startswith(pattern):
+                return name
+
+        # If no pattern match, try to capitalize first part of username
+        # Remove numbers and special characters, take first meaningful part
+        import re
+
+        clean_username = re.sub(r"[0-9_\-\.]+", "", username)
+        if len(clean_username) >= 3:
+            return clean_username[0].upper() + clean_username[1:].lower()
+
+        return ""

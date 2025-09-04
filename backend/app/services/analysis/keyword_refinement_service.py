@@ -46,6 +46,9 @@ class KeywordRefinementService:
         if not self.client:
             raise ValueError("Gemini AI not configured")
 
+        # Extract first name for consistent naming
+        first_name = self.prompt_service._extract_first_name(github_data["user_data"].get("full_name", ""))
+
         if regeneration_params is None:
             regeneration_params = {}
 
@@ -85,7 +88,7 @@ class KeywordRefinementService:
 
             return {
                 "refined_content": formatted_content.strip(),
-                "refined_title": self.prompt_service.extract_title(formatted_content, github_data["user_data"]["github_username"]),
+                "refined_title": self.prompt_service.extract_title(formatted_content, github_data["user_data"]["github_username"], first_name),
                 "word_count": len(formatted_content.split()),
                 "include_keywords_used": validation["include_compliance"],
                 "exclude_keywords_avoided": validation["exclude_compliance"],

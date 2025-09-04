@@ -182,6 +182,6 @@ class AIService:
         """Extract specific, concrete examples from commit analysis."""
         return self.prompt_service._extract_commit_examples(commit_analysis)
 
-    def _extract_title(self, content: str, username: str) -> str:
+    def _extract_title(self, content: str, username: str, first_name: Optional[str] = None) -> str:
         """Extract or generate a title for the recommendation."""
-        return self.prompt_service.extract_title(content, username)
+        return self.prompt_service.extract_title(content, username, first_name)

@@ -12,7 +12,7 @@ from app.core.database import AsyncSessionLocal
 from app.core.exceptions import DatabaseError
 from app.core.redis_client import get_redis
 from app.models.user import User
-from app.services.ai.ai_service import AIService
+from app.services.ai.ai_service_new import AIService
 from app.services.analysis.profile_analysis_service import ProfileAnalysisService
 from app.services.analysis.skill_analysis_service import SkillAnalysisService
 from app.services.github.github_commit_service import GitHubCommitService

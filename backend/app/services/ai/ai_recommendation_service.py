@@ -6,6 +6,7 @@ from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from app.core.config import settings
 from app.core.redis_client import get_cache, set_cache
+from app.services.ai.human_story_generator import HumanStoryGenerator
 from app.services.ai.prompt_service import PromptService
 
 # Handle optional Google Generative AI import
@@ -28,6 +29,7 @@ class AIRecommendationService:
     def __init__(self, prompt_service: PromptService) -> None:
         """Initialize recommendation service."""
         self.prompt_service = prompt_service
+        self.story_generator = HumanStoryGenerator()
         self.client = None
         if genai and settings.GEMINI_API_KEY:
             # Create client with API key
@@ -55,6 +57,7 @@ class AIRecommendationService:
         analysis_context_type: str = "profile",
         repository_url: Optional[str] = None,
         force_refresh: bool = False,
+        display_name: Optional[str] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """Generate a LinkedIn recommendation with streaming progress updates."""
 
@@ -90,6 +93,7 @@ class AIRecommendationService:
                 focus_weights=focus_weights,
                 analysis_context_type=analysis_context_type,
                 repository_url=repository_url,
+                display_name=display_name,
             )
 
             # Stage 3: Identifying key contributions
@@ -151,6 +155,7 @@ class AIRecommendationService:
             # Generate options with progress updates
             options = []
             base_username = github_data["user_data"]["github_username"]
+            first_name = self.prompt_service._extract_first_name(github_data["user_data"].get("full_name", ""))
 
             option_configs = [
                 {
@@ -203,7 +208,7 @@ class AIRecommendationService:
                     "id": i,
                     "name": config["name"],
                     "content": option_content.strip(),
-                    "title": self.prompt_service.extract_title(option_content, base_username),
+                    "title": self.prompt_service.extract_title(option_content, base_username, first_name, display_name),
                     "word_count": len(option_content.split()),
                     "focus": config["focus"],
                     "validation_results": validation_results,
@@ -275,6 +280,9 @@ class AIRecommendationService:
             raise ValueError("Gemini AI not configured")
 
         try:
+            # Extract first name for consistent naming
+            first_name = self.prompt_service._extract_first_name(github_data["user_data"].get("full_name", ""))
+
             # Stage 1: Initializing
             yield {
                 "stage": "Preparing refinement...",
@@ -343,7 +351,7 @@ class AIRecommendationService:
             # Return refined result
             result = {
                 "content": refined_content.strip(),
-                "title": self.prompt_service.extract_title(refined_content, github_data["user_data"]["github_username"]),
+                "title": self.prompt_service.extract_title(refined_content, github_data["user_data"]["github_username"], first_name),
                 "word_count": len(refined_content.split()),
                 "generation_parameters": regeneration_params,
             }
@@ -381,6 +389,7 @@ class AIRecommendationService:
         analysis_context_type: str = "profile",
         repository_url: Optional[str] = None,
         force_refresh: bool = False,
+        display_name: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Generate a LinkedIn recommendation using AI."""
 
@@ -405,6 +414,7 @@ class AIRecommendationService:
                 focus_weights=focus_weights,
                 analysis_context_type=analysis_context_type,
                 repository_url=repository_url,
+                display_name=display_name,
             )
 
             if settings.ENVIRONMENT == "development":
@@ -453,6 +463,7 @@ class AIRecommendationService:
                 length=length,
                 focus_keywords=focus_keywords,
                 focus_weights=focus_weights,
+                display_name=display_name,
             )
 
             # Process and format the response
@@ -488,6 +499,7 @@ class AIRecommendationService:
         length: str,
         focus_keywords: Optional[List[str]] = None,
         focus_weights: Optional[Dict[str, float]] = None,
+        display_name: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """Generate 2 different recommendation options."""
         import time
@@ -498,6 +510,7 @@ class AIRecommendationService:
 
         options = []
         base_username = github_data["user_data"]["github_username"]
+        first_name = self.prompt_service._extract_first_name(github_data["user_data"].get("full_name", ""))
 
         # Generate 2 different options with varying approaches
         option_configs = [
@@ -551,7 +564,7 @@ class AIRecommendationService:
                 "id": i,
                 "name": config["name"],
                 "content": option_content.strip(),
-                "title": self.prompt_service.extract_title(option_content, base_username),
+                "title": self.prompt_service.extract_title(option_content, base_username, first_name, display_name),
                 "word_count": len(option_content.split()),
                 "focus": config["focus"],
                 "validation_results": validation_results,
@@ -574,7 +587,7 @@ class AIRecommendationService:
 
         return options
 
-    def _generate_option_explanation(self, option_content: str, option_name: str, focus: str, github_data: Dict[str, Any]) -> str:
+    def _generate_option_explanation(self, option_content: str, option_name: str, focus: str, github_data: Dict[str, Any], display_name: Optional[str] = None) -> str:
         """Generate a concise explanation for why to choose this recommendation option."""
         try:
             # Analyze the option content to understand its key characteristics
@@ -634,13 +647,14 @@ class AIRecommendationService:
         length: str,
         focus_keywords: Optional[List[str]] = None,
         focus_weights: Optional[Dict[str, float]] = None,
+        display_name: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """Generate multiple recommendation options with explanations."""
-        options = await self._generate_multiple_options(initial_prompt, github_data, recommendation_type, tone, length, focus_keywords, focus_weights)
+        options = await self._generate_multiple_options(initial_prompt, github_data, recommendation_type, tone, length, focus_keywords, focus_weights, display_name)
 
         # Add explanations to each option
         for option in options:
-            explanation = self._generate_option_explanation(option["content"], option["name"], option["focus"], github_data)
+            explanation = self._generate_option_explanation(option["content"], option["name"], option["focus"], github_data, display_name)
             option["explanation"] = explanation
 
         return options
@@ -674,6 +688,13 @@ class AIRecommendationService:
         # Apply formatting
         formatted_content = self._format_recommendation_output(raw_content, length, generation_params)
 
+        # Validate naturalness using story generator
+        try:
+            naturalness_validation = self.story_generator.validate_naturalness(formatted_content)
+        except Exception as e:
+            logger.error(f"Error in naturalness validation: {e}")
+            naturalness_validation = {"is_natural": True, "naturalness_score": 85, "issues": [f"Naturalness validation error: {str(e)}"], "suggestions": ["Review naturalness validation logic"]}
+
         # Validate the structure
         validation = self._validate_recommendation_structure(formatted_content, generation_params)
 
@@ -683,19 +704,30 @@ class AIRecommendationService:
             semantic_validation = self._validate_semantic_alignment(formatted_content, github_data, generation_params)
             generic_validation = self._detect_generic_content(formatted_content)
 
-            # Combine validation results
+            # Combine validation results including naturalness
             combined_validation = {
                 "structure_valid": validation["is_valid"],
                 "semantically_aligned": semantic_validation["is_aligned"],
                 "not_too_generic": not generic_validation["is_too_generic"],
-                "overall_quality_score": min(validation.get("structure_score", 100), semantic_validation.get("alignment_score", 100), max(0, 100 - generic_validation.get("generic_score", 0))),
-                "issues": validation["issues"] + semantic_validation["issues"] + generic_validation["issues"],
-                "suggestions": validation["suggestions"] + semantic_validation["suggestions"] + generic_validation["suggestions"],
+                "is_natural": naturalness_validation.get("is_natural", True),
+                "naturalness_score": naturalness_validation.get("naturalness_score", 85),
+                "overall_quality_score": min(
+                    validation.get("structure_score", 100),
+                    semantic_validation.get("alignment_score", 100),
+                    max(0, 100 - generic_validation.get("generic_score", 0)),
+                    naturalness_validation.get("naturalness_score", 85),
+                ),
+                "issues": validation["issues"] + semantic_validation["issues"] + generic_validation["issues"] + naturalness_validation.get("issues", []),
+                "suggestions": validation["suggestions"] + semantic_validation["suggestions"] + generic_validation["suggestions"] + naturalness_validation.get("suggestions", []),
                 "semantic_coverage": semantic_validation.get("data_coverage", {}),
                 "generic_indicators": {
                     "buzzwords": generic_validation.get("buzzwords_detected", []),
                     "generic_phrases": generic_validation.get("generic_phrases_detected", []),
                     "vague_descriptors": generic_validation.get("vague_descriptors_detected", []),
+                },
+                "naturalness_indicators": {
+                    "robotic_phrases": [issue for issue in naturalness_validation.get("issues", []) if "robotic phrase" in issue],
+                    "technical_jargon": [issue for issue in naturalness_validation.get("issues", []) if "technical jargon" in issue],
                 },
             }
 
@@ -706,20 +738,34 @@ class AIRecommendationService:
                     logger.warning(f"⚠️  Semantic alignment issues: {semantic_validation['issues']}")
                 if combined_validation["not_too_generic"] is False:
                     logger.warning(f"⚠️  Generic content detected: {generic_validation['issues']}")
+                if not combined_validation["is_natural"]:
+                    logger.warning(f"⚠️  Naturalness issues detected: {naturalness_validation['issues']}")
                 if combined_validation["suggestions"]:
-                    logger.info(f"💡 Quality improvement suggestions: {combined_validation['suggestions']}")
+                    logger.info(f"💡 Quality improvement suggestions: {combined_validation['suggestions'][:3]}")
 
                 logger.info(f"📊 Overall quality score: {combined_validation['overall_quality_score']}/100")
 
             return formatted_content, combined_validation
 
-        # Legacy validation for backward compatibility
-        if settings.ENVIRONMENT == "development" and not validation["is_valid"]:
-            logger.warning(f"⚠️  Content validation issues: {validation['issues']}")
-            if validation["suggestions"]:
-                logger.info(f"💡 Suggestions: {validation['suggestions']}")
+        # Legacy validation for backward compatibility with naturalness validation
+        legacy_validation = {
+            "structure_valid": validation["is_valid"],
+            "is_natural": naturalness_validation["is_natural"],
+            "naturalness_score": naturalness_validation["naturalness_score"],
+            "overall_quality_score": min(validation.get("structure_score", 100), naturalness_validation["naturalness_score"]),
+            "issues": validation["issues"] + naturalness_validation["issues"],
+            "suggestions": validation["suggestions"] + naturalness_validation["suggestions"],
+        }
 
-        return formatted_content
+        if settings.ENVIRONMENT == "development":
+            if not validation["is_valid"]:
+                logger.warning(f"⚠️  Content validation issues: {validation['issues']}")
+            if not naturalness_validation["is_natural"]:
+                logger.warning(f"⚠️  Naturalness issues detected: {naturalness_validation['issues']}")
+            if legacy_validation["suggestions"]:
+                logger.info(f"💡 Suggestions: {legacy_validation['suggestions'][:3]}")
+
+        return formatted_content, legacy_validation
 
     def _format_recommendation_output(self, content: str, length_guideline: str, generation_params: Optional[Dict[str, Any]] = None) -> str:
         """Format and structure the AI-generated recommendation output."""
@@ -812,13 +858,15 @@ class AIRecommendationService:
         # Final cleaning and joining
         cleaned_paragraphs = []
         for para in paragraphs:
-            cleaned = " ".join(para.split())  # Remove excessive whitespace
+            # Replace single newlines within a paragraph with a space, then remove excessive whitespace
+            cleaned = " ".join(para.replace("\n", " ").split())
             if cleaned and not cleaned.endswith((".", "!", "?")):  # Ensure proper sentence endings
                 cleaned += "."
             if cleaned and len(cleaned) > 1:  # Capitalize first letter
                 cleaned = cleaned[0].upper() + cleaned[1:]
             cleaned_paragraphs.append(cleaned)
 
+        # Explicitly join with double newlines
         final_content = "\n\n".join(cleaned_paragraphs)
         logger.debug(f"Final content before tone formatting (first 100 chars): {final_content[:100]}...")
 
@@ -1076,6 +1124,9 @@ class AIRecommendationService:
             logger.info("🔄 REGENERATING RECOMMENDATION")
             logger.info("=" * 60)
 
+            # Extract first name for consistent naming
+            first_name = self.prompt_service._extract_first_name(github_data["user_data"].get("full_name", ""))
+
             # Build refinement prompt
             refinement_prompt = self.prompt_service.build_refinement_prompt_for_regeneration(
                 original_content=original_content,
@@ -1107,7 +1158,7 @@ class AIRecommendationService:
             # Return refined result
             result = {
                 "content": refined_content.strip(),
-                "title": self.prompt_service.extract_title(refined_content, github_data["user_data"]["github_username"]),
+                "title": self.prompt_service.extract_title(refined_content, github_data["user_data"]["github_username"], first_name),
                 "word_count": len(refined_content.split()),
                 "generation_parameters": regeneration_params,
             }

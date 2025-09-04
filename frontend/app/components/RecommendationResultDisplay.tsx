@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkBreaks from 'remark-breaks';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import {
@@ -261,10 +262,14 @@ export default function RecommendationResultDisplay({
               <div className='prose prose-sm max-w-none mb-4'>
                 <div className='font-sans text-sm bg-muted p-4 rounded-md'>
                   <ReactMarkdown
+                    remarkPlugins={[remarkBreaks]}
                     components={{
                       p: ({ children }) => (
-                        <p className='mb-3 leading-relaxed'>{children}</p>
+                        <p className='mb-4 leading-relaxed text-gray-700'>
+                          {children}
+                        </p>
                       ),
+                      br: () => <br className='my-2' />,
                     }}
                   >
                     {currentContent}
@@ -285,6 +290,14 @@ export default function RecommendationResultDisplay({
                   </div>
                   <div>
                     Paragraph count: {currentContent.split('\n\n').length}
+                  </div>
+                  <div>
+                    Processed paragraphs:{' '}
+                    {currentContent
+                      .split('\n\n')
+                      .filter(p => p.trim())
+                      .map((p, i) => `[${i + 1}] ${p.slice(0, 50)}...`)
+                      .join(' | ')}
                   </div>
                   <div>
                     Raw preview:{' '}
