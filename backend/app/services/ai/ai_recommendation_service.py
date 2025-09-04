@@ -1,6 +1,7 @@
 """AI Recommendation Service for generating LinkedIn recommendations."""
 
 import logging
+import re
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from app.core.config import settings
@@ -48,6 +49,8 @@ class AIRecommendationService:
         target_role: Optional[str] = None,
         specific_skills: Optional[list] = None,
         exclude_keywords: Optional[list] = None,
+        focus_keywords: Optional[List[str]] = None,
+        focus_weights: Optional[Dict[str, float]] = None,
         dynamic_params: Optional[Dict[str, Any]] = None,
         analysis_context_type: str = "profile",
         repository_url: Optional[str] = None,
@@ -83,6 +86,8 @@ class AIRecommendationService:
                 target_role=target_role,
                 specific_skills=specific_skills,
                 exclude_keywords=exclude_keywords,
+                focus_keywords=focus_keywords,
+                focus_weights=focus_weights,
                 analysis_context_type=analysis_context_type,
                 repository_url=repository_url,
             )
@@ -95,14 +100,25 @@ class AIRecommendationService:
             }
 
             # Check cache for final result - include analysis context in cache key
-            context_suffix = ""
-            if analysis_context_type != "profile":
-                context_suffix = f":{analysis_context_type}"
+            # CRITICAL: Separate cache keys for different contexts to prevent data contamination
+            if analysis_context_type == "repo_only":
+                # Use separate cache namespace for repo_only to ensure complete isolation
                 if repository_url:
                     repo_path = repository_url.replace("https://github.com/", "").split("?")[0]
-                    context_suffix += f":{repo_path}"
+                    cache_key = f"ai_recommendation_repo_only:{hash(initial_prompt)}:{repo_path}"
+                else:
+                    cache_key = f"ai_recommendation_repo_only:{hash(initial_prompt)}"
+                logger.info(f"🔒 Using isolated cache key for repo_only context: {cache_key}")
+            else:
+                # Original caching logic for other contexts
+                context_suffix = ""
+                if analysis_context_type != "profile":
+                    context_suffix = f":{analysis_context_type}"
+                    if repository_url:
+                        repo_path = repository_url.replace("https://github.com/", "").split("?")[0]
+                        context_suffix += f":{repo_path}"
 
-            cache_key = f"ai_recommendation_v3:{hash(initial_prompt)}{context_suffix}"
+                cache_key = f"ai_recommendation_v3:{hash(initial_prompt)}{context_suffix}"
 
             # Skip cache if force_refresh is requested
             if not force_refresh:
@@ -149,16 +165,10 @@ class AIRecommendationService:
                     "temperature_modifier": 0.2,
                     "custom_instruction": "Emphasize teamwork and collaborative abilities.",
                 },
-                {
-                    "name": "Option 3",
-                    "focus": "leadership_growth",
-                    "temperature_modifier": 0.15,
-                    "custom_instruction": "Highlight leadership potential and growth mindset.",
-                },
             ]
 
             for i, config in enumerate(option_configs, 1):
-                progress = 50 + (i * 15)  # 65%, 80%, 95%
+                progress = 50 + (i * 20)  # 70%, 90%
                 yield {
                     "stage": f"Drafting {config['name']}...",
                     "progress": progress,
@@ -170,6 +180,8 @@ class AIRecommendationService:
                     initial_prompt,
                     str(config["custom_instruction"]),
                     str(config["focus"]),
+                    focus_keywords,
+                    focus_weights,
                 )
 
                 # Generate the option
@@ -184,7 +196,7 @@ class AIRecommendationService:
                     "focus": config["focus"],
                 }
 
-                option_content = await self._generate_single_option(option_prompt, temp_modifier, length, option_gen_params)
+                option_content, validation_results = await self._generate_single_option(option_prompt, temp_modifier, length, option_gen_params, github_data)
 
                 # Create option object
                 option = {
@@ -194,6 +206,7 @@ class AIRecommendationService:
                     "title": self.prompt_service.extract_title(option_content, base_username),
                     "word_count": len(option_content.split()),
                     "focus": config["focus"],
+                    "validation_results": validation_results,
                 }
 
                 options.append(option)
@@ -363,6 +376,8 @@ class AIRecommendationService:
         target_role: Optional[str] = None,
         specific_skills: Optional[list] = None,
         exclude_keywords: Optional[list] = None,
+        focus_keywords: Optional[List[str]] = None,
+        focus_weights: Optional[Dict[str, float]] = None,
         analysis_context_type: str = "profile",
         repository_url: Optional[str] = None,
         force_refresh: bool = False,
@@ -386,6 +401,8 @@ class AIRecommendationService:
                 target_role=target_role,
                 specific_skills=specific_skills,
                 exclude_keywords=exclude_keywords,
+                focus_keywords=focus_keywords,
+                focus_weights=focus_weights,
                 analysis_context_type=analysis_context_type,
                 repository_url=repository_url,
             )
@@ -394,14 +411,25 @@ class AIRecommendationService:
                 logger.info(f"✅ Prompt built with {len(initial_prompt)} characters")
 
             # Check cache for final result - include analysis context in cache key
-            context_suffix = ""
-            if analysis_context_type != "profile":
-                context_suffix = f":{analysis_context_type}"
+            # CRITICAL: Separate cache keys for different contexts to prevent data contamination
+            if analysis_context_type == "repo_only":
+                # Use separate cache namespace for repo_only to ensure complete isolation
                 if repository_url:
                     repo_path = repository_url.replace("https://github.com/", "").split("?")[0]
-                    context_suffix += f":{repo_path}"
+                    cache_key = f"ai_recommendation_repo_only:{hash(initial_prompt)}:{repo_path}"
+                else:
+                    cache_key = f"ai_recommendation_repo_only:{hash(initial_prompt)}"
+                logger.info(f"🔒 Using isolated cache key for repo_only context: {cache_key}")
+            else:
+                # Original caching logic for other contexts
+                context_suffix = ""
+                if analysis_context_type != "profile":
+                    context_suffix = f":{analysis_context_type}"
+                    if repository_url:
+                        repo_path = repository_url.replace("https://github.com/", "").split("?")[0]
+                        context_suffix += f":{repo_path}"
 
-            cache_key = f"ai_recommendation_v3:{hash(initial_prompt)}{context_suffix}"
+                cache_key = f"ai_recommendation_v3:{hash(initial_prompt)}{context_suffix}"
 
             # Skip cache if force_refresh is requested
             if not force_refresh:
@@ -416,13 +444,15 @@ class AIRecommendationService:
                 else:
                     logger.info("🚀 CACHE MISS: Starting multi-option generation...")
 
-            # Generate 3 different recommendation options with explanations
+            # Generate 2 different recommendation options with explanations
             options = await self._generate_multiple_options_with_explanations(
                 initial_prompt=initial_prompt,
                 github_data=github_data,
                 recommendation_type=recommendation_type,
                 tone=tone,
                 length=length,
+                focus_keywords=focus_keywords,
+                focus_weights=focus_weights,
             )
 
             # Process and format the response
@@ -456,8 +486,10 @@ class AIRecommendationService:
         recommendation_type: str,
         tone: str,
         length: str,
+        focus_keywords: Optional[List[str]] = None,
+        focus_weights: Optional[Dict[str, float]] = None,
     ) -> List[Dict[str, Any]]:
-        """Generate 3 different recommendation options."""
+        """Generate 2 different recommendation options."""
         import time
 
         logger.info("🎭 GENERATING MULTIPLE OPTIONS")
@@ -467,7 +499,7 @@ class AIRecommendationService:
         options = []
         base_username = github_data["user_data"]["github_username"]
 
-        # Generate 3 different options with varying approaches
+        # Generate 2 different options with varying approaches
         option_configs = [
             {
                 "name": "Option 1",
@@ -481,12 +513,6 @@ class AIRecommendationService:
                 "temperature_modifier": 0.2,
                 "custom_instruction": "Emphasize teamwork and collaborative abilities.",
             },
-            {
-                "name": "Option 3",
-                "focus": "leadership_growth",
-                "temperature_modifier": 0.15,
-                "custom_instruction": "Highlight leadership potential and growth mindset.",
-            },
         ]
 
         for i, config in enumerate(option_configs, 1):
@@ -499,6 +525,8 @@ class AIRecommendationService:
                 initial_prompt,
                 str(config["custom_instruction"]),
                 str(config["focus"]),
+                focus_keywords,
+                focus_weights,
             )
 
             # Generate the option
@@ -514,7 +542,7 @@ class AIRecommendationService:
                 "focus": config["focus"],
             }
 
-            option_content = await self._generate_single_option(option_prompt, temp_modifier, length, option_gen_params)
+            option_content, validation_results = await self._generate_single_option(option_prompt, temp_modifier, length, option_gen_params, github_data)
 
             option_end = time.time()
 
@@ -526,6 +554,7 @@ class AIRecommendationService:
                 "title": self.prompt_service.extract_title(option_content, base_username),
                 "word_count": len(option_content.split()),
                 "focus": config["focus"],
+                "validation_results": validation_results,
             }
 
             options.append(option)
@@ -603,9 +632,11 @@ class AIRecommendationService:
         recommendation_type: str,
         tone: str,
         length: str,
+        focus_keywords: Optional[List[str]] = None,
+        focus_weights: Optional[Dict[str, float]] = None,
     ) -> List[Dict[str, Any]]:
         """Generate multiple recommendation options with explanations."""
-        options = await self._generate_multiple_options(initial_prompt, github_data, recommendation_type, tone, length)
+        options = await self._generate_multiple_options(initial_prompt, github_data, recommendation_type, tone, length, focus_keywords, focus_weights)
 
         # Add explanations to each option
         for option in options:
@@ -614,7 +645,9 @@ class AIRecommendationService:
 
         return options
 
-    async def _generate_single_option(self, prompt: str, temperature_modifier: float, length: str = "medium", generation_params: Optional[Dict[str, Any]] = None) -> str:
+    async def _generate_single_option(
+        self, prompt: str, temperature_modifier: float, length: str = "medium", generation_params: Optional[Dict[str, Any]] = None, github_data: Optional[Dict[str, Any]] = None
+    ) -> tuple[str, Optional[Dict[str, Any]]]:
         """Generate a single recommendation option with formatting."""
         if not self.client or not genai_available:
             raise ValueError("AI client not initialized")
@@ -631,12 +664,56 @@ class AIRecommendationService:
         # Get the raw content
         raw_content = response.candidates[0].content.parts[0].text
 
+        # Debug: Log raw AI output to see what we're working with
+        logger.info(f"🔍 RAW AI OUTPUT (length: {len(raw_content)} chars):")
+        logger.info(f"🔍 First 300 chars: {raw_content[:300]}...")
+        double_newlines = "\n\n" in raw_content
+        logger.info(f"🔍 Contains double newlines: {double_newlines}")
+        logger.info(f"🔍 Number of sentences (estimated): {len(raw_content.split('.'))}")
+
         # Apply formatting
         formatted_content = self._format_recommendation_output(raw_content, length, generation_params)
 
         # Validate the structure
         validation = self._validate_recommendation_structure(formatted_content, generation_params)
 
+        # Enhanced validation with semantic alignment and generic content detection
+        if generation_params and github_data is not None:
+            # Get github_data from generation_params or assume it's passed through
+            semantic_validation = self._validate_semantic_alignment(formatted_content, github_data, generation_params)
+            generic_validation = self._detect_generic_content(formatted_content)
+
+            # Combine validation results
+            combined_validation = {
+                "structure_valid": validation["is_valid"],
+                "semantically_aligned": semantic_validation["is_aligned"],
+                "not_too_generic": not generic_validation["is_too_generic"],
+                "overall_quality_score": min(validation.get("structure_score", 100), semantic_validation.get("alignment_score", 100), max(0, 100 - generic_validation.get("generic_score", 0))),
+                "issues": validation["issues"] + semantic_validation["issues"] + generic_validation["issues"],
+                "suggestions": validation["suggestions"] + semantic_validation["suggestions"] + generic_validation["suggestions"],
+                "semantic_coverage": semantic_validation.get("data_coverage", {}),
+                "generic_indicators": {
+                    "buzzwords": generic_validation.get("buzzwords_detected", []),
+                    "generic_phrases": generic_validation.get("generic_phrases_detected", []),
+                    "vague_descriptors": generic_validation.get("vague_descriptors_detected", []),
+                },
+            }
+
+            if settings.ENVIRONMENT == "development":
+                if not combined_validation["structure_valid"]:
+                    logger.warning(f"⚠️  Structure validation issues: {validation['issues']}")
+                if not combined_validation["semantically_aligned"]:
+                    logger.warning(f"⚠️  Semantic alignment issues: {semantic_validation['issues']}")
+                if combined_validation["not_too_generic"] is False:
+                    logger.warning(f"⚠️  Generic content detected: {generic_validation['issues']}")
+                if combined_validation["suggestions"]:
+                    logger.info(f"💡 Quality improvement suggestions: {combined_validation['suggestions']}")
+
+                logger.info(f"📊 Overall quality score: {combined_validation['overall_quality_score']}/100")
+
+            return formatted_content, combined_validation
+
+        # Legacy validation for backward compatibility
         if settings.ENVIRONMENT == "development" and not validation["is_valid"]:
             logger.warning(f"⚠️  Content validation issues: {validation['issues']}")
             if validation["suggestions"]:
@@ -649,95 +726,107 @@ class AIRecommendationService:
         if not content or not content.strip():
             return content
 
-        # Clean up the content
-        formatted_content = content.strip()
+        logger.debug(f"Formatting started for content (first 100 chars): {content[:100]}...")
 
-        # Split into paragraphs and clean up
+        # 1. Remove Markdown for bold and italics
+        # Regex to find **text**, __text__, *text*, _text_ and replace with just text
+        cleaned_content = re.sub(r"\*\*(.*?)\*\*|__(.*?)__|\*(.*?)\*|_(.*?)_", r"\1\2\3\4", content)
+        logger.debug(f"After markdown removal (first 100 chars): {cleaned_content[:100]}...")
+
+        # Clean up the content (remove excessive whitespace and strip leading/trailing)
+        formatted_content = cleaned_content.strip()
+
+        # 2. Initial splitting into paragraphs
+        # Try splitting by double newlines first for explicit breaks
         paragraphs = [p.strip() for p in formatted_content.split("\n\n") if p.strip()]
+        logger.debug(f"After initial split (found {len(paragraphs)} paragraphs): {paragraphs[:2]}...")
 
-        # If we don't have clear paragraphs, try to detect them
+        # If few paragraphs, try to split by sentences to form more natural paragraphs
         if len(paragraphs) <= 1:
-            # Split on double newlines or look for paragraph breaks
-            potential_paragraphs = formatted_content.split("\n\n")
-            if len(potential_paragraphs) <= 1:
-                # Try to split on single newlines or sentence patterns
-                sentences = [s.strip() for s in formatted_content.split(".") if s.strip()]
-                if len(sentences) > 5:
-                    # Group sentences into paragraphs
-                    paragraphs = []
-                    current_paragraph = []
-                    sentences_per_paragraph = max(2, len(sentences) // 3)  # Aim for 3 paragraphs
+            sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", formatted_content) if s.strip()]
 
-                    for i, sentence in enumerate(sentences):
-                        current_paragraph.append(sentence + ".")
-                        if (i + 1) % sentences_per_paragraph == 0 or i == len(sentences) - 1:
-                            paragraphs.append(" ".join(current_paragraph))
-                            current_paragraph = []
-                else:
-                    paragraphs = [formatted_content]
+            if len(sentences) > 2:  # Only re-paragraph if there are enough sentences
+                paragraphs = []
+                current_paragraph_sentences = []
 
-        # Ensure proper paragraph count based on length guideline
+                # Determine target sentences per paragraph based on overall length and target paragraphs
+                target_paragraphs = self._get_target_paragraphs(length_guideline)
+                sentences_per_paragraph = max(2, len(sentences) // target_paragraphs)
+
+                for i, sentence in enumerate(sentences):
+                    current_paragraph_sentences.append(sentence)
+                    if len(current_paragraph_sentences) >= sentences_per_paragraph and (len(paragraphs) < target_paragraphs - 1 or i == len(sentences) - 1):
+                        paragraphs.append(" ".join(current_paragraph_sentences))
+                        current_paragraph_sentences = []
+
+                # Add any remaining sentences as the last paragraph
+                if current_paragraph_sentences:
+                    paragraphs.append(" ".join(current_paragraph_sentences))
+            else:
+                paragraphs = [formatted_content]  # Fallback if not enough sentences for splitting
+            logger.debug(f"After sentence-based re-paragraphing (found {len(paragraphs)} paragraphs): {paragraphs[:2]}...")
+
+        # 3. Ensure proper paragraph count based on length guideline
         target_paragraphs = self._get_target_paragraphs(length_guideline)
 
-        if len(paragraphs) < target_paragraphs:
-            # Try to split longer paragraphs
-            expanded_paragraphs: List[str] = []
+        # Dynamic adjustment of paragraphs
+        # If we have too few, try to split longer ones
+        while len(paragraphs) < target_paragraphs and any(len(p.split()) > 70 for p in paragraphs):
+            new_paragraphs = []
+            made_split = False
             for para in paragraphs:
-                if len(expanded_paragraphs) >= target_paragraphs:
-                    expanded_paragraphs.append(para)
-                    break
-
-                sentences = [s.strip() for s in para.split(".") if s.strip()]
-                if len(sentences) > 3 and len(expanded_paragraphs) < target_paragraphs - 1:
-                    # Split this paragraph
-                    mid_point = len(sentences) // 2
-                    first_half = ". ".join(sentences[:mid_point]) + "."
-                    second_half = ". ".join(sentences[mid_point:]) + "."
-                    expanded_paragraphs.extend([first_half, second_half])
+                if len(para.split()) > 70 and len(new_paragraphs) < target_paragraphs - 1:  # Prevent endless splitting
+                    sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", para) if s.strip()]
+                    if len(sentences) > 2:
+                        mid_point = len(sentences) // 2
+                        new_paragraphs.append(" ".join(sentences[:mid_point]))
+                        new_paragraphs.append(" ".join(sentences[mid_point:]))
+                        made_split = True
+                    else:
+                        new_paragraphs.append(para)
                 else:
-                    expanded_paragraphs.append(para + "." if not para.endswith(".") else para)
+                    new_paragraphs.append(para)
+            if not made_split or len(new_paragraphs) == len(paragraphs):  # No more paragraphs were split or no split was made
+                break
+            paragraphs = new_paragraphs
+            logger.debug(f"After dynamic splitting (now {len(paragraphs)} paragraphs): {paragraphs[:2]}...")
 
-            paragraphs = expanded_paragraphs
-
-        elif len(paragraphs) > target_paragraphs:
-            # Merge shorter paragraphs
-            merged_paragraphs: List[str] = []
+        # If we have too many, try to merge shorter ones
+        while len(paragraphs) > target_paragraphs and any(len(p.split()) < 40 for p in paragraphs):
+            merged_paragraphs = []
+            made_merge = False
             i = 0
             while i < len(paragraphs):
-                if i + 1 < len(paragraphs) and len(merged_paragraphs) < target_paragraphs - 1:
-                    # Merge this paragraph with the next
-                    merged = paragraphs[i] + " " + paragraphs[i + 1]
-                    merged_paragraphs.append(merged)
+                if i + 1 < len(paragraphs) and len(paragraphs[i].split()) + len(paragraphs[i + 1].split()) < 100 and len(merged_paragraphs) < target_paragraphs - 1:
+                    merged_paragraphs.append(paragraphs[i] + " " + paragraphs[i + 1])
+                    made_merge = True
                     i += 2
                 else:
                     merged_paragraphs.append(paragraphs[i])
                     i += 1
-
+            if not made_merge or len(merged_paragraphs) == len(paragraphs):  # No more paragraphs were merged or no merge was made
+                break
             paragraphs = merged_paragraphs
+            logger.debug(f"After dynamic merging (now {len(paragraphs)} paragraphs): {paragraphs[:2]}...")
 
-        # Clean up each paragraph
+        # Final cleaning and joining
         cleaned_paragraphs = []
         for para in paragraphs:
-            # Remove excessive whitespace
-            cleaned = " ".join(para.split())
-
-            # Ensure proper sentence endings
-            if cleaned and not cleaned.endswith("."):
+            cleaned = " ".join(para.split())  # Remove excessive whitespace
+            if cleaned and not cleaned.endswith((".", "!", "?")):  # Ensure proper sentence endings
                 cleaned += "."
-
-            # Capitalize first letter if it's a new sentence
-            if cleaned and len(cleaned) > 1:
+            if cleaned and len(cleaned) > 1:  # Capitalize first letter
                 cleaned = cleaned[0].upper() + cleaned[1:]
-
             cleaned_paragraphs.append(cleaned)
 
-        # Join paragraphs with proper spacing
         final_content = "\n\n".join(cleaned_paragraphs)
+        logger.debug(f"Final content before tone formatting (first 100 chars): {final_content[:100]}...")
 
-        # Apply tone-specific formatting
+        # Apply tone-specific formatting (existing logic)
         if generation_params:
             tone = generation_params.get("tone", "professional")
             final_content = self._apply_tone_formatting(final_content, tone)
+            logger.debug(f"Final content after tone formatting (first 100 chars): {final_content[:100]}...")
 
         return final_content
 
@@ -757,6 +846,162 @@ class AIRecommendationService:
             return content
         else:
             return content
+
+    def _validate_semantic_alignment(self, content: str, github_data: Dict[str, Any], generation_params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Validate that the generated content semantically aligns with the input GitHub data."""
+        validation_results = {"is_aligned": True, "alignment_score": 100, "issues": [], "suggestions": [], "data_coverage": {}}
+
+        content_lower = content.lower()
+
+        # Extract key data points from github_data
+        user_data = github_data.get("user_data", {})
+        username = user_data.get("github_username", "").lower()
+        skills = github_data.get("skills", {})
+        technical_skills = [skill.lower() for skill in skills.get("technical_skills", [])]
+        frameworks = [fw.lower() for fw in skills.get("frameworks", [])]
+        languages = github_data.get("languages", [])
+        languages_lower = [lang.language.lower() for lang in languages if lang.language]
+
+        # Check for username presence (should be mentioned)
+        if username and username not in content_lower:
+            validation_results["issues"].append(f"Username '{username}' not mentioned in recommendation")
+            validation_results["alignment_score"] -= 20
+
+        # Check for technical skills coverage
+        mentioned_skills = []
+        for skill in technical_skills[:5]:  # Check top 5 skills
+            if skill in content_lower:
+                mentioned_skills.append(skill)
+
+        skill_coverage = len(mentioned_skills) / max(len(technical_skills[:5]), 1)
+        validation_results["data_coverage"]["technical_skills"] = {"mentioned": mentioned_skills, "coverage_ratio": skill_coverage, "total_available": len(technical_skills[:5])}
+
+        if skill_coverage < 0.4 and technical_skills:  # Less than 40% coverage
+            validation_results["issues"].append(f"Low technical skills coverage: only {len(mentioned_skills)}/{len(technical_skills[:5])} skills mentioned")
+            validation_results["alignment_score"] -= 15
+
+        # Check for programming languages
+        mentioned_languages = []
+        for lang in languages_lower[:3]:  # Check top 3 languages
+            if lang in content_lower:
+                mentioned_languages.append(lang)
+
+        language_coverage = len(mentioned_languages) / max(len(languages_lower[:3]), 1)
+        validation_results["data_coverage"]["languages"] = {"mentioned": mentioned_languages, "coverage_ratio": language_coverage, "total_available": len(languages_lower[:3])}
+
+        # Check for frameworks
+        mentioned_frameworks = []
+        for framework in frameworks[:3]:  # Check top 3 frameworks
+            if framework in content_lower:
+                mentioned_frameworks.append(framework)
+
+        framework_coverage = len(mentioned_frameworks) / max(len(frameworks[:3]), 1)
+        validation_results["data_coverage"]["frameworks"] = {"mentioned": mentioned_frameworks, "coverage_ratio": framework_coverage, "total_available": len(frameworks[:3])}
+
+        # Check for high-impact contributions if available
+        high_impact = github_data.get("high_impact_contributions", {})
+        notable_contributions = high_impact.get("notable_contributions", [])
+        if notable_contributions:
+            contribution_mentioned = any(contrib.get("repository", "").lower() in content_lower for contrib in notable_contributions)
+            if not contribution_mentioned:
+                validation_results["issues"].append("No mention of notable high-impact contributions")
+                validation_results["alignment_score"] -= 10
+
+        # Overall alignment assessment
+        total_coverage = (skill_coverage + language_coverage + framework_coverage) / 3
+        if total_coverage < 0.3:
+            validation_results["is_aligned"] = False
+            validation_results["issues"].append("Overall data coverage is very low - recommendation may be too generic")
+            validation_results["suggestions"].append("Consider mentioning more specific technical skills and technologies from the profile")
+
+        validation_results["alignment_score"] = max(0, validation_results["alignment_score"])
+
+        return validation_results
+
+    def _detect_generic_content(self, content: str) -> Dict[str, Any]:
+        """Detect generic, cliché, or overly common phrases in the recommendation."""
+        generic_indicators = {
+            "buzzwords": [
+                "passionate",
+                "dedicated",
+                "hardworking",
+                "team player",
+                "quick learner",
+                "detail-oriented",
+                "problem solver",
+                "innovative",
+                "creative",
+                "proactive",
+                "results-driven",
+                "customer-focused",
+                "self-motivated",
+                "excellent communication",
+            ],
+            "generic_phrases": [
+                "worked on various projects",
+                "contributed to the team",
+                "helped improve",
+                "was responsible for",
+                "played a key role",
+                "worked closely with",
+                "gained experience in",
+                "developed skills in",
+                "learned to use",
+            ],
+            "vague_descriptors": ["good at", "skilled in", "experienced with", "knowledge of", "understanding of", "familiar with", "comfortable with"],
+        }
+
+        content_lower = content.lower()
+        detected_issues = []
+
+        # Count buzzwords
+        buzzword_count = 0
+        found_buzzwords = []
+        for buzzword in generic_indicators["buzzwords"]:
+            if buzzword in content_lower:
+                buzzword_count += 1
+                found_buzzwords.append(buzzword)
+
+        # Count generic phrases
+        generic_phrase_count = 0
+        found_generic_phrases = []
+        for phrase in generic_indicators["generic_phrases"]:
+            if phrase in content_lower:
+                generic_phrase_count += 1
+                found_generic_phrases.append(phrase)
+
+        # Count vague descriptors
+        vague_descriptor_count = 0
+        found_vague_descriptors = []
+        for descriptor in generic_indicators["vague_descriptors"]:
+            if descriptor in content_lower:
+                vague_descriptor_count += 1
+                found_vague_descriptors.append(descriptor)
+
+        # Calculate generic score (higher = more generic)
+        generic_score = min(100, (buzzword_count + generic_phrase_count + vague_descriptor_count) * 5)
+
+        # Assess severity
+        if buzzword_count > 3:
+            detected_issues.append(f"High buzzword usage ({buzzword_count} detected) - makes content less authentic")
+        if generic_phrase_count > 2:
+            detected_issues.append(f"Multiple generic phrases ({generic_phrase_count} detected) - lacks specificity")
+        if generic_score > 60:
+            detected_issues.append("Content appears highly generic and could benefit from more specific examples")
+
+        return {
+            "generic_score": generic_score,
+            "issues": detected_issues,
+            "buzzwords_detected": found_buzzwords,
+            "generic_phrases_detected": found_generic_phrases,
+            "vague_descriptors_detected": found_vague_descriptors,
+            "is_too_generic": generic_score > 40,
+            "suggestions": (
+                ["Replace buzzwords with specific examples and achievements", "Include concrete project names and technical details", "Focus on measurable outcomes rather than general descriptors"]
+                if generic_score > 30
+                else []
+            ),
+        }
 
     def _validate_recommendation_structure(self, content: str, generation_params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Validate the structure and quality of the formatted recommendation."""
@@ -791,11 +1036,11 @@ class AIRecommendationService:
                 validation_results["issues"].append("Content too short for long format")
                 validation_results["structure_score"] = int(validation_results["structure_score"]) - 15  # Explicitly cast to int
 
-        # Check for incomplete sentences
-        sentences = content.split(".")
+        # Check for incomplete sentences (using regex to split more robustly)
+        sentences = re.split(r"(?<=[.!?])\s+", content)
         incomplete_sentences = [s for s in sentences if s.strip() and len(s.split()) < 3]
-        if len(incomplete_sentences) > len(sentences) * 0.2:
-            validation_results["issues"].append("Too many incomplete sentences")
+        if len(incomplete_sentences) > len(sentences) * 0.2 and len(sentences) > 5:  # Only flag if many sentences and a significant percentage are short
+            validation_results["issues"].append(f"Too many incomplete or very short sentences ({len(incomplete_sentences)} out of {len(sentences)})")
             validation_results["structure_score"] = int(validation_results["structure_score"]) - 10  # Explicitly cast to int
 
         # Check paragraph lengths
@@ -891,6 +1136,13 @@ class AIRecommendationService:
 
         # Get the raw content
         raw_content = response.candidates[0].content.parts[0].text
+
+        # Debug: Log raw AI output to see what we're working with
+        logger.info(f"🔄 RAW REGENERATION AI OUTPUT (length: {len(raw_content)} chars):")
+        logger.info(f"🔄 First 300 chars: {raw_content[:300]}...")
+        double_newlines = "\n\n" in raw_content
+        logger.info(f"🔄 Contains double newlines: {double_newlines}")
+        logger.info(f"🔄 Number of sentences (estimated): {len(raw_content.split('.'))}")
 
         # Apply formatting
         formatted_content = self._format_recommendation_output(raw_content, length, generation_params)

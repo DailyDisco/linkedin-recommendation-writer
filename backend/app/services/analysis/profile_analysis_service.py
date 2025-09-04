@@ -332,17 +332,29 @@ class ProfileAnalysisService:
         return dependencies
 
     def analyze_user_profile(self, user_data: Dict[str, Any], repositories: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Analyze a complete user profile including skills and activity patterns."""
+        """Analyze a complete user profile including skills and activity patterns with enhanced insights."""
         # Extract skills
         skills_data = self.extract_skills(user_data, repositories)
 
         # Analyze activity patterns
         activity_analysis = self._analyze_activity_patterns(repositories)
 
+        # Extract high-impact contributions
+        high_impact_contributions = self._extract_high_impact_contributions(repositories)
+
+        # Analyze collaboration patterns
+        collaboration_patterns = self._analyze_collaboration_patterns(repositories)
+
+        # Analyze technical maturity
+        technical_maturity = self._assess_technical_maturity(repositories, skills_data)
+
         # Combine all analysis
         return {
             **skills_data,
             **activity_analysis,
+            "high_impact_contributions": high_impact_contributions,
+            "collaboration_patterns": collaboration_patterns,
+            "technical_maturity": technical_maturity,
             "user_data": user_data,
             "repository_count": len(repositories),
             "analysis_timestamp": "2024-09-01T00:00:00Z",  # Would use datetime.utcnow() in real implementation
@@ -381,4 +393,145 @@ class ProfileAnalysisService:
             "language_distribution": languages,
             "top_topics": [topic for topic, count in top_topics],
             "activity_score": len(repositories) * 10 + total_stars // 10 + total_forks // 5,
+        }
+
+    def _extract_high_impact_contributions(self, repositories: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Extract high-impact contributions that demonstrate significant achievements."""
+        high_impact_repos = []
+        notable_contributions = []
+
+        for repo in repositories:
+            stars = repo.get("stargazers_count", 0)
+            forks = repo.get("forks_count", 0)
+            description = repo.get("description", "").lower()
+            topics = repo.get("topics", [])
+
+            # Criteria for high-impact repository
+            impact_score = stars * 2 + forks * 3
+
+            # Check for notable indicators
+            notable_indicators = [
+                "production" in description,
+                "enterprise" in description,
+                "million" in description or "billion" in description,
+                "users" in description,
+                stars > 100,
+                forks > 50,
+                any(topic in ["production", "enterprise", "popular", "featured"] for topic in topics),
+            ]
+
+            if impact_score > 50 or any(notable_indicators):
+                high_impact_repos.append(
+                    {
+                        "name": repo.get("name", ""),
+                        "full_name": repo.get("full_name", ""),
+                        "description": repo.get("description", ""),
+                        "stars": stars,
+                        "forks": forks,
+                        "language": repo.get("language", ""),
+                        "impact_score": impact_score,
+                        "notable_indicators": notable_indicators.count(True),
+                    }
+                )
+
+            # Extract specific notable contributions
+            if "production" in description:
+                notable_contributions.append(
+                    {"type": "production_deployment", "description": f"Built production-ready {repo.get('name')} system", "repository": repo.get("full_name"), "impact": "high"}
+                )
+            elif stars > 500:
+                notable_contributions.append(
+                    {"type": "popular_project", "description": f"Created widely-adopted {repo.get('name')} with {stars} stars", "repository": repo.get("full_name"), "impact": "high"}
+                )
+
+        return {
+            "high_impact_repositories": sorted(high_impact_repos, key=lambda x: x["impact_score"], reverse=True)[:5],
+            "notable_contributions": notable_contributions[:3],
+            "total_impact_score": sum(repo.get("impact_score", 0) for repo in high_impact_repos),
+        }
+
+    def _analyze_collaboration_patterns(self, repositories: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Analyze collaboration patterns and team-oriented contributions."""
+        collaboration_indicators = {"team_size_signals": [], "collaboration_evidence": [], "leadership_indicators": []}
+
+        for repo in repositories:
+            contributors_count = repo.get("contributors_count", 0)
+            description = repo.get("description", "").lower()
+
+            # Team size signals
+            if contributors_count > 10:
+                collaboration_indicators["team_size_signals"].append({"repository": repo.get("full_name"), "contributors": contributors_count, "evidence": "large contributor base"})
+
+            # Collaboration evidence
+            collab_keywords = ["team", "collaboration", "open source", "community", "contributors"]
+            if any(keyword in description for keyword in collab_keywords):
+                collaboration_indicators["collaboration_evidence"].append(
+                    {"repository": repo.get("full_name"), "type": "descriptive_evidence", "keywords_found": [kw for kw in collab_keywords if kw in description]}
+                )
+
+            # Leadership indicators
+            if repo.get("owner", {}).get("login") == repo.get("owner", {}).get("login"):  # User is owner
+                if contributors_count > 5:
+                    collaboration_indicators["leadership_indicators"].append({"repository": repo.get("full_name"), "type": "project_leadership", "contributors_managed": contributors_count})
+
+        return {
+            "collaboration_score": len(collaboration_indicators["collaboration_evidence"]) * 20
+            + len(collaboration_indicators["team_size_signals"]) * 15
+            + len(collaboration_indicators["leadership_indicators"]) * 25,
+            **collaboration_indicators,
+            "collaboration_level": "high" if len(collaboration_indicators["collaboration_evidence"]) > 2 else "medium" if len(collaboration_indicators["collaboration_evidence"]) > 0 else "low",
+        }
+
+    def _assess_technical_maturity(self, repositories: List[Dict[str, Any]], skills_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Assess technical maturity based on project complexity and skill diversity."""
+        maturity_indicators = {"project_complexity": 0, "technology_diversity": 0, "architecture_signals": 0, "quality_indicators": 0}
+
+        languages = set()
+        frameworks = set()
+        tools = set()
+
+        for repo in repositories:
+            lang = repo.get("language")
+            if lang:
+                languages.add(lang)
+
+            description = repo.get("description", "").lower()
+
+            # Architecture signals
+            arch_keywords = ["architecture", "microservices", "distributed", "scalability", "enterprise"]
+            if any(keyword in description for keyword in arch_keywords):
+                maturity_indicators["architecture_signals"] += 1
+
+            # Quality indicators
+            quality_keywords = ["testing", "ci", "cd", "lint", "quality", "standards"]
+            if any(keyword in description for keyword in quality_keywords):
+                maturity_indicators["quality_indicators"] += 1
+
+            # Extract frameworks and tools from description
+            for framework in skills_data.get("frameworks", []):
+                if framework.lower() in description:
+                    frameworks.add(framework)
+
+            for tool in skills_data.get("tools", []):
+                if tool.lower() in description:
+                    tools.add(tool)
+
+        # Calculate maturity scores
+        maturity_indicators["technology_diversity"] = len(languages) + len(frameworks) + len(tools)
+        maturity_indicators["project_complexity"] = len(repositories) + maturity_indicators["architecture_signals"] * 2
+
+        total_maturity_score = (
+            maturity_indicators["project_complexity"] * 20
+            + maturity_indicators["technology_diversity"] * 15
+            + maturity_indicators["architecture_signals"] * 25
+            + maturity_indicators["quality_indicators"] * 20
+        )
+
+        return {
+            **maturity_indicators,
+            "maturity_score": min(total_maturity_score, 100),
+            "maturity_level": "senior" if total_maturity_score > 70 else "mid" if total_maturity_score > 40 else "junior",
+            "languages_used": list(languages),
+            "frameworks_demonstrated": list(frameworks),
+            "tools_mastered": list(tools),
         }

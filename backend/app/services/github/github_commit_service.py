@@ -625,70 +625,20 @@ class GitHubCommitService:
         }
 
     def _analyze_excellence_patterns(self, commit_messages: List[str], conventional_analysis: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Identify what the user excels at based on commit message patterns."""
+        """Identify what the user excels at based on commit message patterns with enhanced analysis."""
         excellence_keywords = {
-            "bug_fixing": [
-                "fix",
-                "bug",
-                "resolve",
-                "patch",
-                "correct",
-                "debug",
-            ],
-            "feature_development": [
-                "add",
-                "implement",
-                "create",
-                "build",
-                "develop",
-                "feature",
-            ],
-            "optimization": [
-                "optimize",
-                "improve",
-                "enhance",
-                "performance",
-                "speed",
-                "efficient",
-            ],
-            "refactoring": [
-                "refactor",
-                "restructure",
-                "reorganize",
-                "clean",
-                "simplify",
-            ],
-            "testing": [
-                "test",
-                "testing",
-                "spec",
-                "coverage",
-                "unit",
-                "integration",
-            ],
-            "documentation": [
-                "doc",
-                "readme",
-                "comment",
-                "documentation",
-                "guide",
-            ],
-            "security": [
-                "security",
-                "auth",
-                "secure",
-                "vulnerability",
-                "encrypt",
-            ],
-            "ui_ux": [
-                "ui",
-                "ux",
-                "interface",
-                "design",
-                "styling",
-                "css",
-                "frontend",
-            ],
+            "bug_fixing": ["fix", "bug", "resolve", "patch", "correct", "debug", "issue", "error", "crash", "hotfix", "quickfix", "workaround", "regression", "defect", "fault", "problem"],
+            "feature_development": ["add", "implement", "create", "build", "develop", "feature", "new", "introduce", "launch", "deploy", "rollout", "integrate", "connect", "establish", "setup"],
+            "optimization": ["optimize", "improve", "enhance", "performance", "speed", "efficient", "faster", "quicker", "accelerate", "boost", "streamline", "refine", "tune", "polish"],
+            "refactoring": ["refactor", "restructure", "reorganize", "clean", "simplify", "tidy", "modernize", "upgrade", "migrate", "consolidate", "extract", "split", "merge", "rename"],
+            "testing": ["test", "testing", "spec", "coverage", "unit", "integration", "e2e", "qa", "verify", "validate", "assert", "mock", "stub", "fixture", "suite"],
+            "documentation": ["doc", "readme", "comment", "documentation", "guide", "wiki", "tutorial", "example", "sample", "demo", "explain", "describe", "clarify"],
+            "security": ["security", "auth", "secure", "vulnerability", "encrypt", "protect", "safe", "access", "permission", "authorization", "authentication", "ssl", "https"],
+            "ui_ux": ["ui", "ux", "interface", "design", "styling", "css", "frontend", "user", "experience", "interaction", "responsive", "mobile", "web", "layout", "theme"],
+            "data_handling": ["data", "database", "query", "sql", "nosql", "migration", "schema", "model", "entity", "table", "collection", "index", "cache", "store"],
+            "api_development": ["api", "endpoint", "rest", "graphql", "http", "request", "response", "service", "microservice", "client", "server", "route", "controller"],
+            "devops_automation": ["ci", "cd", "pipeline", "deploy", "build", "automation", "script", "config", "infrastructure", "docker", "kubernetes", "cloud", "aws", "azure"],
+            "code_quality": ["lint", "format", "style", "quality", "standard", "convention", "consistency", "maintain", "sustainable", "readable", "clear"],
         }
 
         pattern_counts = {}
@@ -754,11 +704,86 @@ class GitHubCommitService:
             )
         )
 
+        # Infer soft skills from technical patterns
+        soft_skills_inference = self._infer_soft_skills_from_patterns(sorted_patterns)
+
         return {
             "patterns": sorted_patterns,
             "primary_strength": (list(sorted_patterns.keys())[0] if sorted_patterns else None),
             "conventional_commit_enhanced": conventional_analysis is not None,
+            "inferred_soft_skills": soft_skills_inference,
         }
+
+    def _infer_soft_skills_from_patterns(self, excellence_patterns: Dict[str, Any]) -> Dict[str, Any]:
+        """Infer soft skills from technical excellence patterns."""
+        soft_skills_map = {
+            "problem_solving": {
+                "patterns": ["bug_fixing", "optimization", "refactoring"],
+                "description": "Analytical thinking and problem-solving abilities",
+                "evidence": "Consistently addresses complex technical challenges",
+            },
+            "attention_to_detail": {
+                "patterns": ["testing", "code_quality", "security"],
+                "description": "Meticulous attention to detail and quality",
+                "evidence": "Focuses on thorough testing and code quality assurance",
+            },
+            "innovation_creativity": {
+                "patterns": ["feature_development", "optimization", "ui_ux"],
+                "description": "Creative problem-solving and innovative thinking",
+                "evidence": "Develops new features and optimizes existing solutions",
+            },
+            "reliability": {
+                "patterns": ["bug_fixing", "testing", "security"],
+                "description": "Reliable and dependable work approach",
+                "evidence": "Consistently fixes issues and maintains system stability",
+            },
+            "continuous_learning": {
+                "patterns": ["feature_development", "api_development", "devops_automation"],
+                "description": "Commitment to learning and adopting new technologies",
+                "evidence": "Works with diverse technologies and modern frameworks",
+            },
+            "collaboration": {
+                "patterns": ["documentation", "code_quality", "refactoring"],
+                "description": "Team-oriented approach to development",
+                "evidence": "Creates well-documented, maintainable code for team success",
+            },
+            "leadership": {
+                "patterns": ["refactoring", "devops_automation", "api_development"],
+                "description": "Technical leadership and system architecture",
+                "evidence": "Architects and refactors complex systems",
+            },
+            "adaptability": {
+                "patterns": ["data_handling", "api_development", "devops_automation"],
+                "description": "Flexibility in working with different technologies",
+                "evidence": "Adapts to various technical domains and challenges",
+            },
+        }
+
+        inferred_skills = {}
+        pattern_names = set(excellence_patterns.keys())
+
+        for soft_skill, config in soft_skills_map.items():
+            matching_patterns = pattern_names.intersection(set(config["patterns"]))
+            if matching_patterns:
+                # Calculate confidence based on number of matching patterns and their strength
+                confidence = min(len(matching_patterns) * 25, 100)  # Max 100 confidence
+                # Boost confidence if primary pattern matches
+                primary_pattern = list(excellence_patterns.keys())[0] if excellence_patterns else None
+                if primary_pattern and primary_pattern in matching_patterns:
+                    confidence = min(confidence + 20, 100)
+
+                inferred_skills[soft_skill] = {"description": config["description"], "evidence": config["evidence"], "confidence": confidence, "supporting_patterns": list(matching_patterns)}
+
+        # Sort by confidence
+        sorted_skills = dict(
+            sorted(
+                inferred_skills.items(),
+                key=lambda x: x[1]["confidence"],
+                reverse=True,
+            )
+        )
+
+        return {"skills": sorted_skills, "top_soft_skill": list(sorted_skills.keys())[0] if sorted_skills else None, "inference_method": "pattern_based_analysis"}
 
     def _analyze_tools_and_features(self, commit_messages: List[str]) -> Dict[str, Any]:
         """Extract tools, libraries, and features mentioned in commits."""
@@ -1098,6 +1123,237 @@ class GitHubCommitService:
                 "avg_commits_per_repo": 0,
                 "most_active_repository": None,
             },
+        }
+
+    async def generate_contributor_commit_summary(self, username: str, repository_full_name: str, max_commits: int = 50) -> Dict[str, Any]:
+        """Generate a comprehensive summary of a contributor's commits and PRs for recommendation purposes."""
+        try:
+            if not self.github_client:
+                logger.warning("⚠️  GitHub client not available for commit summary generation")
+                return self._empty_contributor_summary()
+
+            # Parse repository info
+            repo_parts = repository_full_name.split("/")
+            if len(repo_parts) != 2:
+                logger.error(f"Invalid repository name format: {repository_full_name}")
+                return self._empty_contributor_summary()
+
+            owner, repo_name = repo_parts
+
+            # Get repository and user data
+            repo = self.github_client.get_repo(repository_full_name)
+            user = self.github_client.get_user(username)
+
+            # Get contributor's commits
+            contributor_commits = []
+            try:
+                commits = repo.get_commits(author=user, since=None)
+                for commit in commits[:max_commits]:
+                    commit_data = {
+                        "sha": commit.sha,
+                        "message": commit.commit.message,
+                        "date": commit.commit.author.date.isoformat() if commit.commit.author else None,
+                        "files_changed": len(list(commit.files)) if commit.files else 0,
+                        "additions": commit.stats.additions if commit.stats else 0,
+                        "deletions": commit.stats.deletions if commit.stats else 0,
+                        "repository": repository_full_name,
+                    }
+                    contributor_commits.append(commit_data)
+            except Exception as e:
+                logger.warning(f"Could not fetch commits for {username} in {repository_full_name}: {e}")
+
+            # Get contributor's pull requests
+            contributor_prs = []
+            try:
+                pulls = repo.get_pulls(state="all", sort="created", direction="desc")
+                for pr in pulls:
+                    if pr.user.login == username:
+                        pr_data = {
+                            "number": pr.number,
+                            "title": pr.title,
+                            "body": pr.body[:500] if pr.body else "",  # Truncate body
+                            "state": pr.state,
+                            "created_at": pr.created_at.isoformat(),
+                            "merged_at": pr.merged_at.isoformat() if pr.merged_at else None,
+                            "additions": pr.additions,
+                            "deletions": pr.deletions,
+                            "changed_files": pr.changed_files,
+                            "review_comments": pr.review_comments,
+                            "labels": [label.name for label in pr.labels],
+                        }
+                        contributor_prs.append(pr_data)
+            except Exception as e:
+                logger.warning(f"Could not fetch PRs for {username} in {repository_full_name}: {e}")
+
+            # Analyze commits and PRs
+            summary = self._analyze_contributor_activity(contributor_commits, contributor_prs)
+
+            return {
+                "contributor": username,
+                "repository": repository_full_name,
+                "total_commits": len(contributor_commits),
+                "total_prs": len(contributor_prs),
+                "summary": summary,
+                "generated_at": datetime.now().isoformat(),
+            }
+
+        except Exception as e:
+            logger.error(f"Error generating contributor commit summary: {e}")
+            return self._empty_contributor_summary()
+
+    def _analyze_contributor_activity(self, commits: List[Dict[str, Any]], prs: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Analyze contributor's commits and PRs to generate insights for recommendations."""
+        insights = {
+            "technical_focus": [],
+            "collaboration_patterns": [],
+            "problem_solving_approaches": [],
+            "code_quality_indicators": [],
+            "impact_areas": [],
+            "key_achievements": [],
+            "work_patterns": [],
+        }
+
+        # Analyze commit messages for technical focus
+        commit_messages = [commit["message"] for commit in commits]
+        technical_patterns = self._extract_technical_patterns(commit_messages)
+        insights["technical_focus"] = technical_patterns
+
+        # Analyze PR patterns
+        if prs:
+            pr_analysis = self._analyze_pr_patterns(prs)
+            insights.update(pr_analysis)
+
+        # Extract key achievements
+        achievements = self._extract_key_achievements(commits, prs)
+        insights["key_achievements"] = achievements
+
+        # Analyze work patterns
+        patterns = self._analyze_work_patterns(commits, prs)
+        insights["work_patterns"] = patterns
+
+        return insights
+
+    def _extract_technical_patterns(self, commit_messages: List[str]) -> List[str]:
+        """Extract technical focus areas from commit messages."""
+        patterns = []
+
+        # Common technical patterns to look for
+        tech_indicators = {
+            "frontend": ["ui", "component", "react", "vue", "angular", "frontend", "interface", "ux", "styling"],
+            "backend": ["api", "server", "database", "endpoint", "service", "backend", "authentication", "security"],
+            "testing": ["test", "spec", "unit", "integration", "coverage", "assert", "mock"],
+            "performance": ["optimize", "performance", "speed", "memory", "cache", "efficiency"],
+            "architecture": ["refactor", "architecture", "structure", "design", "pattern"],
+            "bug_fixing": ["fix", "bug", "issue", "resolve", "correct", "patch"],
+            "features": ["feature", "implement", "add", "create", "build", "develop"],
+        }
+
+        for category, keywords in tech_indicators.items():
+            matches = sum(1 for msg in commit_messages for keyword in keywords if keyword.lower() in msg.lower())
+            if matches > 0:
+                patterns.append(f"{category.replace('_', ' ').title()}: {matches} contributions")
+
+        return patterns
+
+    def _analyze_pr_patterns(self, prs: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Analyze pull request patterns for collaboration insights."""
+        patterns = {"collaboration_patterns": [], "code_quality_indicators": [], "impact_areas": []}
+
+        # Analyze PR sizes and complexity
+        for pr in prs:
+            additions = pr.get("additions", 0)
+            deletions = pr.get("deletions", 0)
+            files_changed = pr.get("changed_files", 0)
+
+            if additions + deletions > 500:
+                patterns["impact_areas"].append("Large-scale feature implementation")
+            elif files_changed > 10:
+                patterns["impact_areas"].append("Cross-cutting changes affecting multiple components")
+
+            if pr.get("review_comments", 0) > 5:
+                patterns["collaboration_patterns"].append("Active participation in code review discussions")
+
+        # Analyze PR labels for additional insights
+        all_labels = []
+        for pr in prs:
+            all_labels.extend(pr.get("labels", []))
+
+        if all_labels:
+            label_counts = Counter(all_labels)
+            top_labels = [label for label, count in label_counts.most_common(3)]
+            if "bug" in [label.lower() for label in top_labels]:
+                patterns["code_quality_indicators"].append("Focus on bug fixes and issue resolution")
+            if "enhancement" in [label.lower() for label in top_labels]:
+                patterns["code_quality_indicators"].append("Feature development and enhancement work")
+
+        return patterns
+
+    def _extract_key_achievements(self, commits: List[Dict[str, Any]], prs: List[Dict[str, Any]]) -> List[str]:
+        """Extract key achievements from commits and PRs."""
+        achievements = []
+
+        # Analyze commit impact
+        total_additions = sum(commit.get("additions", 0) for commit in commits)
+
+        if total_additions > 1000:
+            achievements.append(f"Added {total_additions} lines of code demonstrating significant development contributions")
+
+        # Analyze PR achievements
+        merged_prs = [pr for pr in prs if pr.get("state") == "closed" and pr.get("merged_at")]
+        if len(merged_prs) > 0:
+            achievements.append(f"Successfully merged {len(merged_prs)} pull requests")
+
+        # Look for patterns in commit messages
+        commit_messages = [commit["message"] for commit in commits]
+        performance_commits = [msg for msg in commit_messages if "performance" in msg.lower() or "optimize" in msg.lower()]
+        if len(performance_commits) > 2:
+            achievements.append("Performance optimization and code efficiency improvements")
+
+        return achievements
+
+    def _analyze_work_patterns(self, commits: List[Dict[str, Any]], prs: List[Dict[str, Any]]) -> List[str]:
+        """Analyze work patterns and consistency."""
+        patterns = []
+
+        if commits:
+            # Analyze commit frequency
+            dates = [commit.get("date") for commit in commits if commit.get("date")]
+            if len(dates) > 5:
+                patterns.append("Consistent and regular contribution pattern")
+
+            # Analyze commit sizes
+            avg_additions = sum(commit.get("additions", 0) for commit in commits) / len(commits)
+            if avg_additions > 100:
+                patterns.append("Substantial code contributions with meaningful changes")
+            else:
+                patterns.append("Focused, incremental development approach")
+
+        # Analyze PR patterns
+        if prs:
+            pr_states = [pr.get("state") for pr in prs]
+            closed_prs = sum(1 for state in pr_states if state == "closed")
+            if closed_prs > len(prs) * 0.7:
+                patterns.append("High success rate in pull request completion")
+
+        return patterns
+
+    def _empty_contributor_summary(self) -> Dict[str, Any]:
+        """Return empty contributor summary structure."""
+        return {
+            "contributor": "unknown",
+            "repository": "unknown",
+            "total_commits": 0,
+            "total_prs": 0,
+            "summary": {
+                "technical_focus": [],
+                "collaboration_patterns": [],
+                "problem_solving_approaches": [],
+                "code_quality_indicators": [],
+                "impact_areas": [],
+                "key_achievements": [],
+                "work_patterns": [],
+            },
+            "generated_at": datetime.now().isoformat(),
         }
 
     def _analyze_commit_impacts(self, commits: List[Dict[str, Any]]) -> Dict[str, Any]:

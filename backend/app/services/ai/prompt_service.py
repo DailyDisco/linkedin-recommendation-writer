@@ -1,6 +1,9 @@
 """AI Prompt Service for building and formatting prompts."""
 
+import logging
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 
 class PromptService:
@@ -16,6 +19,8 @@ class PromptService:
         target_role: Optional[str] = None,
         specific_skills: Optional[list] = None,
         exclude_keywords: Optional[list] = None,
+        focus_keywords: Optional[List[str]] = None,
+        focus_weights: Optional[Dict[str, float]] = None,
         analysis_context_type: str = "profile",
         repository_url: Optional[str] = None,
     ) -> str:
@@ -53,8 +58,61 @@ class PromptService:
 
         # Handle different analysis contexts
         if context_type == "repo_only":
-            # Build repository-only prompt and skip all general profile logic
+            # ULTRA-STRICT: Build repository-only prompt with ZERO profile data access
+            # CRITICAL: NO access to general profile data - only repository-specific data allowed
+            logger.info("🔒 PROMPT SERVICE: REPO_ONLY mode - validating data isolation")
+            logger.info(f"🔍 PROMPT SERVICE: Received github_data keys: {list(github_data.keys())}")
+            if "user_data" in github_data:
+                logger.info(f"🔍 PROMPT SERVICE: user_data: {github_data['user_data']}")
+                # Validate that user_data only contains username
+                user_data = github_data["user_data"]
+                allowed_fields = {"github_username", "login"}
+                for field in user_data:
+                    if field not in allowed_fields and user_data[field]:
+                        logger.warning(f"⚠️ PROMPT SERVICE: Unexpected user_data field '{field}' with value: {user_data[field]}")
+            if "repo_contributor_stats" in github_data:
+                logger.info(f"🔍 PROMPT SERVICE: repo_contributor_stats: {github_data['repo_contributor_stats']}")
+            if "repository_info" in github_data:
+                logger.info(f"🔍 PROMPT SERVICE: repository_info: {github_data['repository_info']}")
+            if "languages" in github_data:
+                logger.info(f"🔍 PROMPT SERVICE: languages count: {len(github_data['languages'])}")
+            if "skills" in github_data:
+                logger.info(f"🔍 PROMPT SERVICE: skills keys: {list(github_data['skills'].keys())}")
+
+            # Log forbidden profile data fields that should NOT be present
+            forbidden_fields = ["bio", "company", "location", "email", "followers", "following", "public_repos", "avatar_url", "full_name", "organizations", "starred_repositories"]
+            for field in forbidden_fields:
+                if field in github_data.get("user_data", {}):
+                    logger.error(f"🚨 CRITICAL: Forbidden profile field '{field}' found in repo_only data!")
+                elif field in github_data:
+                    logger.error(f"🚨 CRITICAL: Forbidden profile section '{field}' found in repo_only data!")
+
+            # VALIDATION: Ensure no profile data is present in the data structure
+            if self._contains_profile_data(github_data):
+                logger.error("🚨 CRITICAL: Profile data detected in repo_only context - ABORTING")
+                raise ValueError("Profile data contamination detected in repo_only context")
+
+            # ADDITIONAL VALIDATION: Check final prompt for profile data leaks
+            final_prompt = "\n".join(prompt_parts)
+            prompt_validation = self._validate_prompt_for_profile_data(final_prompt)
+            if not prompt_validation["is_valid"]:
+                logger.error("🚨 CRITICAL: Profile data detected in final prompt - ABORTING")
+                for issue in prompt_validation["issues"]:
+                    logger.error(f"   • {issue}")
+                raise ValueError(f"Profile data contamination detected in repo_only prompt: {prompt_validation['issues']}")
+
+            # Use ONLY repository-specific data - NO general user profile access
+            user_data = github_data.get("user_data", {})  # Basic identifying info only (username only)
+            languages = github_data.get("languages", [])  # Repository-specific languages only
+            skills = github_data.get("skills", {})  # Repository-specific skills only
+            commit_analysis = github_data.get("commit_analysis", {})  # Repository-specific commits only
+
             repo_info = github_data.get("repository_info", {})
+            repo_contributor_stats = github_data.get("repo_contributor_stats", {})
+
+            logger.info(f"🔍 PROMPT SERVICE: Using repo_info: {repo_info.get('name', 'N/A') if repo_info else 'N/A'}")
+            logger.info(f"🔍 PROMPT SERVICE: Using username: {user_data.get('github_username', 'N/A')}")
+
             if repo_info:
                 prompt_parts.extend(
                     [
@@ -77,18 +135,23 @@ class PromptService:
                         "- Focus exclusively on what they've done in THIS repository only",
                         "- IGNORE any general guidelines about overall experience or background",
                         "- DO NOT infer or assume technologies based on the person's general profile",
+                        "- CRITICAL: Do not mention any personal details such as bio, company, or location unless directly relevant to contributions in this specific repository.",
+                        "- CRITICAL: Do not reference the user's overall follower count or public repository count outside of this project.",
+                        "- CRITICAL: Do not mention any starred repositories, organizations, or general profile information.",
+                        "- CRITICAL: DO NOT infer or mention any technologies, languages, or frameworks (e.g., Go, Python, machine learning) that are NOT explicitly listed in the 'WHAT TO INCLUDE (ONLY FROM THIS REPOSITORY)' section above.",
+                        "This includes their 'curiosity' or 'interest' in such unlisted technologies.",
                         "",
                         "WHAT TO INCLUDE (ONLY FROM THIS REPOSITORY):",
                     ]
                 )
 
-                # Only include repository-specific data
-                repo_languages = github_data.get("repository_languages", [])
-                repo_skills = github_data.get("repository_skills", {})
-                repo_commit_analysis = github_data.get("repository_commit_analysis", {})
+                # Use the explicitly filtered data sources (already set above)
+                repo_languages = languages  # Already filtered to repository-specific
+                repo_skills = skills  # Already filtered to repository-specific
+                repo_commit_analysis = commit_analysis  # Already filtered to repository-specific
 
                 if repo_languages:
-                    top_repo_languages = [lang.get("language", "") for lang in repo_languages[:3]]
+                    top_repo_languages = [getattr(lang, "language", "") for lang in repo_languages[:3]]
                     prompt_parts.append(f"- Languages used in this repository: {', '.join(top_repo_languages)}")
                     prompt_parts.append(f"- IMPORTANT: Only mention these languages: {', '.join(top_repo_languages)}")
 
@@ -116,20 +179,67 @@ class PromptService:
                         if patterns.get("most_active_month"):
                             prompt_parts.append(f"- Most active development period: {patterns['most_active_month']}")
 
-                # Add repository-specific user data if available
-                if github_data.get("contributor_info"):
-                    contributor = github_data["contributor_info"]
+                # Add contributor commit summary for better recommendations (without mentioning repository name)
+                contributor_summary = github_data.get("contributor_commit_summary", {})
+                if contributor_summary and contributor_summary.get("total_commits", 0) > 0:
+                    logger.info("🔍 PROMPT SERVICE: Adding contributor commit summary to prompt")
                     prompt_parts.append("")
-                    prompt_parts.append("CONTRIBUTOR DETAILS FOR THIS REPOSITORY:")
-                    prompt_parts.append(f"- Total contributions to this repository: {contributor.get('contributions', 0)} commits")
-                    if contributor.get("full_name"):
-                        prompt_parts.append(f"- Contributor: {contributor['full_name']}")
+                    prompt_parts.append("CONTRIBUTOR'S TECHNICAL CONTRIBUTIONS AND ACHIEVEMENTS:")
+                    prompt_parts.append(f"- Total commits: {contributor_summary.get('total_commits', 0)}")
+                    prompt_parts.append(f"- Pull requests: {contributor_summary.get('total_prs', 0)}")
+
+                    # Add technical focus areas
+                    summary_data = contributor_summary.get("summary", {})
+                    technical_focus = summary_data.get("technical_focus", [])
+                    if technical_focus:
+                        prompt_parts.append(f"- Technical focus areas: {', '.join(technical_focus[:3])}")
+
+                    # Add key achievements
+                    key_achievements = summary_data.get("key_achievements", [])
+                    if key_achievements:
+                        prompt_parts.append(f"- Key achievements: {', '.join(key_achievements[:2])}")
+
+                    # Add work patterns
+                    work_patterns = summary_data.get("work_patterns", [])
+                    if work_patterns:
+                        prompt_parts.append(f"- Work patterns: {', '.join(work_patterns[:2])}")
+
+                    # Add collaboration patterns
+                    collaboration_patterns = summary_data.get("collaboration_patterns", [])
+                    if collaboration_patterns:
+                        prompt_parts.append(f"- Collaboration approach: {', '.join(collaboration_patterns[:2])}")
+
+                    logger.info(f"✅ Added contributor summary: {contributor_summary.get('total_commits', 0)} commits, {len(technical_focus)} focus areas")
+
+                # Legacy contributor stats (if no commit summary available)
+                elif repo_contributor_stats:
+                    logger.info("🔍 PROMPT SERVICE: Adding legacy repo_contributor_stats to prompt")
+                    prompt_parts.append("")
+                    prompt_parts.append("CONTRIBUTOR DETAILS:")
+                    prompt_parts.append(f"- Total contributions: {repo_contributor_stats.get('contributions_to_repo', 0)} commits")
+                    prompt_parts.append(f"- Contributor: {repo_contributor_stats.get('username', 'Unknown')}")
+                    logger.info(
+                        f"🔍 PROMPT SERVICE: Added legacy contributor stats: username={repo_contributor_stats.get('username')}, contributions={repo_contributor_stats.get('contributions_to_repo', 0)}"
+                    )
 
                 prompt_parts.append("")
-                prompt_parts.append("FINAL WARNING:")
-                prompt_parts.append("- DO NOT mention any work outside of this specific repository")
-                prompt_parts.append("- If information is limited, focus on what you do know about this repository")
-                prompt_parts.append("- Stay focused on THIS repository's work only")
+                prompt_parts.append("IMPORTANT GUIDELINES:")
+                prompt_parts.append("- Focus exclusively on the technical contributions and achievements shown above")
+                prompt_parts.append("- Use the contributor's technical focus areas and achievements to highlight their expertise")
+                prompt_parts.append("- Emphasize their problem-solving approach and collaboration patterns")
+                prompt_parts.append("- Highlight their consistent work patterns and code quality indicators")
+                prompt_parts.append("- If information is limited, focus on the specific technical achievements provided")
+                prompt_parts.append("- Stay focused on their demonstrated technical capabilities and contributions")
+                prompt_parts.append("- Absolutely no mention of general user profile aspects like overall bio, company, or location")
+                prompt_parts.append("- Do not reference overall follower counts or general repository statistics")
+                prompt_parts.append("- Use only the technical information provided above - do not infer or assume additional technologies")
+                prompt_parts.append("- Emphasize their practical technical achievements and collaborative approach")
+
+                # LOG THE COMPLETE PROMPT FOR DEBUGGING
+                final_prompt = "\n".join(prompt_parts)
+                logger.info("🔍 PROMPT SERVICE: FINAL PROMPT PREVIEW (first 500 chars):")
+                logger.info(f"🔍 PROMPT SERVICE: {final_prompt[:500]}...")
+                logger.info(f"🔍 PROMPT SERVICE: Total prompt length: {len(final_prompt)} characters")
 
             else:
                 prompt_parts.append("\nRepository information is not available for this specific repository.")
@@ -190,7 +300,7 @@ class PromptService:
         if context_type == "profile":
             # Profile-based skills
             if languages:
-                top_languages = [lang["language"] for lang in languages[:5]]
+                top_languages = [getattr(lang, "language", "") for lang in languages[:5]]
                 prompt_parts.append(f"- Programming languages they work with: {', '.join(top_languages)}")
 
             if skills.get("technical_skills"):
@@ -245,7 +355,7 @@ class PromptService:
             repo_commit_analysis = github_data.get("commit_analysis", {})
 
             if repo_languages:
-                top_languages = [lang["language"] for lang in repo_languages[:5]]
+                top_languages = [getattr(lang, "language", "") for lang in repo_languages[:5]]
                 prompt_parts.append(f"- Programming languages they work with in this project: {', '.join(top_languages)}")
 
             if repo_skills.get("technical_skills"):
@@ -275,51 +385,88 @@ class PromptService:
         if specific_skills:
             prompt_parts.append(f"\nMake sure to highlight these skills: {', '.join(specific_skills)}")
 
-        # Add keywords to exclude if provided
+        # Add focus keywords with weights for enhanced customization
+        if focus_keywords:
+            focus_parts = ["\nFOCUS AREAS TO EMPHASIZE:"]
+            for keyword in focus_keywords:
+                weight = focus_weights.get(keyword, 1.0) if focus_weights else 1.0
+                weight_text = ""
+                if weight > 1.5:
+                    weight_text = " (HIGH PRIORITY - dedicate significant attention to this)"
+                elif weight > 1.2:
+                    weight_text = " (MODERATE PRIORITY - give extra emphasis to this)"
+                elif weight < 0.8:
+                    weight_text = " (OPTIONAL - mention if relevant but not required)"
+
+                focus_parts.append(f"- {keyword}{weight_text}")
+            prompt_parts.extend(focus_parts)
+
+        # Add keywords to exclude with strict enforcement
         if exclude_keywords:
-            prompt_parts.append(f"\nIMPORTANT: Do NOT mention any of these terms or concepts: {', '.join(exclude_keywords)}")
-            prompt_parts.append("- If any of these terms would naturally appear, rephrase to avoid them entirely")
+            prompt_parts.extend(
+                [
+                    "\nSTRICT EXCLUSION REQUIREMENTS:",
+                    f"- ABSOLUTELY DO NOT mention any of these terms: {', '.join(exclude_keywords)}",
+                    "- If any of these terms appear in your knowledge, rephrase completely to avoid them",
+                    "- Even subtle references or synonyms of these terms are prohibited",
+                    "- If the topic would naturally involve these terms, find alternative ways to express the same concepts",
+                ]
+            )
 
         # Add custom prompt if provided
         if custom_prompt:
             prompt_parts.append(f"\nAdditional information to include: {custom_prompt}")
 
-        # Add context-specific restrictions for repo_only
+        # Add context-specific guidelines for focused recommendations
         if context_type == "repo_only":
             prompt_parts.extend(
                 [
                     "",
-                    "REPO-ONLY SPECIFIC GUIDELINES:",
-                    "- ONLY discuss the specific repository mentioned above",
-                    "- DO NOT reference any other repositories or projects",
-                    "- DO NOT mention general GitHub profile information",
-                    "- If you lack specific details about this repository, acknowledge that limitation",
-                    "- Stay focused on what the person did in THIS repository only",
-                    "- Do not extrapolate or assume work outside of this repository",
-                    "- CRITICAL: If no frameworks are listed above, do not mention ANY frameworks",
-                    "- CRITICAL: Only mention technologies that are explicitly listed in the repository data above",
-                    "- CRITICAL: Do not infer or assume additional technologies based on general knowledge",
+                    "FOCUSED RECOMMENDATION GUIDELINES:",
+                    "- Focus on the specific technical contributions and achievements detailed above",
+                    "- Use the technical focus areas and key achievements to highlight their expertise",
+                    "- Emphasize their demonstrated problem-solving and collaboration patterns",
+                    "- Highlight their consistent work patterns and technical approach",
+                    "- If information is limited, focus on the specific achievements provided",
+                    "- Stay focused on their technical capabilities and contributions shown",
+                    "- Do not reference other projects or general profile information",
+                    "- Use only the technologies and skills explicitly mentioned above",
+                    "- Emphasize practical technical achievements and collaborative approach",
                 ]
             )
 
         # Add guidelines based on length
         base_guidelines = [
-            "\nGuidelines:",
+            "\nCRITICAL FORMATTING INSTRUCTIONS:",
             "- Write in first person as someone who has worked with this developer",
+            "- **MANDATORY**: Structure your response with clear paragraph breaks using DOUBLE NEWLINES",
+            "- **FORMAT REQUIREMENT**: Each paragraph MUST be separated by exactly TWO newline characters (\\n\\n)",
+            "- **PARAGRAPH STRUCTURE**: Create 3-4 distinct paragraphs, each containing 2-4 complete sentences",
+            "- **DO NOT** create single-line breaks within paragraphs - only double newlines between paragraphs",
+            "- **EXAMPLE FORMAT**:",
+            "  Paragraph 1 content here with complete thoughts.\\n\\n",
+            "  Paragraph 2 content here with different focus.\\n\\n",
+            "  Paragraph 3 content here with final thoughts.\\n\\n",
+            "- **VERIFICATION**: Ensure there are exactly 2+ blank lines between each paragraph block",
         ]
 
         # Add context-specific guidelines
         if context_type == "repo_only":
             base_guidelines.extend(
                 [
-                    "- Be specific about technical achievements and skills demonstrated in THIS SPECIFIC REPOSITORY",
-                    "- Use natural, conversational language, like you're talking to a colleague.",
-                    "- Focus on technical competence and collaborative abilities shown in this repository only",
-                    "- Provide specific examples and positive anecdotes from their work in THIS repository",
-                    "- DO NOT mention any company names, employers, or employment history",
-                    "- DO NOT reference work outside of this specific repository",
-                    "- Focus on technical skills and collaborative abilities demonstrated in this repository only",
-                    "- Separate the recommendation into clear, distinct paragraphs to improve readability.",
+                    "- Be specific about technical achievements and skills demonstrated in the work above",
+                    "- Use natural, conversational language, like you're talking to a colleague",
+                    "- Focus on technical competence and collaborative abilities shown in their contributions",
+                    "- Provide specific examples and positive anecdotes from their technical work",
+                    "- Emphasize their problem-solving approach and technical expertise demonstrated",
+                    "- Highlight their consistent work patterns and attention to detail",
+                    "- Focus on their technical skills and collaborative abilities as shown above",
+                    "- **CRITICAL FORMATTING REQUIREMENT**: You MUST separate paragraphs with DOUBLE LINE BREAKS",
+                    "- **MANDATORY**: Use exactly TWO newline characters (\\n\\n) between each paragraph",
+                    "- **STRICT RULE**: NO single line breaks within paragraphs - ONLY double newlines between paragraphs",
+                    "- **OUTPUT FORMAT**: Paragraph1 text here.\\n\\nParagraph2 text here.\\n\\nParagraph3 text here.",
+                    "- **VERIFICATION STEP**: Count your newlines - there should be exactly 2 blank lines between paragraphs",
+                    "- **PARAGRAPH COUNT**: Create exactly 3 paragraphs for optimal readability",
                     f"- Target length: {self._get_length_guideline(length)} words",
                     "- Do not include any placeholders or template text",
                     "- Make it sound natural and personal, like a real recommendation",
@@ -333,7 +480,12 @@ class PromptService:
                     "- Focus on both technical competence and collaborative abilities, providing specific examples and positive anecdotes from their work.",
                     "- DO NOT mention any company names, employers, or employment history",
                     "- Focus on technical skills and collaborative abilities only",
-                    "- Separate the recommendation into clear, distinct paragraphs to improve readability.",
+                    "- **CRITICAL FORMATTING REQUIREMENT**: You MUST separate paragraphs with DOUBLE LINE BREAKS",
+                    "- **MANDATORY**: Use exactly TWO newline characters (\\n\\n) between each paragraph",
+                    "- **STRICT RULE**: NO single line breaks within paragraphs - ONLY double newlines between paragraphs",
+                    "- **OUTPUT FORMAT**: Paragraph1 text here.\\n\\nParagraph2 text here.\\n\\nParagraph3 text here.",
+                    "- **VERIFICATION STEP**: Count your newlines - there should be exactly 2 blank lines between paragraphs",
+                    "- **PARAGRAPH COUNT**: Create exactly 3 paragraphs for optimal readability",
                     f"- Target length: {self._get_length_guideline(length)} words",
                     "- Do not include any placeholders or template text",
                     "- Make it sound natural and personal, like a real recommendation",
@@ -523,16 +675,30 @@ class PromptService:
 
         return examples
 
-    def build_option_prompt(self, base_prompt: str, custom_instruction: str, focus: str) -> str:
-        """Build a customized prompt for a specific option."""
+    def build_option_prompt(self, base_prompt: str, custom_instruction: str, focus: str, focus_keywords: Optional[List[str]] = None, focus_weights: Optional[Dict[str, float]] = None) -> str:
+        """Build a customized prompt for a specific option with enhanced focus control."""
         focus_formatted = focus.replace("_", " ")
-        return f"""{base_prompt}
 
+        # Build focus enhancement section
+        focus_enhancement = f"""
 FOR THIS VERSION, FOCUS ON:
 {custom_instruction}
 
-Create a recommendation that really highlights their {focus_formatted} skills while keeping it natural and conversational.
-"""
+Create a recommendation that really highlights their {focus_formatted} skills while keeping it natural and conversational."""
+
+        # Add specific keyword focus if provided
+        if focus_keywords:
+            focus_enhancement += "\n\nADDITIONAL FOCUS AREAS:"
+            for keyword in focus_keywords:
+                weight = focus_weights.get(keyword, 1.0) if focus_weights else 1.0
+                priority_text = ""
+                if weight > 1.5:
+                    priority_text = " - PRIORITY: Dedicate significant attention"
+                elif weight > 1.2:
+                    priority_text = " - PRIORITY: Give extra emphasis"
+                focus_enhancement += f"\n- {keyword}{priority_text}"
+
+        return f"{base_prompt}{focus_enhancement}"
 
     def build_refinement_prompt_for_regeneration(
         self,
@@ -582,11 +748,20 @@ DETAILS:
 - Tone: {tone}
 - Target Length: {target_length} words{exclude_section}
 
+**CRITICAL FORMATTING REQUIREMENTS:**
+- **MANDATORY**: Structure your response with clear paragraph breaks using DOUBLE NEWLINES
+- **FORMAT REQUIREMENT**: Each paragraph MUST be separated by exactly TWO newline characters (\\n\\n)
+- **PARAGRAPH STRUCTURE**: Create 3 distinct paragraphs, each containing 2-4 complete sentences
+- **DO NOT** create single-line breaks within paragraphs - only double newlines between paragraphs
+- **OUTPUT FORMAT**: Paragraph1 text here.\\n\\nParagraph2 text here.\\n\\nParagraph3 text here.
+- **VERIFICATION**: Ensure there are exactly 2 blank lines between each paragraph block
+
 Please rewrite the recommendation with these changes while keeping it:
 1. Authentic and real-sounding
 2. The right tone and length
 3. Focused on their technical and teamwork skills
 4. Natural and conversational
+5. Properly formatted with paragraph breaks as specified above
 
 Just give me the updated recommendation text, nothing else.
 """
@@ -719,7 +894,7 @@ Just give me the updated recommendation text, nothing else.
         # Add technical context
         languages = repository_data.get("languages", [])
         if languages:
-            top_langs = [lang.get("language") for lang in languages[:3]]
+            top_langs = [getattr(lang, "language", "") for lang in languages[:3]]
             prompt_parts.append(f"- Technologies: {', '.join(top_langs)}")
 
         skills = repository_data.get("skills", {})
@@ -879,3 +1054,141 @@ Just give me the updated recommendation text, nothing else.
                 return first_sentence.strip()
 
         return f"Professional Recommendation for {username}"
+
+    def _contains_profile_data(self, data: Dict[str, Any]) -> bool:
+        """Check if data contains general profile information that should be excluded in repo_only mode."""
+        # Define profile data fields that should NEVER appear in repo_only context
+        profile_indicators = [
+            "bio",
+            "company",
+            "location",
+            "email",
+            "blog",
+            "followers",
+            "following",
+            "public_repos",
+            "public_gists",
+            "starred_repositories",
+            "organizations",
+            "starred_technologies",
+            "repositories",
+            "full_name",
+            "name",
+            "avatar_url",
+        ]
+
+        # Check user_data section
+        user_data = data.get("user_data", {})
+        for field in profile_indicators:
+            if field in user_data:
+                logger.debug(f"🚨 PROFILE DATA DETECTED: Found '{field}' in user_data for repo_only context with value: {user_data[field]}")
+                return True
+
+        # Check for contributor_info (old structure that might contain profile data)
+        if data.get("contributor_info"):
+            contributor_info = data["contributor_info"]
+            for field in ["full_name", "email", "bio", "company", "location", "avatar_url"]:
+                if field in contributor_info:
+                    logger.debug(f"🚨 PROFILE DATA DETECTED: Found '{field}' in contributor_info for repo_only context with value: {contributor_info[field]}")
+                    return True
+
+        # Check for other potential profile data sections
+        profile_sections = ["organizations", "starred_technologies", "starred_repositories"]
+        for section in profile_sections:
+            if data.get(section):
+                logger.debug(f"🚨 PROFILE DATA DETECTED: Found '{section}' section in repo_only context with value: {data[section]}")
+                return True
+
+        return False
+
+    def _validate_prompt_for_profile_data(self, prompt: str) -> Dict[str, Any]:
+        """Validate that the final prompt doesn't contain profile data (but allows profile keywords in instructions)."""
+        validation_result = {"is_valid": True, "issues": [], "warnings": []}
+
+        prompt_lower = prompt.lower()
+
+        # Profile data keywords that should never appear in repo_only prompts
+        # Note: 'linkedin' is excluded because it's part of legitimate "LinkedIn recommendation" context
+        profile_keywords = [
+            "bio",
+            "company",
+            "location",
+            "email",
+            "blog",
+            "followers",
+            "following",
+            "public repos",
+            "public_repos",
+            "starred",
+            "organizations",
+            "orgs",
+            "full name",
+            "full_name",
+            "avatar",
+            "hireable",
+            "website",
+            "twitter",
+        ]
+
+        # Distinguish between main content and instructions
+        content_start = prompt_lower.find("strict instructions:")
+        if content_start == -1:
+            content_start = len(prompt)  # If no instructions section, check whole prompt
+
+        main_content = prompt[:content_start]  # Only check the part before instructions
+        instruction_content = prompt[content_start:]  # The instructions/warnings part
+
+        found_in_content = []
+        found_in_instructions = []
+
+        # Check profile keywords
+        for keyword in profile_keywords:
+            if keyword in main_content.lower():
+                found_in_content.append(keyword)
+            elif keyword in instruction_content.lower():
+                found_in_instructions.append(keyword)
+
+        # Profile keywords in main content are BAD (actual profile data)
+        if found_in_content:
+            validation_result["is_valid"] = False
+            for keyword in found_in_content:
+                # Get context around the keyword in main content
+                keyword_index = main_content.lower().find(keyword)
+                start = max(0, keyword_index - 50)
+                end = min(len(main_content), keyword_index + len(keyword) + 50)
+                context = main_content[start:end].replace("\n", " ").strip()
+                logger.debug(f"🚨 PROMPT VALIDATION: Found profile data '{keyword}' in main content: '{context}'")
+                validation_result["issues"].append(f"Profile data '{keyword}' found in main content: '...{context}...'")
+
+        # Profile keywords in instructions are OK (they're warnings to prevent AI from using profile data)
+        if found_in_instructions:
+            for keyword in found_in_instructions:
+                logger.debug(f"✅ PROMPT VALIDATION: Profile keyword '{keyword}' found in instructions (OK)")
+            validation_result["warnings"].extend([f"Profile keyword '{keyword}' found in instructions (OK - this prevents AI from using profile data)" for keyword in found_in_instructions])
+
+        # Check for specific patterns that indicate profile data in main content only
+        import re
+
+        profile_patterns = [
+            r"\d+\s+followers",  # "123 followers"
+            r"\d+\s+following",  # "456 following"
+            r"\d+\s+public\s+repos",  # "78 public repos"
+            r"@[\w.-]+\s",  # Email-like patterns
+        ]
+
+        for pattern in profile_patterns:
+            matches = re.findall(pattern, main_content, re.IGNORECASE)
+            if matches:
+                validation_result["is_valid"] = False
+                logger.debug(f"🚨 PROMPT VALIDATION: Found profile pattern '{pattern}' in main content: {matches[:3]}...")
+                validation_result["issues"].append(f"Profile pattern '{pattern}' found in main content: {matches[:3]}...")
+
+        # Check for common profile section headers in main content
+        profile_headers = ["about me", "contact", "personal info", "background", "experience", "education", "social media"]
+
+        for header in profile_headers:
+            if header in main_content.lower():
+                logger.debug(f"⚠️ PROMPT VALIDATION: Potential profile header '{header}' found in main content")
+                validation_result["warnings"].append(f"Potential profile header '{header}' found in main content")
+
+        return validation_result
