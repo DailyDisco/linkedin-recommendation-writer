@@ -653,11 +653,11 @@ async def generate_recommendation_options_stream(
                 force_refresh=force_refresh,  # Pass force_refresh
             ):
                 # Map AI progress (5-100%) to our remaining range (40-100%)
-                ai_progress = progress_update.get('progress', 0)
+                ai_progress = progress_update.get("progress", 0)
                 mapped_progress = 40 + int((ai_progress / 100) * 60)  # Scale to 40-100 range
-                
+
                 # Update progress in the update
-                progress_update['progress'] = mapped_progress
+                progress_update["progress"] = mapped_progress
 
                 logger.info(f"📡 SSE yielding progress: {progress_update.get('stage', 'Unknown')} - {mapped_progress}%")
 
@@ -744,11 +744,11 @@ async def regenerate_recommendation_stream(
                 force_refresh=request.force_refresh,
             ):
                 # Map AI progress to remaining range (30-100%)
-                ai_progress = progress_update.get('progress', 0)
+                ai_progress = progress_update.get("progress", 0)
                 mapped_progress = 30 + int((ai_progress / 100) * 70)  # Scale to 30-100 range
-                
+
                 # Update progress in the update
-                progress_update['progress'] = mapped_progress
+                progress_update["progress"] = mapped_progress
 
                 # Format as SSE data
                 data = f"data: {StreamProgressResponse(**progress_update).model_dump_json()}\n\n"
