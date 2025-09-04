@@ -35,7 +35,7 @@ export const AnalysisTypeSection: React.FC<AnalysisTypeSectionProps> = ({
           <label className='flex items-center'>
             <input
               type='radio'
-              name='analysis_type'
+              name='analysis_context_type'
               value='profile'
               checked={analysisType === 'profile'}
               onChange={e =>
@@ -51,7 +51,7 @@ export const AnalysisTypeSection: React.FC<AnalysisTypeSectionProps> = ({
           <label className='flex items-center'>
             <input
               type='radio'
-              name='analysis_type'
+              name='analysis_context_type'
               value='repo_only'
               checked={analysisType === 'repo_only'}
               onChange={e =>

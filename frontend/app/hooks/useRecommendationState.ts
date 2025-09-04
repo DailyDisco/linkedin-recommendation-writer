@@ -3,7 +3,6 @@ import type {
   Recommendation,
   RecommendationOption,
   ParsedGitHubInput,
-  PromptSuggestionsResponse,
 } from '../types/index';
 
 // Form data type
@@ -21,7 +20,7 @@ export interface RecommendationFormData {
   tone: 'professional' | 'friendly' | 'formal' | 'casual';
   length: 'short' | 'medium' | 'long';
   github_input: string;
-  analysis_type: 'profile' | 'repo_only';
+  analysis_context_type: 'profile' | 'repo_only';
   repository_url?: string;
   force_refresh?: boolean;
 }
@@ -49,10 +48,6 @@ export interface RecommendationState {
   dynamicLength: RecommendationFormData['length'];
   dynamicIncludeKeywords: string[];
   dynamicExcludeKeywords: string[];
-  // New state for prompt assistant
-  initialSuggestions: PromptSuggestionsResponse | null;
-  autocompleteSuggestions: Record<string, string[]>;
-  isLoadingSuggestions: boolean;
 }
 
 // Define action types for the reducer
@@ -82,15 +77,6 @@ export type RecommendationAction =
         exclude_keywords: string[];
       };
     }
-  | {
-      type: 'SET_INITIAL_SUGGESTIONS';
-      payload: PromptSuggestionsResponse | null;
-    }
-  | {
-      type: 'SET_AUTOCOMPLETE_SUGGESTIONS';
-      payload: { field: string; suggestions: string[] };
-    }
-  | { type: 'SET_LOADING_SUGGESTIONS'; payload: boolean }
   | { type: 'RESET' };
 
 const initialFormData: RecommendationFormData = {
@@ -102,7 +88,7 @@ const initialFormData: RecommendationFormData = {
   tone: 'professional',
   length: 'medium',
   github_input: '',
-  analysis_type: 'profile',
+  analysis_context_type: 'profile',
   repository_url: '',
   force_refresh: false,
 };
@@ -127,9 +113,6 @@ const initialState: RecommendationState = {
   dynamicLength: 'medium',
   dynamicIncludeKeywords: [],
   dynamicExcludeKeywords: [],
-  initialSuggestions: null,
-  autocompleteSuggestions: {},
-  isLoadingSuggestions: false,
 };
 
 function recommendationReducer(
@@ -191,18 +174,6 @@ function recommendationReducer(
         dynamicIncludeKeywords: action.payload.include_keywords,
         dynamicExcludeKeywords: action.payload.exclude_keywords,
       };
-    case 'SET_INITIAL_SUGGESTIONS':
-      return { ...state, initialSuggestions: action.payload };
-    case 'SET_AUTOCOMPLETE_SUGGESTIONS':
-      return {
-        ...state,
-        autocompleteSuggestions: {
-          ...state.autocompleteSuggestions,
-          [action.payload.field]: action.payload.suggestions,
-        },
-      };
-    case 'SET_LOADING_SUGGESTIONS':
-      return { ...state, isLoadingSuggestions: action.payload };
     case 'RESET':
       return initialState;
     default:

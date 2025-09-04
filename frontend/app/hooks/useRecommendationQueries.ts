@@ -343,8 +343,8 @@ export const useGenerateRecommendationOptionsStream = () => {
       if (request.exclude_keywords?.length) {
         params.append('exclude_keywords', request.exclude_keywords.join(','));
       }
-      if (request.analysis_type) {
-        params.append('analysis_type', request.analysis_type);
+      if (request.analysis_context_type) {
+        params.append('analysis_context_type', request.analysis_context_type);
       }
       if (request.repository_url) {
         params.append('repository_url', request.repository_url);
@@ -443,7 +443,7 @@ export const useCreateRecommendationFromOption = () => {
         explanation: string;
         generation_parameters?: Record<string, unknown>;
       }>;
-      analysis_type: string;
+      analysis_context_type: string;
       repository_url?: string;
       recommendation_type: string;
       tone: string;
@@ -459,7 +459,7 @@ export const useCreateRecommendationFromOption = () => {
           ...opt,
           generation_parameters: opt.generation_parameters || {},
         })),
-        analysis_context_type: params.analysis_type,
+        analysis_context_type: params.analysis_context_type,
         repository_url: params.repository_url,
       });
       return response;

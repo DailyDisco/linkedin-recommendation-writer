@@ -497,7 +497,7 @@ export default function GeneratorPage() {
       setSelectedContributor(contributor);
       setShowRecommendationModal(true);
     },
-    [isLoggedIn, anonymousCount, formData.input_value]
+    [isLoggedIn, anonymousCount]
   );
 
   // Reset dismissal flag when user navigates away and comes back (for new session)

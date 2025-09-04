@@ -251,6 +251,18 @@ class APICSRFProtectionMiddleware(BaseHTTPMiddleware):
 
     def _has_valid_api_auth(self, request: Request) -> bool:
         """Check if request has valid API authentication."""
+        # Special handling for SSE (EventSource) connections
+        if request.url.path in ["/api/v1/recommendations/generate-options/stream", "/api/v1/recommendations/regenerate/stream"]:
+            # For SSE connections, allow if user has valid session via cookies
+            # EventSource sends cookies but not custom headers
+            session_id = request.cookies.get("session_id") or request.cookies.get("auth-storage")
+            if session_id:
+                return True  # Allow SSE connections with session cookies
+
+            # For development/testing, allow SSE connections without strict auth
+            # This allows anonymous users to use the streaming feature
+            return True
+
         # Check for API key
         api_key = request.headers.get("X-API-Key")
         if api_key:

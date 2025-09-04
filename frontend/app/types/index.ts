@@ -90,7 +90,7 @@ export interface RecommendationRequest {
   custom_prompt?: string;
   include_specific_skills?: string[];
   target_role?: string;
-  analysis_type?: 'profile' | 'repo_only';
+  analysis_context_type?: 'profile' | 'repo_only';
   repository_url?: string;
   force_refresh?: boolean;
   include_keywords?: string[];
@@ -262,7 +262,7 @@ export interface GenerateFormData {
   custom_prompt: string;
   target_role: string;
   include_specific_skills: string;
-  analysis_type: 'profile' | 'repo_only';
+  analysis_context_type: 'profile' | 'repo_only';
   repository_url?: string;
 }
 
@@ -320,24 +320,4 @@ export interface SkillAnalysisData {
   target_role: string;
   industry?: string;
   experience_level?: string;
-}
-
-// Prompt Assistant Types
-export interface PromptSuggestionsRequest {
-  github_username: string;
-  recommendation_type: string;
-  tone: string;
-  length: string;
-}
-
-export interface PromptSuggestionsResponse {
-  suggested_working_relationship: string[];
-  suggested_specific_skills: string[];
-  suggested_notable_achievements: string[];
-}
-
-export interface AutocompleteSuggestionsRequest {
-  github_username: string;
-  field_name: 'specific_skills' | 'notable_achievements';
-  current_input: string;
 }

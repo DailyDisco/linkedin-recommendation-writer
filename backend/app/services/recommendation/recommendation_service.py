@@ -77,6 +77,24 @@ class RecommendationService:
     ) -> RecommendationResponse:
         """Create a new recommendation."""
 
+        logger.info("🔍 DEBUG: create_recommendation called with:")
+        logger.info(f"   • github_username: {github_username}")
+        logger.info(f"   • analysis_context_type: {analysis_context_type}")
+        logger.info(f"   • repository_url: {repository_url}")
+        logger.info(f"   • force_refresh: {force_refresh}")
+
+        # Log parameter validation for repo_only mode
+        if analysis_context_type == "repo_only":
+            logger.info("🎯 REPO_ONLY MODE DETECTED")
+            if not repository_url:
+                logger.warning("⚠️  REPO_ONLY mode but no repository_url provided!")
+            else:
+                logger.info(f"✅ REPO_ONLY: Will analyze repository: {repository_url}")
+        elif analysis_context_type == "repository_contributor":
+            logger.info("👥 REPOSITORY CONTRIBUTOR MODE DETECTED")
+        else:
+            logger.info("👤 PROFILE MODE (default)")
+
         import time
 
         start_time = time.time()
@@ -102,7 +120,7 @@ class RecommendationService:
                         # Merge repository data with basic contributor info
                         contributor_data = await self.github_service.analyze_github_profile(username=github_username, force_refresh=False)
                         if contributor_data:
-                            github_data = self._merge_repository_and_contributor_data(github_data, contributor_data, github_username)
+                            github_data = self._merge_repository_and_contributor_data(github_data, contributor_data, github_username, analysis_context_type)
                         else:
                             logger.warning(f"Could not fetch contributor data for {github_username}, using repository data only")
 
@@ -121,7 +139,7 @@ class RecommendationService:
                         owner, repo = repo_path.split("/", 1)
                         repo_data = await self.repository_service.analyze_repository(f"{owner}/{repo}", force_refresh=False)
                         if repo_data:
-                            github_data = self._merge_repository_and_contributor_data(repo_data, github_data, github_username)
+                            github_data = self._merge_repository_and_contributor_data(repo_data, github_data, github_username, analysis_context_type)
 
             else:
                 logger.info("👤 Analyzing full GitHub profile...")
@@ -372,6 +390,11 @@ class RecommendationService:
     ) -> RecommendationOptionsResponse:
         """Create multiple recommendation options."""
 
+        logger.info("🔍 DEBUG: create_recommendation_options called with:")
+        logger.info(f"   • github_username: {github_username}")
+        logger.info(f"   • analysis_context_type: {analysis_context_type}")
+        logger.info(f"   • repository_url: {repository_url}")
+
         import time
 
         start_time = time.time()
@@ -384,6 +407,11 @@ class RecommendationService:
             github_start = time.time()
 
             # Conditionally fetch GitHub data based on analysis context
+            logger.info("🔍 DEBUG: Checking repo_only condition in create_recommendation_options:")
+            logger.info(f"   • analysis_context_type: '{analysis_context_type}'")
+            logger.info(f"   • repository_url: '{repository_url}'")
+            logger.info(f"   • condition check: {analysis_context_type == 'repo_only' and repository_url is not None}")
+
             if analysis_context_type == "repo_only" and repository_url:
                 logger.info("📦 Analyzing specific repository...")
                 # Extract owner/repo from URL
@@ -397,7 +425,7 @@ class RecommendationService:
                         # Merge repository data with basic contributor info
                         contributor_data = await self.github_service.analyze_github_profile(username=github_username, force_refresh=False)
                         if contributor_data:
-                            github_data = self._merge_repository_and_contributor_data(github_data, contributor_data, github_username)
+                            github_data = self._merge_repository_and_contributor_data(github_data, contributor_data, github_username, analysis_context_type)
                         else:
                             logger.warning(f"Could not fetch contributor data for {github_username}, using repository data only")
 
@@ -416,7 +444,7 @@ class RecommendationService:
                         owner, repo = repo_path.split("/", 1)
                         repo_data = await self.repository_service.analyze_repository(f"{owner}/{repo}", force_refresh=False)
                         if repo_data:
-                            github_data = self._merge_repository_and_contributor_data(repo_data, github_data, github_username)
+                            github_data = self._merge_repository_and_contributor_data(repo_data, github_data, github_username, analysis_context_type)
 
             else:
                 logger.info("👤 Analyzing full GitHub profile...")
@@ -451,11 +479,20 @@ class RecommendationService:
             logger.info("-" * 50)
             db_start = time.time()
 
-            github_profile = await self._get_or_create_github_profile(db, github_data)
+            # For repo_only context, we don't need to store/retrieve profile data from database
+            # since we're only using repository-specific data
+            if analysis_context_type == "repo_only":
+                logger.info("🔒 REPO_ONLY: Skipping database profile operations - using repository-only data")
+                github_profile = None
+            else:
+                github_profile = await self._get_or_create_github_profile(db, github_data)
 
             db_end = time.time()
             logger.info(f"⏱️  Database operations completed in {db_end - db_start:.2f} seconds")
-            logger.info(f"✅ GitHub profile record: {'Updated' if github_profile else 'Created'}")
+            if analysis_context_type != "repo_only":
+                logger.info(f"✅ GitHub profile record: {'Updated' if github_profile else 'Created'}")
+            else:
+                logger.info("✅ REPO_ONLY: Database operations skipped")
 
             # Generate AI recommendation options
             logger.info("🤖 STEP 3: AI RECOMMENDATION OPTIONS GENERATION")
@@ -487,7 +524,8 @@ class RecommendationService:
             logger.info(f"   • Database Ops: {db_end - db_start:.2f}s ({((db_end - db_start)/total_time)*100:.1f}%)")
             logger.info(f"   • AI Generation: {ai_end - ai_start:.2f}s ({((ai_end - ai_start)/total_time)*100:.1f}%)")
 
-            return response
+            # Return both the options response and the filtered GitHub data for streaming
+            return {"options_response": response, "github_data": github_data}
 
         except Exception as e:
             logger.error(f"💥 ERROR in recommendation options creation for {github_username}: {e}")
@@ -536,7 +574,7 @@ class RecommendationService:
                         # Merge repository data with basic contributor info
                         contributor_data = await self.github_service.analyze_github_profile(username=github_username, force_refresh=False)
                         if contributor_data:
-                            github_data = self._merge_repository_and_contributor_data(github_data, contributor_data, github_username)
+                            github_data = self._merge_repository_and_contributor_data(github_data, contributor_data, github_username, analysis_context_type)
                         else:
                             logger.warning(f"Could not fetch contributor data for {github_username}, using repository data only")
 
@@ -555,7 +593,7 @@ class RecommendationService:
                         owner, repo = repo_path.split("/", 1)
                         repo_data = await self.repository_service.analyze_repository(f"{owner}/{repo}", force_refresh=False)
                         if repo_data:
-                            github_data = self._merge_repository_and_contributor_data(repo_data, github_data, github_username)
+                            github_data = self._merge_repository_and_contributor_data(repo_data, github_data, github_username, analysis_context_type)
 
             else:
                 logger.info("👤 Analyzing full GitHub profile...")
@@ -609,9 +647,12 @@ class RecommendationService:
             logger.info("-" * 50)
             save_start = time.time()
 
+            # For repo_only mode, github_profile is None, so we use a placeholder ID
+            github_profile_id = github_profile.id if github_profile else None
+
             recommendation_data = self.recommendation_engine_service.create_recommendation_data(
                 ai_result=ai_result,
-                github_profile_id=int(github_profile.id),
+                github_profile_id=github_profile_id,
                 recommendation_type=recommendation_type,
                 tone=tone,
                 length=length,
@@ -1264,56 +1305,151 @@ class RecommendationService:
         repository_data: Dict[str, Any],
         contributor_data: Dict[str, Any],
         contributor_username: str,
+        analysis_context_type: str = "repository_contributor",
     ) -> Dict[str, Any]:
         """Merge repository analysis data with contributor profile data."""
-        logger.info(f"🔄 Merging repository and contributor data for {contributor_username}")
+        logger.info(f"🔄 Merging repository and contributor data for {contributor_username} with context: {analysis_context_type}")
 
-        # Start with contributor's profile data as the base
-        merged_data = contributor_data.copy()
+        if analysis_context_type == "repo_only":
+            # For repo_only context, we want ONLY repository-specific data
+            # Filter out general user profile information to prevent data leakage
+            logger.info("🎯 REPO_ONLY MODE: Filtering out general user data")
+            logger.info(f"🔍 REPO_ONLY: Input contributor_data keys: {list(contributor_data.keys())}")
+            if "user_data" in contributor_data:
+                logger.info(f"🔍 REPO_ONLY: contributor user_data keys: {list(contributor_data['user_data'].keys())}")
+            logger.info(f"🔍 REPO_ONLY: Input repository_data keys: {list(repository_data.keys())}")
+            if "repository_info" in repository_data:
+                logger.info(f"🔍 REPO_ONLY: repository_info: {repository_data['repository_info']}")
 
-        # Add repository-specific information
-        if repository_data:
-            merged_data["repository_info"] = repository_data.get("repository_info", {})
-            merged_data["repository_languages"] = repository_data.get("languages", [])
-            merged_data["repository_commits"] = repository_data.get("commits", [])
-            merged_data["repository_skills"] = repository_data.get("skills", {})
-            merged_data["repository_commit_analysis"] = repository_data.get("commit_analysis", {})
+            # Start with ULTRA-MINIMAL contributor data - ONLY username for repo_only
+            logger.info("🔍 REPO_ONLY: Creating ULTRA-MINIMAL contributor data (NO PROFILE DATA)")
+            filtered_contributor_data = {
+                "user_data": {
+                    "github_username": contributor_data.get("user_data", {}).get("github_username") or contributor_username,
+                    "login": contributor_data.get("user_data", {}).get("login") or contributor_username,
+                    # CRITICAL: EXCLUDE ALL PROFILE DATA in repo_only mode
+                    # EXCLUDE: full_name, name, avatar_url, profile_url, bio, company, location, followers, etc.
+                }
+            }
+            logger.info(f"🔍 REPO_ONLY: ULTRA-MINIMAL user_data: {filtered_contributor_data['user_data']}")
 
-            # Update skills to include repository-specific skills
-            if "skills" in merged_data and repository_data.get("skills"):
-                repo_skills = repository_data["skills"]
-                contributor_skills = merged_data["skills"]
+            merged_data = filtered_contributor_data.copy()
 
-                # Merge technical skills
-                if repo_skills.get("technical_skills"):
-                    contributor_skills["technical_skills"] = list(set(contributor_skills.get("technical_skills", []) + repo_skills["technical_skills"]))
+            # Add repository-specific information with explicit overrides
+            if repository_data:
+                merged_data["repository_info"] = repository_data.get("repository_info", {})
+                merged_data["repository_languages"] = repository_data.get("languages", [])
+                merged_data["repository_commits"] = repository_data.get("commits", [])
+                merged_data["repository_skills"] = repository_data.get("skills", {})
+                merged_data["repository_commit_analysis"] = repository_data.get("commit_analysis", {})
 
-                # Merge frameworks
-                if repo_skills.get("frameworks"):
-                    contributor_skills["frameworks"] = list(set(contributor_skills.get("frameworks", []) + repo_skills["frameworks"]))
+                # CRITICAL: For repo_only, use ONLY repository-specific data
+                # Do NOT merge with general contributor skills - this prevents data leakage
+                merged_data["languages"] = repository_data.get("languages", [])
+                merged_data["skills"] = repository_data.get("skills", {})
+                merged_data["commit_analysis"] = repository_data.get("commit_analysis", {})
 
-                # Merge tools
-                if repo_skills.get("tools"):
-                    contributor_skills["tools"] = list(set(contributor_skills.get("tools", []) + repo_skills["tools"]))
+            # Add metadata about the analysis type
+            merged_data["analysis_context_type"] = "repo_only"
+            merged_data["target_repository"] = repository_data.get("repository_info", {}).get("full_name", "")
+            merged_data["contributor_username"] = contributor_username
 
-                # Merge domains
-                if repo_skills.get("domains"):
-                    contributor_skills["domains"] = list(set(contributor_skills.get("domains", []) + repo_skills["domains"]))
+            logger.info("✅ REPO_ONLY: Filtered merged data created - general profile data excluded")
+            logger.info(f"🔍 REPO_ONLY: Final merged_data keys: {list(merged_data.keys())}")
+            if "user_data" in merged_data:
+                logger.info(f"🔍 REPO_ONLY: Final user_data: {merged_data['user_data']}")
+            if "repo_contributor_stats" in merged_data:
+                logger.info(f"🔍 REPO_ONLY: repo_contributor_stats: {merged_data['repo_contributor_stats']}")
 
-            # Update commit analysis to focus on repository-specific contributions
-            if repository_data.get("commit_analysis") and contributor_data.get("commit_analysis"):
-                # Use repository-specific commit analysis if available
-                merged_data["commit_analysis"] = repository_data["commit_analysis"]
-                merged_data["commit_analysis"]["contributor_focused"] = True
-                merged_data["commit_analysis"]["repository_context"] = repository_data.get("repository_info", {}).get("full_name", "")
+            # CRITICAL DEBUG: Log the complete merged data structure to see what gets passed to AI
+            logger.info("🔍 REPO_ONLY: ======= COMPLETE MERGED DATA STRUCTURE =======")
+            for key, value in merged_data.items():
+                if key == "user_data":
+                    logger.info(f"🔍 REPO_ONLY: user_data = {value}")
+                elif key == "repo_contributor_stats":
+                    logger.info(f"🔍 REPO_ONLY: repo_contributor_stats = {value}")
+                elif key in ["languages", "skills", "commit_analysis", "repository_info"]:
+                    logger.info(f"🔍 REPO_ONLY: {key} = {type(value)} (length: {len(value) if hasattr(value, '__len__') else 'N/A'})")
+                else:
+                    logger.info(f"🔍 REPO_ONLY: {key} = {value}")
+            logger.info("🔍 REPO_ONLY: ===============================================")
 
-        # Add metadata about the analysis type
-        merged_data["analysis_context_type"] = "repository_contributor"
-        merged_data["target_repository"] = repository_data.get("repository_info", {}).get("full_name", "")
-        merged_data["contributor_username"] = contributor_username
+            # VALIDATION: Ensure no profile data leaked through
+            logger.info("🔍 REPO_ONLY: Running final validation...")
+            validation_result = self._validate_repo_only_data_isolation(merged_data)
+            if not validation_result["is_valid"]:
+                logger.error("🚨 CRITICAL: Profile data contamination detected in repo_only data!")
+                for issue in validation_result["issues"]:
+                    logger.error(f"   • {issue}")
+                raise ValueError(f"Profile data contamination in repo_only context: {validation_result['issues']}")
+            else:
+                logger.info("✅ REPO_ONLY: Validation PASSED - no profile data contamination")
 
-        logger.info(f"✅ Merged data created with analysis_context_type: {merged_data['analysis_context_type']}")
-        return merged_data
+            # FINAL DEBUG: Log what will be sent to AI
+            logger.info("🎯 REPO_ONLY: FINAL DATA SENT TO AI:")
+            logger.info(f"   • Username: {merged_data.get('user_data', {}).get('github_username', 'N/A')}")
+            logger.info(f"   • Repository: {merged_data.get('repository_info', {}).get('full_name', 'N/A')}")
+            logger.info(f"   • Languages: {len(merged_data.get('languages', []))} languages")
+            logger.info(f"   • Skills: {len(merged_data.get('skills', {}).get('technical_skills', []))} technical skills")
+            logger.info(f"   • Commits: {merged_data.get('commit_analysis', {}).get('total_commits', 0)} total commits")
+            logger.info("🎯 REPO_ONLY: Data isolation complete - sending to AI")
+
+            if validation_result["warnings"]:
+                logger.warning("⚠️ REPO_ONLY: Validation warnings:")
+                for warning in validation_result["warnings"]:
+                    logger.warning(f"   • {warning}")
+
+            logger.info("🎉 REPO_ONLY: Data isolation complete and validated")
+            return merged_data
+
+        else:
+            # Original logic for repository_contributor and other contexts
+            # Start with contributor's profile data as the base
+            merged_data = contributor_data.copy()
+
+            # Add repository-specific information
+            if repository_data:
+                merged_data["repository_info"] = repository_data.get("repository_info", {})
+                merged_data["repository_languages"] = repository_data.get("languages", [])
+                merged_data["repository_commits"] = repository_data.get("commits", [])
+                merged_data["repository_skills"] = repository_data.get("skills", {})
+                merged_data["repository_commit_analysis"] = repository_data.get("commit_analysis", {})
+
+                # Update skills to include repository-specific skills
+                if "skills" in merged_data and repository_data.get("skills"):
+                    repo_skills = repository_data["skills"]
+                    contributor_skills = merged_data["skills"]
+
+                    # Merge technical skills
+                    if repo_skills.get("technical_skills"):
+                        contributor_skills["technical_skills"] = list(set(contributor_skills.get("technical_skills", []) + repo_skills["technical_skills"]))
+
+                    # Merge frameworks
+                    if repo_skills.get("frameworks"):
+                        contributor_skills["frameworks"] = list(set(contributor_skills.get("frameworks", []) + repo_skills["frameworks"]))
+
+                    # Merge tools
+                    if repo_skills.get("tools"):
+                        contributor_skills["tools"] = list(set(contributor_skills.get("tools", []) + repo_skills["tools"]))
+
+                    # Merge domains
+                    if repo_skills.get("domains"):
+                        contributor_skills["domains"] = list(set(contributor_skills.get("domains", []) + repo_skills["domains"]))
+
+                # Update commit analysis to focus on repository-specific contributions
+                if repository_data.get("commit_analysis") and contributor_data.get("commit_analysis"):
+                    # Use repository-specific commit analysis if available
+                    merged_data["commit_analysis"] = repository_data["commit_analysis"]
+                    merged_data["commit_analysis"]["contributor_focused"] = True
+                    merged_data["commit_analysis"]["repository_context"] = repository_data.get("repository_info", {}).get("full_name", "")
+
+            # Add metadata about the analysis type
+            merged_data["analysis_context_type"] = analysis_context_type
+            merged_data["target_repository"] = repository_data.get("repository_info", {}).get("full_name", "")
+            merged_data["contributor_username"] = contributor_username
+
+            logger.info(f"✅ Merged data created with analysis_context_type: {merged_data['analysis_context_type']}")
+            return merged_data
 
     async def _get_or_create_github_profile_data(
         self,
@@ -1322,9 +1458,14 @@ class RecommendationService:
         analysis_context_type: str = "profile",
         repository_url: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
+        logger.info("🔍 DEBUG: _get_or_create_github_profile_data called with:")
+        logger.info(f"   • username: {github_username}")
+        logger.info(f"   • analysis_context_type: {analysis_context_type}")
+        logger.info(f"   • repository_url: {repository_url}")
         """Get or create GitHub profile data with conditional analysis based on context."""
 
         # Conditionally fetch GitHub data based on analysis context
+        logger.info(f"🔍 DEBUG: About to check repo_only condition: analysis_context_type='{analysis_context_type}', repository_url='{repository_url}'")
         if analysis_context_type == "repo_only" and repository_url:
             logger.info("📦 Analyzing specific repository for repo_only context...")
             # Extract owner/repo from URL
@@ -1333,7 +1474,18 @@ class RecommendationService:
                 owner, repo = repo_path.split("/", 1)
 
                 # Get repository data
+                logger.info(f"🔍 DEBUG: Calling repository_service.analyze_repository for {owner}/{repo}")
                 repository_data = await self.repository_service.analyze_repository(f"{owner}/{repo}", force_refresh=False, analysis_context_type=analysis_context_type, repository_url=repository_url)
+                logger.info(f"🔍 DEBUG: Repository data returned keys: {list(repository_data.keys()) if repository_data else 'None'}")
+                if repository_data:
+                    logger.info("🔍 DEBUG: Repository data structure sample:")
+                    for key in ["repository_info", "languages", "skills", "commits", "commit_analysis"]:
+                        if key in repository_data:
+                            value = repository_data[key]
+                            if isinstance(value, (list, dict)):
+                                logger.info(f"   • {key}: {type(value)} (length: {len(value)})")
+                            else:
+                                logger.info(f"   • {key}: {value}")
 
                 if repository_data:
                     # Filter repository commits to only include the contributor's commits
@@ -1346,29 +1498,57 @@ class RecommendationService:
                             or commit.get("commit", {}).get("author", {}).get("name", "").lower() == github_username.lower()
                         ]
 
-                    # Get minimal contributor info (only basic profile, no extensive data)
-                    contributor_info = await self._get_minimal_contributor_info(github_username)
+                    # Generate contributor commit summary for better recommendations
+                    try:
+                        logger.info(f"📝 Generating contributor commit summary for {github_username} in {repo_path}")
+                        commit_service = GitHubCommitService()
+                        contributor_summary = await commit_service.generate_contributor_commit_summary(github_username, repo_path, max_commits=50)
+                        repository_data["contributor_commit_summary"] = contributor_summary
+                        logger.info(f"✅ Generated commit summary: {contributor_summary.get('total_commits', 0)} commits, {contributor_summary.get('total_prs', 0)} PRs")
+                    except Exception as e:
+                        logger.warning(f"⚠️ Failed to generate contributor commit summary: {e}")
+                        repository_data["contributor_commit_summary"] = None
 
-                    # Construct focused github_data for repository context
+                    # Get minimal contributor info (only basic profile, no extensive data)
+                    logger.info(f"🔍 DEBUG: Calling _get_minimal_contributor_info for {github_username}")
+                    contributor_info = await self._get_minimal_contributor_info(github_username, analysis_context_type)
+                    logger.info(f"🔍 DEBUG: Contributor info returned keys: {list(contributor_info.keys()) if contributor_info else 'None'}")
+                    if contributor_info and "user_data" in contributor_info:
+                        logger.info(f"🔍 DEBUG: Contributor user_data keys: {list(contributor_info['user_data'].keys())}")
+
+                    # Construct ULTRA-STRICTLY FILTERED github_data for repository-only context
+                    # ABSOLUTELY NO general profile data allowed - ONLY repository-specific data
+                    logger.info("🔒 REPO_ONLY: Constructing ultra-filtered data structure - NO profile data allowed")
+
                     github_data: Dict[str, Any] = {
                         "user_data": {
                             "github_username": github_username,
                             "login": github_username,
-                            "full_name": contributor_info.get("full_name", ""),
-                            "avatar_url": contributor_info.get("avatar_url", ""),
-                            "github_id": contributor_info.get("github_id", ""),
-                            # No extensive profile data for repo_only focus
+                            # CRITICAL: NO profile data - full_name, bio, company, location, etc. are ALL excluded
                         },
-                        "repositories": [repository_data.get("repository_info", {})],
-                        "languages": repository_data.get("languages", []),
-                        "skills": repository_data.get("skills", {}),
-                        "commit_analysis": repository_data.get("commit_analysis", {}),
-                        "commits": filtered_commits,  # Only contributor's commits
+                        # EXPLICITLY EXCLUDE all general profile data:
+                        # EXCLUDE: "repositories" (list of all user's repos)
+                        # EXCLUDE: "languages" (general user languages)
+                        # EXCLUDE: "skills" (general user skills)
+                        # EXCLUDE: "commit_analysis" (general user commit analysis)
+                        # EXCLUDE: "commits" (all user's commits)
+                        # EXCLUDE: "starred_technologies"
+                        # EXCLUDE: "organizations"
+                        # EXCLUDE: "bio", "company", "location", "followers", "following", "public_repos"
+                        # ONLY include repository-specific data:
+                        "repository_info": repository_data.get("repository_info", {}),
+                        "languages": repository_data.get("languages", []),  # Repository-specific languages only
+                        "skills": repository_data.get("skills", {}),  # Repository-specific skills only
+                        "commits": filtered_commits,  # Only contributor's commits to this repo
+                        "commit_analysis": repository_data.get("commit_analysis", {}),  # Repository-specific analysis only
+                        # CRITICAL: NO contributor_info with profile data - only essential repo contribution info
+                        "repo_contributor_stats": {
+                            "username": github_username,
+                            "contributions_to_repo": len(filtered_commits),  # Only count commits to this specific repo
+                        },
                         "analyzed_at": datetime.utcnow().isoformat(),
                         "analysis_context_type": "repo_only",
-                        "target_repository": repository_data.get("repository_info", {}).get("full_name", ""),
-                        "repository_info": repository_data.get("repository_info", {}),
-                        # Clear signal to AI about focus
+                        "repository_url": repository_url,
                         "ai_focus_instruction": (
                             f"Focus ONLY on {github_username}'s contributions to "
                             f"{repository_data.get('repository_info', {}).get('full_name', '')} repository. "
@@ -1385,7 +1565,12 @@ class RecommendationService:
             else:
                 raise ValueError(f"Invalid repository URL format: {repository_url}")
 
-        elif analysis_context_type == "repository_contributor" and repository_url:
+        else:
+            logger.info("🔍 DEBUG: NOT taking repo_only path. Falling through to other analysis types.")
+            logger.info(f"   • analysis_context_type: {analysis_context_type}")
+            logger.info(f"   • repository_url: {repository_url}")
+
+        if analysis_context_type == "repository_contributor" and repository_url:
             logger.info("👥 Analyzing repository with contributor context...")
             # Get full profile data but emphasize repository context
             github_data = await self.github_service.analyze_github_profile(username=github_username, force_refresh=False, analysis_context_type=analysis_context_type, repository_url=repository_url)
@@ -1406,10 +1591,24 @@ class RecommendationService:
 
         return github_data
 
-    async def _get_minimal_contributor_info(self, username: str) -> Dict[str, Any]:
-        """Get minimal contributor information without extensive profile analysis."""
+    async def _get_minimal_contributor_info(self, username: str, context_type: str = "profile") -> Dict[str, Any]:
+        """Get minimal contributor information without extensive profile analysis.
+
+        For repo_only context, we want to minimize profile data exposure.
+        """
         try:
-            # Use GitHub service to get basic user info only
+            # For repo_only context, use a much more restrictive approach
+            if context_type == "repo_only":
+                logger.info("🔒 REPO_ONLY: Using ultra-minimal contributor info to prevent profile data leakage")
+                # Only fetch the absolute minimum needed - no profile data
+                return {
+                    "github_username": username,
+                    "login": username,
+                    # Explicitly exclude: full_name, avatar_url, github_id, bio, company, location, etc.
+                    # We only need the username for identification in repo_only mode
+                }
+
+            # For other contexts, use the existing logic
             user_data = await self.github_service._get_user_data(username)
             if user_data:
                 return {
@@ -1420,8 +1619,77 @@ class RecommendationService:
         except Exception as e:
             logger.warning(f"Could not fetch minimal contributor info for {username}: {e}")
 
-        # Return empty dict if we can't get info - the system should still work
-        return {}
+        # Return minimal fallback - just the username
+        return {"github_username": username, "login": username}
+
+    def _validate_repo_only_data_isolation(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate that repo_only data contains no general profile information."""
+        validation_result = {"is_valid": True, "issues": [], "warnings": []}
+
+        # Define profile data fields that should NEVER appear in repo_only context
+        forbidden_profile_fields = [
+            "bio",
+            "company",
+            "location",
+            "email",
+            "blog",
+            "followers",
+            "following",
+            "public_repos",
+            "public_gists",
+            "starred_repositories",
+            "organizations",
+            "starred_technologies",
+            "repositories",
+            "full_name",
+            "name",
+            "avatar_url",
+        ]
+
+        # Check user_data section for profile data
+        user_data = data.get("user_data", {})
+        for field in forbidden_profile_fields:
+            if field in user_data and user_data[field]:
+                validation_result["is_valid"] = False
+                validation_result["issues"].append(f"Profile field '{field}' found in user_data")
+
+        # Check for contributor_info (old structure that might contain profile data)
+        if data.get("contributor_info"):
+            contributor_info = data["contributor_info"]
+            for field in ["full_name", "email", "bio", "company", "location", "avatar_url"]:
+                if field in contributor_info and contributor_info[field]:
+                    validation_result["is_valid"] = False
+                    validation_result["issues"].append(f"Profile field '{field}' found in contributor_info")
+
+        # Check for profile data sections that should be excluded
+        profile_sections = ["organizations", "starred_technologies", "starred_repositories"]
+        for section in profile_sections:
+            if data.get(section):
+                validation_result["is_valid"] = False
+                validation_result["issues"].append(f"Profile section '{section}' found in data")
+
+        # Check user_data for non-empty profile fields (excluding allowed fields)
+        allowed_user_fields = {"github_username", "login"}
+        for field, value in user_data.items():
+            if field not in allowed_user_fields and value:
+                # Allow empty strings but not actual data
+                if isinstance(value, str) and value.strip():
+                    validation_result["warnings"].append(f"Unexpected data in user_data['{field}']: '{value[:50]}...'")
+                elif not isinstance(value, str):
+                    validation_result["warnings"].append(f"Unexpected non-string data in user_data['{field}']: {type(value)}")
+
+        # Ensure required repository data is present
+        required_repo_fields = ["repository_info", "languages", "skills", "commit_analysis"]
+        for field in required_repo_fields:
+            if not data.get(field):
+                validation_result["warnings"].append(f"Missing required repository field: '{field}'")
+
+        # Validate analysis_context_type
+        if data.get("analysis_context_type") != "repo_only":
+            validation_result["is_valid"] = False
+            validation_result["issues"].append("analysis_context_type is not 'repo_only'")
+
+        return validation_result
 
     async def create_recommendation_from_option(
         self,
@@ -1463,7 +1731,7 @@ class RecommendationService:
                         # Merge repository data with basic contributor info
                         contributor_data = await self.github_service.analyze_github_profile(username=github_username, force_refresh=False)
                         if contributor_data:
-                            github_data = self._merge_repository_and_contributor_data(github_data, contributor_data, github_username)
+                            github_data = self._merge_repository_and_contributor_data(github_data, contributor_data, github_username, analysis_context_type)
                         else:
                             logger.warning(f"Could not fetch contributor data for {github_username}, using repository data only")
 
@@ -1482,7 +1750,7 @@ class RecommendationService:
                         owner, repo = repo_path.split("/", 1)
                         repo_data = await self.repository_service.analyze_repository(f"{owner}/{repo}", force_refresh=False)
                         if repo_data:
-                            github_data = self._merge_repository_and_contributor_data(repo_data, github_data, github_username)
+                            github_data = self._merge_repository_and_contributor_data(repo_data, github_data, github_username, analysis_context_type)
 
             else:
                 logger.info("👤 Analyzing full GitHub profile...")

@@ -262,7 +262,7 @@ export const recommendationApi = {
       github_username: githubUsername,
       selected_option: selectedOption,
       all_options: allOptions,
-      analysis_type: analysisType || 'profile',
+      analysis_context_type: analysisType || 'profile',
       repository_url: repositoryUrl,
       recommendation_type: recommendationType,
       tone: tone,
@@ -348,6 +348,9 @@ export const apiClient = {
     include_specific_skills?: string[];
     include_keywords?: string[];
     exclude_keywords?: string[];
+    force_refresh?: boolean;
+    analysis_context_type?: string;
+    repository_url?: string;
   }) {
     const response = await api.post('/recommendations/generate-options', data);
     return response.data;
@@ -376,6 +379,7 @@ export const apiClient = {
     tone?: string;
     length?: string;
     exclude_keywords?: string[];
+    force_refresh?: boolean;
   }) {
     const response = await api.post('/recommendations/regenerate', data);
     return response.data;

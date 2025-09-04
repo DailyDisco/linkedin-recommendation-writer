@@ -313,6 +313,7 @@ class DynamicRefinementRequest(BaseModel):
     dynamic_length: Optional[str] = Field(None, description="Dynamic length override")
     include_keywords: Optional[List[str]] = Field(None, description="Keywords to include")
     exclude_keywords: Optional[List[str]] = Field(None, description="Keywords to exclude")
+    force_refresh: Optional[bool] = Field(False, description="Bypass cache and force fresh generation")
 
 
 class StreamProgressResponse(BaseModel):
@@ -332,92 +333,3 @@ class RecommendationListResponse(BaseModel):
     total: int
     page: int = 1
     page_size: int = 10
-
-
-class PromptSuggestionsRequest(BaseModel):
-    """Request schema for generating initial prompt suggestions."""
-
-    github_username: str = Field(..., description="GitHub username to analyze", min_length=1, max_length=39)
-    recommendation_type: str = Field(
-        "professional",
-        description="Type of recommendation",
-        pattern="^(professional|technical|leadership|academic|personal)$",
-    )
-    tone: str = Field(
-        "professional",
-        description="Tone of the recommendation",
-        pattern="^(professional|friendly|formal|casual)$",
-    )
-    length: str = Field(
-        "medium",
-        description="Length of the recommendation",
-        pattern="^(short|medium|long)$",
-    )
-
-    @field_validator("github_username")
-    @classmethod
-    def validate_github_username(cls, v: str) -> str:
-        """Validate GitHub username format."""
-        if not security_utils.validate_github_username(v):
-            raise ValueError("Invalid GitHub username format")
-        return v
-
-
-class PromptSuggestionsResponse(BaseModel):
-    """Response schema for initial prompt suggestions."""
-
-    suggested_working_relationship: List[str] = Field(default_factory=list, description="Suggested working relationship descriptions")
-    suggested_specific_skills: List[str] = Field(default_factory=list, description="Suggested specific skills")
-    suggested_notable_achievements: List[str] = Field(default_factory=list, description="Suggested notable achievements")
-
-
-class AutocompleteSuggestionsRequest(BaseModel):
-    """Request schema for AI auto-completion suggestions."""
-
-    github_username: str = Field(..., description="GitHub username for context", min_length=1, max_length=39)
-    field_name: str = Field(..., description="Field name: 'specific_skills' or 'notable_achievements'", pattern="^(specific_skills|notable_achievements)$")
-    current_input: str = Field(..., description="Current user input for auto-completion", max_length=500)
-
-    @field_validator("github_username")
-    @classmethod
-    def validate_github_username(cls, v: str) -> str:
-        """Validate GitHub username format."""
-        if not security_utils.validate_github_username(v):
-            raise ValueError("Invalid GitHub username format")
-        return v
-
-    @field_validator("current_input")
-    @classmethod
-    def sanitize_current_input(cls, v: str) -> str:
-        """Sanitize the current input."""
-        return security_utils.sanitize_text(v)
-
-
-class ChatAssistantRequest(BaseModel):
-    """Request schema for chat assistant interactions."""
-
-    github_username: str = Field(..., description="GitHub username for context", min_length=1, max_length=39)
-    conversation_history: List[Dict[str, str]] = Field(..., description="Conversation history with 'role' and 'content' keys")
-    user_message: str = Field(..., description="Current user message", max_length=1000)
-    current_form_data: Dict[str, Any] = Field(..., description="Current form data for context")
-
-    @field_validator("github_username")
-    @classmethod
-    def validate_github_username(cls, v: str) -> str:
-        """Validate GitHub username format."""
-        if not security_utils.validate_github_username(v):
-            raise ValueError("Invalid GitHub username format")
-        return v
-
-    @field_validator("user_message")
-    @classmethod
-    def sanitize_user_message(cls, v: str) -> str:
-        """Sanitize the user message."""
-        return security_utils.sanitize_text(v)
-
-
-class ChatAssistantResponse(BaseModel):
-    """Response schema for chat assistant replies."""
-
-    ai_reply: str = Field(..., description="AI assistant's reply message")
-    suggested_form_updates: Optional[Dict[str, str]] = Field(None, description="Optional suggested updates to form fields")

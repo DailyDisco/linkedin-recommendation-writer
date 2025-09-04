@@ -82,7 +82,7 @@ class RecommendationEngineService:
             length=length,
             analysis_context_type=analysis_context_type,
             repository_url=repository_url,
-            force_refresh=force_refresh,
+            force_refresh=force_refresh,  # Pass force_refresh
         )
 
         logger.info("✅ AI recommendation regenerated successfully")
@@ -129,15 +129,15 @@ class RecommendationEngineService:
 
         recommendation_data = RecommendationCreate(
             github_profile_id=github_profile_id,
-            title=ai_result["title"],
-            content=ai_result["content"],
+            title=ai_result.get("title", "LinkedIn Recommendation"),
+            content=ai_result.get("content", "Recommendation content not available"),
             recommendation_type=recommendation_type,
             tone=tone,
             length=length,
-            ai_model=ai_result["generation_parameters"]["model"],
+            ai_model=ai_result.get("generation_parameters", {}).get("model", "unknown"),
             generation_prompt=ai_result.get("generation_prompt"),
-            generation_parameters=ai_result["generation_parameters"],
-            word_count=ai_result["word_count"],
+            generation_parameters=ai_result.get("generation_parameters", {}),
+            word_count=ai_result.get("word_count", 0),
         )
 
         logger.info("✅ Recommendation data structure created")
@@ -151,6 +151,7 @@ class RecommendationEngineService:
         base_length: str = "medium",
         target_role: Optional[str] = None,
         specific_skills: Optional[List[str]] = None,
+        force_refresh: bool = False,
     ) -> RecommendationOptionsResponse:
         """Generate multiple recommendation options with variations."""
         logger.info("🎯 Generating recommendation options...")
@@ -173,16 +174,17 @@ class RecommendationEngineService:
                 length=variation["length"],
                 target_role=target_role,
                 specific_skills=specific_skills,
+                force_refresh=force_refresh,  # Pass force_refresh
             )
 
             option = RecommendationOption(
                 id=i,
                 name=ai_result.get("name", f"Option {i}"),
-                title=ai_result["title"],
-                content=ai_result["content"],
+                title=ai_result.get("title", f"Recommendation Option {i}"),
+                content=ai_result.get("content", "Recommendation content not available"),
                 focus=ai_result.get("focus", f"{variation['tone']} focus"),
                 explanation=ai_result.get("explanation", f"Best for {variation['tone']} communications"),
-                word_count=ai_result["word_count"],
+                word_count=ai_result.get("word_count", 0),
             )
             options.append(option)
 

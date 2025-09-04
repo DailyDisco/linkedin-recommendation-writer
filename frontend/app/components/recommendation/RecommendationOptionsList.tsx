@@ -82,7 +82,7 @@ const RecommendationOptionsList: React.FC<RecommendationOptionsListProps> = ({
       </div>
 
       <p className='text-gray-600'>
-        Here are 3 different recommendation options based on the GitHub
+        Here are 2 different recommendation options based on the GitHub
         analysis. Each option has a different focus area. Choose the one that
         best fits your needs.
       </p>

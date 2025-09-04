@@ -230,6 +230,8 @@ class GitHubRepositoryService:
             repo_info = await self._get_repository_info(owner, repo_name)
             if not repo_info:
                 logger.error(f"❌ Failed to fetch repository info for {repository_full_name}")
+                logger.error("   • This is likely due to GitHub API authentication issues")
+                logger.error("   • Check if GITHUB_TOKEN environment variable is set")
                 return None
 
             repo_end = time.time()
@@ -238,7 +240,8 @@ class GitHubRepositoryService:
             logger.info(f"   • Name: {repo_info.get('name', 'N/A')}")
             logger.info(f"   • Language: {repo_info.get('language', 'N/A')}")
             logger.info(f"   • Stars: {repo_info.get('stars', 0)}")
-            logger.info(f"   • Description: {repo_info.get('description', 'N/A')[:50]}...")
+            description = repo_info.get("description", "N/A") or "N/A"
+            logger.info(f"   • Description: {description[:50]}...")
 
             # Get repository languages
             logger.info("💻 STEP 2: ANALYZING REPOSITORY LANGUAGES")
@@ -249,7 +252,7 @@ class GitHubRepositoryService:
 
             lang_end = time.time()
             logger.info(f"⏱️  Language analysis completed in {lang_end - lang_start:.2f} seconds")
-            logger.info(f"✅ Found {len(repo_languages)} programming languages in repository")
+            logger.info(f"✅ Found {len(repo_languages) if repo_languages else 0} programming languages in repository")
 
             # Get repository commits (limited for performance)
             logger.info("📝 STEP 3: ANALYZING REPOSITORY COMMITS")
@@ -260,42 +263,99 @@ class GitHubRepositoryService:
 
             commits_end = time.time()
             logger.info(f"⏱️  Commit analysis completed in {commits_end - commits_start:.2f} seconds")
-            logger.info(f"✅ Analyzed {len(repo_commits)} commits from repository")
+            logger.info(f"✅ Analyzed {len(repo_commits) if repo_commits else 0} commits from repository")
+
+            # Debug: Check if any of the results are None
+            logger.info("🔍 DEBUG: Checking analysis results...")
+            logger.info(f"   • repo_info: {'OK' if repo_info else 'None'}")
+            logger.info(f"   • repo_languages: {'OK' if repo_languages else 'None'}")
+            logger.info(f"   • repo_commits: {'OK' if repo_commits else 'None'}")
 
             # Extract repository-specific skills and technologies
             logger.info("🔧 STEP 4: EXTRACTING REPOSITORY SKILLS")
             logger.info("-" * 40)
             skills_start = time.time()
 
-            repo_skills = await self._extract_repository_skills(repo_info, repo_languages, repo_commits)
+            try:
+                repo_skills = await self._extract_repository_skills(repo_info, repo_languages, repo_commits)
+                logger.info("✅ Skills extraction method completed")
+            except Exception as e:
+                logger.error(f"💥 ERROR in skills extraction: {e}")
+                import traceback
+
+                logger.error(f"Stack trace: {traceback.format_exc()}")
+                repo_skills = None
 
             skills_end = time.time()
             logger.info(f"⏱️  Skills extraction completed in {skills_end - skills_start:.2f} seconds")
+
+            # Debug: Check skills result
+            logger.info(f"🔍 DEBUG: Skills extraction result: {'OK' if repo_skills else 'None'}")
+            if repo_skills:
+                logger.info(f"   • Technical skills: {len(repo_skills.get('technical_skills', []))}")
+                logger.info(f"   • Frameworks: {len(repo_skills.get('frameworks', []))}")
 
             # Analyze repository-specific commit patterns
             logger.info("📊 STEP 5: ANALYZING COMMIT PATTERNS")
             logger.info("-" * 40)
             patterns_start = time.time()
 
-            commit_patterns = await self._analyze_repository_commit_patterns(repo_commits, repo_languages)
+            try:
+                commit_patterns = await self._analyze_repository_commit_patterns(repo_commits, repo_languages)
+                logger.info("✅ Commit pattern analysis method completed")
+            except Exception as e:
+                logger.error(f"💥 ERROR in commit pattern analysis: {e}")
+                import traceback
+
+                logger.error(f"Stack trace: {traceback.format_exc()}")
+                commit_patterns = None
 
             patterns_end = time.time()
             logger.info(f"⏱️  Pattern analysis completed in {patterns_end - patterns_start:.2f} seconds")
+
+            # Debug: Check patterns result
+            logger.info(f"🔍 DEBUG: Pattern analysis result: {'OK' if commit_patterns else 'None'}")
+            if commit_patterns:
+                logger.info(f"   • Pattern keys: {list(commit_patterns.keys())}")
 
             # Compile final repository analysis
             analysis_end = time.time()
             total_time = analysis_end - analysis_start
 
-            result = {
-                "repository_info": repo_info,
-                "languages": repo_languages,
-                "commits": repo_commits,
-                "skills": repo_skills,
-                "commit_analysis": commit_patterns,
-                "analyzed_at": datetime.utcnow().isoformat(),
-                "analysis_time_seconds": round(total_time, 2),
-                "analysis_context_type": "repository",
-            }
+            logger.info("🔍 DEBUG: Constructing final result...")
+            logger.info(f"   • repo_info type: {type(repo_info)}")
+            logger.info(f"   • repo_languages type: {type(repo_languages)}")
+            logger.info(f"   • repo_commits type: {type(repo_commits)}")
+            logger.info(f"   • repo_skills type: {type(repo_skills)}")
+            logger.info(f"   • commit_patterns type: {type(commit_patterns)}")
+
+            try:
+                result = {
+                    "repository_info": repo_info,
+                    "languages": repo_languages,
+                    "commits": repo_commits,
+                    "skills": repo_skills,
+                    "commit_analysis": commit_patterns,
+                    "analyzed_at": datetime.utcnow().isoformat(),
+                    "analysis_time_seconds": round(total_time, 2),
+                    "analysis_context_type": "repository",
+                }
+                logger.info("✅ Final result constructed successfully")
+            except Exception as result_error:
+                logger.error(f"💥 Error constructing final result: {result_error}")
+                logger.error("   • Checking individual components...")
+                # Try to identify which component is causing the issue
+                if repo_info is None:
+                    logger.error("   • repo_info is None!")
+                if repo_languages is None:
+                    logger.error("   • repo_languages is None!")
+                if repo_commits is None:
+                    logger.error("   • repo_commits is None!")
+                if repo_skills is None:
+                    logger.error("   • repo_skills is None!")
+                if commit_patterns is None:
+                    logger.error("   • commit_patterns is None!")
+                raise
 
             # Cache the result
             await set_cache(cache_key, result, ttl=self.COMMIT_ANALYSIS_CACHE_TTL)
@@ -317,6 +377,8 @@ class GitHubRepositoryService:
         """Get basic repository information."""
         try:
             if not self.github_client:
+                logger.error("🚨 GitHub client not initialized - cannot fetch repository info")
+                logger.error("   • This usually means GITHUB_TOKEN is not configured")
                 return None
 
             repo = self.github_client.get_repo(f"{owner}/{repo_name}")
@@ -415,9 +477,9 @@ class GitHubRepositoryService:
                         },
                         "stats": (
                             {
-                                "additions": (commit.stats.additions if commit.stats else 0),
-                                "deletions": (commit.stats.deletions if commit.stats else 0),
-                                "total": commit.stats.total if commit.stats else 0,
+                                "additions": (commit.stats.additions if commit.stats and hasattr(commit.stats, "additions") and commit.stats.additions is not None else 0),
+                                "deletions": (commit.stats.deletions if commit.stats and hasattr(commit.stats, "deletions") and commit.stats.deletions is not None else 0),
+                                "total": (commit.stats.total if commit.stats and hasattr(commit.stats, "total") and commit.stats.total is not None else 0),
                             }
                             if commit.stats
                             else None
@@ -453,53 +515,70 @@ class GitHubRepositoryService:
     ) -> Dict[str, Any]:
         """Extract skills and technologies from repository data."""
         try:
+            logger.info("🔍 DEBUG: Starting skills extraction...")
+            logger.info(f"   • repo_info type: {type(repo_info)}")
+            logger.info(f"   • languages type: {type(languages)}, length: {len(languages) if languages else 0}")
+            logger.info(f"   • commits type: {type(commits)}, length: {len(commits) if commits else 0}")
+
             # Extract technical skills from languages
             technical_skills = [lang.language for lang in languages[:5]]  # Top 5 languages
+            logger.info(f"   • technical_skills: {technical_skills}")
 
             # Extract frameworks and tools from commit messages and file names
             frameworks = []
             tools: List[str] = []
             domains = []
 
-            # Common framework patterns
+            # Common framework patterns - more specific to avoid false positives
             framework_patterns = {
-                "React": ["react", "jsx", "tsx", "component"],
-                "Vue": ["vue", "vuex", "vue-router"],
-                "Angular": ["angular", "ng-", "@angular"],
-                "Django": ["django", "models.py", "views.py", "urls.py"],
-                "Flask": ["flask", "app.py", "routes"],
-                "Express": ["express", "app.js", "routes"],
-                "Spring": ["spring", "@controller", "@service"],
-                "Laravel": ["laravel", "artisan"],
-                "Rails": ["rails", "ruby on rails"],
-                "Next.js": ["next.js", "next.config"],
-                "Nuxt.js": ["nuxt", "nuxt.config"],
-                "Svelte": ["svelte", ".svelte"],
-                "FastAPI": ["fastapi", "pydantic"],
-                "GraphQL": ["graphql", ".graphql"],
-                "Docker": ["docker", "dockerfile", "docker-compose"],
-                "Kubernetes": ["kubernetes", "k8s", "helm"],
-                "AWS": ["aws", "lambda", "s3", "ec2"],
-                "Azure": ["azure", "blob", "function"],
-                "GCP": ["google cloud", "firebase", "gcp"],
+                "React": ["react", "jsx", "tsx", "component", "react-dom", "create-react-app"],
+                "Vue": ["vue", "vuex", "vue-router", "vue-cli"],
+                "Angular": ["angular", "ng-", "@angular", "angular-cli"],
+                "Django": ["django", "models.py", "views.py", "urls.py", "manage.py"],
+                "Flask": ["flask", "app.py", "routes", "flask-sqlalchemy"],
+                "Express": ["express", "app.js", "routes", "express-session"],
+                "Spring": ["spring", "@controller", "@service", "spring-boot"],
+                "Laravel": ["laravel", "artisan", "composer.json"],
+                "Rails": ["rails", "ruby on rails", "rails-assets"],
+                "Next.js": ["next.js", "next.config", "next-env"],
+                "Nuxt.js": ["nuxt", "nuxt.config", "nuxt-build"],
+                "Svelte": ["svelte", ".svelte", "svelte-kit"],
+                "FastAPI": ["fastapi", "pydantic", "uvicorn"],
+                "GraphQL": ["graphql", ".graphql", "apollo"],
+                "Docker": ["docker", "dockerfile", "docker-compose", "containerd"],
+                "Kubernetes": ["kubernetes", "k8s", "helm", "kubectl"],
+                "AWS": ["aws", "lambda", "s3", "ec2", "boto3"],
+                "Azure": ["azure", "azure-sdk", "azure-storage", "azure-functions", "azure-cli"],
+                "GCP": ["google cloud", "firebase", "gcp", "google-cloud"],
             }
 
             # Check commit messages and file names for frameworks
-            for commit in commits[:20]:  # Check first 20 commits
-                message = commit.get("message", "").lower()
-                for framework, patterns in framework_patterns.items():
-                    if any(pattern in message for pattern in patterns):
-                        if framework not in frameworks:
-                            frameworks.append(framework)
-
-            # Check file names for frameworks
-            for commit in commits[:10]:
-                for file_info in commit.get("files", []):
-                    filename = file_info.get("filename", "").lower()
+            if commits:
+                for commit in commits[:20]:  # Check first 20 commits
+                    message = commit.get("message", "").lower()
                     for framework, patterns in framework_patterns.items():
-                        if any(pattern in filename for pattern in patterns):
-                            if framework not in frameworks:
-                                frameworks.append(framework)
+                        for pattern in patterns:
+                            if pattern in message:
+                                # For cloud providers, require more context to avoid false positives
+                                if framework in ["Azure", "AWS", "GCP"]:
+                                    # Check if it's not just a generic word like "function"
+                                    if pattern in ["function", "blob", "lambda"]:
+                                        # Require additional context for generic terms
+                                        context_words = ["azure", "aws", "gcp", "cloud", "storage", "sdk"]
+                                        if not any(context_word in message for context_word in context_words):
+                                            continue
+                                if framework not in frameworks:
+                                    frameworks.append(framework)
+                                break  # Found this framework, move to next
+
+                # Check file names for frameworks
+                for commit in commits[:10]:
+                    for file_info in commit.get("files", []):
+                        filename = file_info.get("filename", "").lower()
+                        for framework, patterns in framework_patterns.items():
+                            if any(pattern in filename for pattern in patterns):
+                                if framework not in frameworks:
+                                    frameworks.append(framework)
 
             # Determine domains based on repository content
             repo_description = (repo_info.get("description") or "").lower()
@@ -599,13 +678,30 @@ class GitHubRepositoryService:
     async def _analyze_repository_commit_patterns(self, commits: List[Dict[str, Any]], languages: List[LanguageStats]) -> Dict[str, Any]:
         """Analyze commit patterns specific to the repository."""
         try:
+            logger.info("🔍 DEBUG: Starting commit pattern analysis...")
+            logger.info(f"   • commits type: {type(commits)}, length: {len(commits) if commits else 0}")
+            logger.info(f"   • languages type: {type(languages)}, length: {len(languages) if languages else 0}")
+
             if not commits:
+                logger.info("   • No commits to analyze, returning empty analysis")
                 return self._empty_commit_analysis()
 
             # Basic commit statistics
             total_commits = len(commits)
-            total_additions = sum([c.get("stats", {}).get("additions", 0) for c in commits])
-            total_deletions = sum([c.get("stats", {}).get("deletions", 0) for c in commits])
+            logger.info(f"   • Analyzing {total_commits} commits...")
+
+            # Debug: Check if commit stats exist
+            sample_commit = commits[0] if commits else None
+            if sample_commit:
+                logger.info(f"   • Sample commit keys: {list(sample_commit.keys())}")
+                if "stats" in sample_commit and sample_commit["stats"] is not None:
+                    logger.info(f"   • Sample stats: {sample_commit['stats']}")
+                else:
+                    logger.info("   • No stats in sample commit")
+
+            # Safely handle commit stats that might be None
+            total_additions = sum([c.get("stats", {}).get("additions", 0) if c.get("stats") is not None else 0 for c in commits])
+            total_deletions = sum([c.get("stats", {}).get("deletions", 0) if c.get("stats") is not None else 0 for c in commits])
 
             # Analyze commit messages for patterns
             commit_messages = [c.get("message", "") for c in commits]
@@ -648,7 +744,7 @@ class GitHubRepositoryService:
 
             # Determine technical focus areas
             tech_focus = {}
-            if languages:
+            if languages and len(languages) > 0 and hasattr(languages[0], "language"):
                 primary_lang = languages[0].language  # Access .language attribute
                 tech_focus[f"{primary_lang} Development"] = len([c for c in commits if any(primary_lang.lower() in str(c).lower() for c in c.get("files", []))])
 

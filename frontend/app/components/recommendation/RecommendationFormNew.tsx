@@ -8,12 +8,10 @@ import { GitHubInputSection } from './form-sections/GitHubInputSection';
 import { AnalysisTypeSection } from './form-sections/AnalysisTypeSection';
 import { RecommendationSettingsSection } from './form-sections/RecommendationSettingsSection';
 
-import { PromptAssistantChat } from '../PromptAssistantChat';
-import type { ContributorInfo, ParsedGitHubInput } from '../../types/index';
+import type { ParsedGitHubInput } from '../../types/index';
 import type { RecommendationFormData } from '../../hooks/useRecommendationState';
 
 interface RecommendationFormNewProps {
-  contributor: ContributorInfo;
   formData: RecommendationFormData;
   errors: Record<string, string>;
   parsedGitHubInput: ParsedGitHubInput | null;
@@ -28,7 +26,6 @@ interface RecommendationFormNewProps {
 }
 
 export const RecommendationFormNew: React.FC<RecommendationFormNewProps> = ({
-  contributor,
   formData,
   errors,
   parsedGitHubInput,
@@ -56,7 +53,7 @@ export const RecommendationFormNew: React.FC<RecommendationFormNewProps> = ({
       {/* Analysis Type Selection */}
       <AnalysisTypeSection
         parsedGitHubInput={parsedGitHubInput}
-        analysisType={formData.analysis_type}
+        analysisType={formData.analysis_context_type}
         repositoryUrl={formData.repository_url || ''}
         errors={errors}
         onChange={onChange}
@@ -182,9 +179,6 @@ export const RecommendationFormNew: React.FC<RecommendationFormNewProps> = ({
         forceRefresh={formData.force_refresh}
         onChange={onChange}
       />
-
-      {/* Prompt Assistant Chat */}
-      <PromptAssistantChat contributor={contributor} formData={formData} />
 
       {/* Action Buttons */}
       <div className='flex justify-end space-x-3'>

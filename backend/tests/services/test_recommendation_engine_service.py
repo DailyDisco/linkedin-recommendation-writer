@@ -386,3 +386,109 @@ class TestRecommendationEngineService:
 
         assert "structure" in " ".join(result["issues"]).lower()
         assert result["structure_score"] <= 10  # Should have some structure but not great
+
+    @pytest.mark.asyncio
+    async def test_generate_recommendation_repo_only_context_filters_data(self, engine_service, mock_ai_service):
+        """Test that repo_only context properly filters out general user data to prevent data leakage."""
+
+        # Mock data with both general user profile and repository-specific info
+        github_data_repo_only = {
+            "user_data": {
+                "github_username": "octocat",
+                "full_name": "Octo Cat",
+                "bio": "General bio about Octocat.",
+                "company": "GitHub",
+                "location": "San Francisco",
+                "public_repos": 10,
+                "followers": 100,
+                "starred_technologies": {"languages": {"Python": 5}},
+                "organizations": [{"login": "octo-org"}],
+            },
+            "repository_info": {
+                "name": "test-repo",
+                "full_name": "octocat/test-repo",
+                "description": "A repository for testing.",
+                "language": "TypeScript",
+                "stars": 50,
+                "forks": 10,
+                "owner": {"login": "octocat"},
+            },
+            "repository_languages": [{"language": "TypeScript", "percentage": 80}],
+            "repository_skills": {"technical_skills": ["React", "Node.js"], "frameworks": ["Express"]},
+            "repository_commit_analysis": {
+                "total_commits": 20,
+                "excellence_areas": {"primary_strength": "code_quality"},
+            },
+            # General user data that should be ignored in repo_only mode
+            "languages": [{"language": "Python", "percentage": 90}],
+            "skills": {"technical_skills": ["Python", "Flask"]},
+            "commit_analysis": {"total_commits": 500, "excellence_areas": {"primary_strength": "feature_development"}},
+        }
+
+        # Mock the AI service response
+        mock_ai_service.generate_recommendation.return_value = {
+            "options": [
+                {
+                    "id": 1,
+                    "name": "Option 1",
+                    "content": "Test recommendation content",
+                    "title": "Test Title",
+                    "word_count": 50,
+                    "focus": "technical_expertise",
+                }
+            ],
+            "generation_parameters": {},
+            "generation_prompt": "mocked prompt"
+        }
+
+        # Call the service with repo_only context
+        result = await engine_service.generate_recommendation(
+            github_data=github_data_repo_only,
+            recommendation_type="professional",
+            tone="professional",
+            length="medium",
+            analysis_context_type="repo_only",
+            repository_url="https://github.com/octocat/test-repo",
+        )
+
+        # Verify the AI service was called
+        mock_ai_service.generate_recommendation.assert_called_once()
+
+        # Get the arguments passed to the AI service
+        call_args, call_kwargs = mock_ai_service.generate_recommendation.call_args
+        filtered_github_data = call_args[0]  # First positional argument is github_data
+
+        # Assert that general user data has been filtered out
+        user_data = filtered_github_data.get("user_data", {})
+
+        # These should be absent or empty in repo_only mode
+        assert user_data.get("bio") is None or user_data.get("bio") == ""
+        assert "starred_technologies" not in user_data
+        assert "organizations" not in user_data
+        assert user_data.get("company") is None or user_data.get("company") == ""
+        assert user_data.get("location") is None or user_data.get("location") == ""
+        assert user_data.get("public_repos") is None
+        assert user_data.get("followers") is None
+
+        # These should be present (essential identifying info)
+        assert user_data.get("github_username") == "octocat"
+        assert user_data.get("full_name") == "Octo Cat"
+
+        # Repository-specific data should be used instead of general data
+        languages = filtered_github_data.get("languages", [])
+        assert len(languages) > 0
+        assert languages[0]["language"] == "TypeScript"
+        assert "Python" not in [lang["language"] for lang in languages]
+
+        skills = filtered_github_data.get("skills", {})
+        assert "React" in skills.get("technical_skills", [])
+        assert "Flask" not in skills.get("technical_skills", [])
+
+        commit_analysis = filtered_github_data.get("commit_analysis", {})
+        assert commit_analysis.get("total_commits") == 20  # Repository-specific
+        assert commit_analysis.get("excellence_areas", {}).get("primary_strength") == "code_quality"
+
+        # Verify the result structure
+        assert "options" in result
+        assert len(result["options"]) > 0
+        assert result["generation_parameters"]["model"] is not None

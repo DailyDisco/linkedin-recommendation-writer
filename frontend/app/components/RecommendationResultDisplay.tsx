@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import {
@@ -48,7 +49,7 @@ interface FormData {
   tone: 'professional' | 'friendly' | 'formal' | 'casual';
   length: 'short' | 'medium' | 'long';
   github_input: string;
-  analysis_type: 'profile' | 'repo_only';
+  analysis_context_type: 'profile' | 'repo_only';
   repository_url?: string;
   include_keywords?: string[]; // Added to FormData
   exclude_keywords?: string[]; // Added to FormData
@@ -258,10 +259,63 @@ export default function RecommendationResultDisplay({
             {/* Preview Tab */}
             <TabsContent value='preview' className='mt-4'>
               <div className='prose prose-sm max-w-none mb-4'>
-                <pre className='whitespace-pre-wrap font-sans text-sm bg-muted p-4 rounded-md'>
-                  {currentContent}
-                </pre>
+                <div className='font-sans text-sm bg-muted p-4 rounded-md'>
+                  <ReactMarkdown
+                    components={{
+                      p: ({ children }) => (
+                        <p className='mb-3 leading-relaxed'>{children}</p>
+                      ),
+                    }}
+                  >
+                    {currentContent}
+                  </ReactMarkdown>
+                </div>
               </div>
+
+              {/* Debug: Show raw content representation */}
+              <details className='mt-4'>
+                <summary className='text-sm text-gray-500 cursor-pointer'>
+                  Debug: Raw Content Analysis
+                </summary>
+                <div className='text-xs bg-gray-100 p-2 mt-2 rounded space-y-2'>
+                  <div>Length: {currentContent.length} chars</div>
+                  <div>
+                    Contains double newlines:{' '}
+                    {currentContent.includes('\n\n') ? 'YES' : 'NO'}
+                  </div>
+                  <div>
+                    Paragraph count: {currentContent.split('\n\n').length}
+                  </div>
+                  <div>
+                    Raw preview:{' '}
+                    {currentContent.slice(0, 100).replace(/\n/g, '\\n')}
+                  </div>
+                </div>
+              </details>
+
+              {/* ReactMarkdown Info */}
+              <details className='mt-4'>
+                <summary className='text-sm text-green-600 cursor-pointer'>
+                  ℹ️ Using ReactMarkdown for rendering
+                </summary>
+                <div className='bg-green-50 p-4 mt-2 rounded text-sm'>
+                  <p>
+                    This recommendation is now rendered using ReactMarkdown,
+                    which automatically:
+                  </p>
+                  <ul className='list-disc list-inside mt-2 space-y-1'>
+                    <li>
+                      Converts double newlines (<code>\n\n</code>) to paragraph
+                      breaks
+                    </li>
+                    <li>Handles proper spacing and typography</li>
+                    <li>
+                      Maintains LinkedIn compatibility (no bold/italic
+                      formatting)
+                    </li>
+                  </ul>
+                </div>
+              </details>
               <div className='flex justify-between items-center text-sm text-gray-500'>
                 <span>Word Count: {currentWordCount}</span>
                 <span>

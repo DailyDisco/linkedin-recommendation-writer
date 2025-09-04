@@ -16,12 +16,27 @@ def setup_logging() -> None:
     log_dir.mkdir(exist_ok=True, parents=True)
 
     # Configure root logger
+    handlers = [logging.StreamHandler(sys.stdout)]
+
+    # Add file handler for detailed logs
+    if not is_production:
+        # Development: write all logs to file
+        file_handler = logging.FileHandler(log_dir / "app.log")
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(logging.Formatter(settings.LOG_FORMAT))
+        handlers.append(file_handler)
+
+        # Separate debug file for AI services
+        ai_handler = logging.FileHandler(log_dir / "ai_service.log")
+        ai_handler.setLevel(logging.DEBUG)
+        ai_handler.setFormatter(logging.Formatter(settings.LOG_FORMAT))
+        ai_handler.addFilter(lambda record: record.name.startswith("app.services.ai"))
+        handlers.append(ai_handler)
+
     logging.basicConfig(
         level=getattr(logging, settings.LOG_LEVEL),
         format=settings.LOG_FORMAT,
-        handlers=[
-            logging.StreamHandler(sys.stdout),
-        ],
+        handlers=handlers,
     )
 
     # Explicitly set app logger to DEBUG

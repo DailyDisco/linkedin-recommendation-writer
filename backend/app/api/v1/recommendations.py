@@ -13,24 +13,17 @@ from app.core.dependencies import (
     AnonymousUser,
     PaginationParams,
     check_generation_limit,
-    get_ai_service,
     get_current_user_optional,
     get_database_session,
-    get_github_service,
     get_pagination_params,
     get_recommendation_service,
     increment_generation_count,
 )
 from app.models.user import User
 from app.schemas.recommendation import (
-    AutocompleteSuggestionsRequest,
-    ChatAssistantRequest,
-    ChatAssistantResponse,
     DynamicRefinementRequest,
     KeywordRefinementRequest,
     KeywordRefinementResponse,
-    PromptSuggestionsRequest,
-    PromptSuggestionsResponse,
     ReadmeGenerationRequest,
     ReadmeGenerationResponse,
     RecommendationFromOptionRequest,
@@ -45,8 +38,6 @@ from app.schemas.recommendation import (
     StreamProgressResponse,
     VersionComparisonResponse,
 )
-from app.services.ai.ai_service import AIService
-from app.services.github.github_user_service import GitHubUserService
 from app.services.recommendation.recommendation_service import RecommendationService
 
 logger = logging.getLogger(__name__)
@@ -185,7 +176,7 @@ async def generate_recommendation_options(
 
     try:
         logger.info("🎯 Starting multiple options generation process...")
-        options_response = await recommendation_service.create_recommendation_options(
+        result = await recommendation_service.create_recommendation_options(
             db=db,
             user_id=user_id,  # Can be None for anonymous users
             github_username=request.github_username,
@@ -200,6 +191,9 @@ async def generate_recommendation_options(
             analysis_context_type=getattr(request, "analysis_context_type", "profile"),
             repository_url=getattr(request, "repository_url", None),
         )
+
+        # Extract the options response from the result
+        options_response = result.get("options_response")
 
         # Only increment after successful generation
         await increment_recommendation_count(db, current_user, req)
@@ -603,6 +597,7 @@ async def generate_recommendation_options_stream(
     exclude_keywords: Optional[str] = Query(None),  # Comma-separated string
     analysis_context_type: str = Query("profile", pattern="^(profile|repo_only)$"),
     repository_url: Optional[str] = Query(None, max_length=500),
+    force_refresh: bool = Query(False),  # New parameter
     req: Request = None,
     db: AsyncSession = Depends(get_database_session),
     recommendation_service: RecommendationService = Depends(get_recommendation_service),
@@ -622,6 +617,7 @@ async def generate_recommendation_options_stream(
         exclude_keywords=exclude_keywords.split(",") if exclude_keywords else None,
         analysis_context_type=analysis_context_type,
         repository_url=repository_url,
+        force_refresh=force_refresh,  # Pass force_refresh
     )
 
     # Check limit but don't increment yet
@@ -636,14 +632,33 @@ async def generate_recommendation_options_stream(
 
     async def generate_stream():
         try:
-            logger.info("🎯 SSE stream started - checking GitHub data...")
+            logger.info("🎯 SSE stream started - using RecommendationService...")
 
-            # Get GitHub data from GitHub service
-            github_user_service = get_github_service()
-            github_data = await github_user_service.analyze_github_profile(request.github_username, force_refresh=False)
-            logger.info(f"✅ GitHub data retrieved for user: {request.github_username}")
+            # Use the RecommendationService which handles repo_only context properly
+            result = await recommendation_service.create_recommendation_options(
+                db=db,
+                github_username=request.github_username,
+                user_id=current_user.id if isinstance(current_user, User) else None,
+                recommendation_type=request.recommendation_type,
+                tone=request.tone,
+                length=request.length,
+                custom_prompt=request.custom_prompt,
+                target_role=request.target_role,
+                specific_skills=request.include_specific_skills,
+                include_keywords=None,  # Not used in streaming
+                exclude_keywords=request.exclude_keywords,
+                analysis_context_type=request.analysis_context_type,
+                repository_url=request.repository_url,
+            )
 
-            # Create AI recommendation service directly
+            # Extract filtered GitHub data
+            github_data = result.get("github_data", {})
+
+            logger.info(f"✅ RecommendationService returned filtered GitHub data with {len(github_data)} keys")
+            logger.info(f"   • Analysis context: {request.analysis_context_type}")
+            logger.info(f"   • Repository URL: {request.repository_url}")
+
+            # Create AI recommendation service for streaming
             from app.services.ai.ai_recommendation_service import AIRecommendationService
             from app.services.ai.prompt_service import PromptService
 
@@ -661,6 +676,9 @@ async def generate_recommendation_options_stream(
                 target_role=request.target_role,
                 specific_skills=request.include_specific_skills,
                 exclude_keywords=request.exclude_keywords,
+                analysis_context_type=request.analysis_context_type,
+                repository_url=request.repository_url,
+                force_refresh=force_refresh,  # Pass force_refresh
             ):
                 logger.info(f"📡 SSE yielding progress: {progress_update.get('stage', 'Unknown')} - {progress_update.get('progress', 0)}%")
 
@@ -720,7 +738,7 @@ async def regenerate_recommendation_stream(
         try:
             # Get GitHub data
             github_data = await recommendation_service._get_or_create_github_profile_data(
-                db=db, github_username=request.github_username, analysis_context_type=request.analysis_context_type, repository_url=request.repository_url
+                db=db, github_username=request.github_username, analysis_context_type=request.analysis_context_type, repository_url=request.repository_url, force_refresh=request.force_refresh
             )
 
             # Stream the regeneration process
@@ -737,6 +755,7 @@ async def regenerate_recommendation_stream(
                 dynamic_length=request.dynamic_length,
                 include_keywords=request.include_keywords,
                 exclude_keywords=request.exclude_keywords,
+                force_refresh=request.force_refresh,
             ):
                 # Format as SSE data
                 data = f"data: {StreamProgressResponse(**progress_update).model_dump_json()}\n\n"
@@ -826,6 +845,24 @@ async def get_recommendation(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
+@router.post("/prompt-suggestions")
+async def get_prompt_suggestions(
+    request: RecommendationRequest,
+    db: AsyncSession = Depends(get_database_session),
+    recommendation_service: RecommendationService = Depends(get_recommendation_service),
+    current_user: Union[User, AnonymousUser] = Depends(get_current_user_optional),
+) -> dict:
+    """Get prompt suggestions for recommendation generation."""
+
+    try:
+        # For now, return empty suggestions to prevent 405 error
+        # This endpoint is mainly used for cache warming
+        return {"suggestions": [], "message": "Prompt suggestions endpoint available"}
+    except Exception as e:
+        logger.error(f"Error getting prompt suggestions: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
 @router.delete("/{recommendation_id}")
 async def delete_recommendation(
     recommendation_id: int,
@@ -842,99 +879,3 @@ async def delete_recommendation(
     except Exception as e:
         logger.error(f"Error deleting recommendation {recommendation_id}: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
-
-
-# Prompt Assistant Endpoints
-@router.post("/prompt-suggestions", response_model=PromptSuggestionsResponse)
-async def get_prompt_suggestions(
-    request: PromptSuggestionsRequest,
-    github_user_service: GitHubUserService = Depends(get_github_service),
-    ai_service: AIService = Depends(get_ai_service),
-    current_user: Union[User, AnonymousUser] = Depends(get_current_user_optional),
-) -> PromptSuggestionsResponse:
-    """Get initial prompt suggestions for recommendation form fields."""
-    try:
-        # Get GitHub profile data for context
-        github_data = await github_user_service.analyze_github_profile(username=request.github_username, force_refresh=False, max_repositories=5)  # Limit for performance
-
-        if not github_data:
-            logger.warning(f"Could not fetch GitHub data for {request.github_username}")
-            # Return empty suggestions if no GitHub data available
-            return PromptSuggestionsResponse()
-
-        # Get AI-generated suggestions
-        suggestions = await ai_service.get_initial_prompt_suggestions(
-            github_data=github_data,
-            recommendation_type=request.recommendation_type,
-            tone=request.tone,
-            length=request.length,
-        )
-
-        return suggestions
-
-    except Exception as e:
-        logger.error(f"Error generating prompt suggestions: {e}")
-        # Return empty suggestions on error to avoid breaking the UI
-        return PromptSuggestionsResponse()
-
-
-@router.post("/autocomplete-suggestions", response_model=list[str])
-async def get_autocomplete_suggestions_api(
-    request: AutocompleteSuggestionsRequest,
-    github_user_service: GitHubUserService = Depends(get_github_service),
-    ai_service: AIService = Depends(get_ai_service),
-    current_user: Union[User, AnonymousUser] = Depends(get_current_user_optional),
-) -> list[str]:
-    """Get AI-powered auto-completion suggestions for form fields."""
-    try:
-        # Get GitHub profile data for context
-        github_data = await github_user_service.analyze_github_profile(username=request.github_username, force_refresh=False, max_repositories=5)  # Limit for performance
-
-        if not github_data:
-            logger.warning(f"Could not fetch GitHub data for {request.github_username}")
-            return []
-
-        # Get AI-generated suggestions
-        suggestions = await ai_service.get_autocomplete_suggestions(
-            github_data=github_data,
-            field_name=request.field_name,
-            current_input=request.current_input,
-        )
-
-        return suggestions
-
-    except Exception as e:
-        logger.error(f"Error generating autocomplete suggestions: {e}")
-        # Return empty list on error to avoid breaking the UI
-        return []
-
-
-@router.post("/chat-assistant", response_model=ChatAssistantResponse)
-async def chat_with_assistant_api(
-    request: ChatAssistantRequest,
-    github_user_service: GitHubUserService = Depends(get_github_service),
-    ai_service: AIService = Depends(get_ai_service),
-    current_user: Union[User, AnonymousUser] = Depends(get_current_user_optional),
-) -> ChatAssistantResponse:
-    """Handle conversational AI assistance for the recommendation form."""
-    try:
-        # Get GitHub profile data for context
-        github_data = await github_user_service.analyze_github_profile(username=request.github_username, force_refresh=False, max_repositories=5)  # Limit for performance
-
-        if not github_data:
-            logger.warning(f"Could not fetch GitHub data for {request.github_username}")
-            return ChatAssistantResponse(ai_reply="I'm sorry, but I need access to your GitHub profile to provide personalized assistance. Please try again later.")
-
-        # Get AI-generated response
-        response = await ai_service.chat_with_assistant(
-            github_data=github_data,
-            conversation_history=request.conversation_history,
-            user_message=request.user_message,
-            current_form_data=request.current_form_data,
-        )
-
-        return response
-
-    except Exception as e:
-        logger.error(f"Error in chat assistant: {e}")
-        return ChatAssistantResponse(ai_reply="I'm sorry, I encountered an error while processing your request. Please try again.")

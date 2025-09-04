@@ -90,14 +90,14 @@ export default function RecommendationModal({
           dispatch({
             type: 'UPDATE_FORM',
             payload: {
-              analysis_type: 'repo_only',
+              analysis_context_type: 'repo_only',
               repository_url: initialInputValue,
             },
           });
         } else if (mode === 'user') {
           dispatch({
             type: 'UPDATE_FORM',
-            payload: { analysis_type: 'profile' },
+            payload: { analysis_context_type: 'profile' },
           });
         }
       }
@@ -172,12 +172,12 @@ export default function RecommendationModal({
       if (parsed.type === 'repo_url') {
         dispatch({
           type: 'UPDATE_FORM',
-          payload: { analysis_type: 'repo_only' },
+          payload: { analysis_context_type: 'repo_only' },
         });
       } else {
         dispatch({
           type: 'UPDATE_FORM',
-          payload: { analysis_type: 'profile' },
+          payload: { analysis_context_type: 'profile' },
         });
       }
     } else {
@@ -198,7 +198,7 @@ export default function RecommendationModal({
     }
 
     if (
-      state.formData.analysis_type === 'repo_only' &&
+      state.formData.analysis_context_type === 'repo_only' &&
       state.parsedGitHubInput &&
       state.parsedGitHubInput.type === 'username'
     ) {
@@ -259,11 +259,12 @@ Key Achievements: ${state.formData.notableAchievements}
         .map(s => s.trim())
         .filter(Boolean),
       target_role:
-        state.formData.analysis_type === 'repo_only'
+        state.formData.analysis_context_type === 'repo_only'
           ? `Repository: ${state.parsedGitHubInput!.repository || parseGitHubInput(state.formData.repository_url || '').repository}`
           : undefined,
-      analysis_type: state.formData.analysis_type,
+      analysis_context_type: state.formData.analysis_context_type,
       repository_url: state.formData.repository_url,
+      force_refresh: state.formData.force_refresh || false,
     };
 
     // Use streaming version for real-time progress updates
@@ -320,7 +321,7 @@ Key Achievements: ${state.formData.notableAchievements}
         ...opt,
         generation_parameters: opt.generation_parameters || {},
       })),
-      analysis_type: state.formData.analysis_type,
+      analysis_context_type: state.formData.analysis_context_type,
       repository_url: state.formData.repository_url,
       recommendation_type: state.formData.recommendation_type,
       tone: state.formData.tone,
@@ -380,6 +381,7 @@ Key Achievements: ${state.formData.notableAchievements}
       length: dynamicParams.length,
       include_keywords: dynamicParams.include_keywords,
       exclude_keywords: dynamicParams.exclude_keywords,
+      force_refresh: state.formData.force_refresh || false,
     };
 
     dispatch({ type: 'SET_IS_REGENERATING', payload: true });
@@ -441,7 +443,6 @@ Key Achievements: ${state.formData.notableAchievements}
               <RecommendationLimitMessage onClose={onClose} />
             ) : state.step === 'form' ? (
               <RecommendationFormNew
-                contributor={contributor}
                 formData={state.formData}
                 errors={state.errors}
                 parsedGitHubInput={state.parsedGitHubInput}
@@ -451,7 +452,7 @@ Key Achievements: ${state.formData.notableAchievements}
                 onAnalysisTypeChange={type =>
                   dispatch({
                     type: 'UPDATE_FORM',
-                    payload: { analysis_type: type },
+                    payload: { analysis_context_type: type },
                   })
                 }
                 onSubmit={handleSubmit}
