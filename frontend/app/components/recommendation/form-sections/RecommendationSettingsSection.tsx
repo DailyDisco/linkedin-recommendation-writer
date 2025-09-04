@@ -3,11 +3,11 @@ import { Label } from '@/components/ui/label';
 
 interface RecommendationSettingsSectionProps {
   recommendationType:
-    | 'professional'
-    | 'technical'
-    | 'leadership'
-    | 'academic'
-    | 'personal';
+  | 'professional'
+  | 'technical'
+  | 'leadership'
+  | 'academic'
+  | 'personal';
   tone: 'professional' | 'friendly' | 'formal' | 'casual';
   length: 'short' | 'medium' | 'long';
   forceRefresh?: boolean;

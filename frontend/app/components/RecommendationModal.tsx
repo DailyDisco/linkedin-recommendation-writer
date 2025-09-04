@@ -347,7 +347,7 @@ Key Achievements: ${state.formData.notableAchievements}
 
         dispatch({ type: 'SET_STEP', payload: 'result' });
       },
-      onError: () => {},
+      onError: () => { },
     });
   };
 
