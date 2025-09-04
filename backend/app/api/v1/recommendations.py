@@ -587,6 +587,21 @@ async def generate_recommendation_options_stream(
         try:
             logger.info("🎯 SSE stream started - using RecommendationService...")
 
+            # Phase 1: Initial setup and GitHub analysis (0-40%)
+            yield f"data: {StreamProgressResponse(stage='Starting analysis...', progress=5, status='initializing').model_dump_json()}\n\n"
+
+            # Determine analysis type for progress messages
+            if request.analysis_context_type == "repo_only":
+                analysis_desc = f"Analyzing repository: {request.repository_url or 'repository'}"
+            elif request.analysis_context_type == "repository_contributor":
+                analysis_desc = f"Analyzing {request.github_username}'s contributions to repository"
+            else:
+                analysis_desc = f"Analyzing {request.github_username}'s GitHub profile"
+
+            yield f"data: {StreamProgressResponse(stage=analysis_desc, progress=10, status='analyzing').model_dump_json()}\n\n"
+
+            yield f"data: {StreamProgressResponse(stage='Fetching GitHub data...', progress=20, status='fetching').model_dump_json()}\n\n"
+
             # Use the RecommendationService which handles repo_only context properly
             result = await recommendation_service.create_recommendation_options(
                 db=db,
@@ -604,12 +619,16 @@ async def generate_recommendation_options_stream(
                 repository_url=request.repository_url,
             )
 
+            yield f"data: {StreamProgressResponse(stage='Processing GitHub data...', progress=35, status='processing').model_dump_json()}\n\n"
+
             # Extract filtered GitHub data
             github_data = result.get("github_data", {})
 
             logger.info(f"✅ RecommendationService returned filtered GitHub data with {len(github_data)} keys")
             logger.info(f"   • Analysis context: {request.analysis_context_type}")
             logger.info(f"   • Repository URL: {request.repository_url}")
+
+            yield f"data: {StreamProgressResponse(stage='Preparing AI generation...', progress=40, status='preparing').model_dump_json()}\n\n"
 
             # Create AI recommendation service for streaming
             from app.services.ai.ai_recommendation_service import AIRecommendationService
@@ -618,7 +637,7 @@ async def generate_recommendation_options_stream(
             prompt_service = PromptService()
             ai_recommendation_service = AIRecommendationService(prompt_service)
 
-            # Stream the generation process
+            # Phase 2: AI generation (40-100%) - map AI progress to remaining range
             last_heartbeat = time.time()
             async for progress_update in ai_recommendation_service.generate_recommendation_stream(
                 github_data=github_data,
@@ -633,12 +652,19 @@ async def generate_recommendation_options_stream(
                 repository_url=request.repository_url,
                 force_refresh=force_refresh,  # Pass force_refresh
             ):
-                logger.info(f"📡 SSE yielding progress: {progress_update.get('stage', 'Unknown')} - {progress_update.get('progress', 0)}%")
+                # Map AI progress (5-100%) to our remaining range (40-100%)
+                ai_progress = progress_update.get('progress', 0)
+                mapped_progress = 40 + int((ai_progress / 100) * 60)  # Scale to 40-100 range
+                
+                # Update progress in the update
+                progress_update['progress'] = mapped_progress
+
+                logger.info(f"📡 SSE yielding progress: {progress_update.get('stage', 'Unknown')} - {mapped_progress}%")
 
                 # Send heartbeat to keep connection alive
                 current_time = time.time()
                 if current_time - last_heartbeat > 10:  # Send heartbeat every 10 seconds
-                    heartbeat_data = f"data: {StreamProgressResponse(stage='Processing...', progress=progress_update.get('progress', 0), status='processing').model_dump_json()}\n\n"
+                    heartbeat_data = f"data: {StreamProgressResponse(stage='Processing...', progress=mapped_progress, status='processing').model_dump_json()}\n\n"
                     yield heartbeat_data
                     last_heartbeat = current_time
 
@@ -689,12 +715,19 @@ async def regenerate_recommendation_stream(
 
     async def regenerate_stream():
         try:
+            # Phase 1: Data preparation (0-30%)
+            yield f"data: {StreamProgressResponse(stage='Preparing refinement...', progress=5, status='initializing').model_dump_json()}\n\n"
+
+            yield f"data: {StreamProgressResponse(stage='Loading GitHub data...', progress=15, status='loading').model_dump_json()}\n\n"
+
             # Get GitHub data
             github_data = await recommendation_service._get_or_create_github_profile_data(
                 db=db, github_username=request.github_username, analysis_context_type=request.analysis_context_type, repository_url=request.repository_url, force_refresh=request.force_refresh
             )
 
-            # Stream the regeneration process
+            yield f"data: {StreamProgressResponse(stage='Processing refinement instructions...', progress=30, status='processing').model_dump_json()}\n\n"
+
+            # Phase 2: AI regeneration (30-100%) - map AI progress to remaining range
             async for progress_update in recommendation_service.ai_service.regenerate_recommendation_stream(
                 original_content=request.original_content,
                 refinement_instructions=request.refinement_instructions,
@@ -710,6 +743,13 @@ async def regenerate_recommendation_stream(
                 exclude_keywords=request.exclude_keywords,
                 force_refresh=request.force_refresh,
             ):
+                # Map AI progress to remaining range (30-100%)
+                ai_progress = progress_update.get('progress', 0)
+                mapped_progress = 30 + int((ai_progress / 100) * 70)  # Scale to 30-100 range
+                
+                # Update progress in the update
+                progress_update['progress'] = mapped_progress
+
                 # Format as SSE data
                 data = f"data: {StreamProgressResponse(**progress_update).model_dump_json()}\n\n"
                 yield data
