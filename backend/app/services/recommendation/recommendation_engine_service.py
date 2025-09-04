@@ -69,6 +69,7 @@ class RecommendationEngineService:
         analysis_context_type: str = "profile",
         repository_url: Optional[str] = None,
         force_refresh: bool = False,
+        display_name: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Regenerate a recommendation with refinement instructions."""
         logger.info("🔄 Regenerating AI recommendation...")
@@ -80,9 +81,7 @@ class RecommendationEngineService:
             recommendation_type=recommendation_type,
             tone=tone,
             length=length,
-            analysis_context_type=analysis_context_type,
-            repository_url=repository_url,
-            force_refresh=force_refresh,  # Pass force_refresh
+            display_name=display_name,
         )
 
         logger.info("✅ AI recommendation regenerated successfully")

@@ -24,8 +24,6 @@ from app.schemas.recommendation import (
     DynamicRefinementRequest,
     KeywordRefinementRequest,
     KeywordRefinementResponse,
-    ReadmeGenerationRequest,
-    ReadmeGenerationResponse,
     RecommendationFromOptionRequest,
     RecommendationListResponse,
     RecommendationOptionsResponse,
@@ -254,53 +252,6 @@ async def refine_recommendation_with_keywords(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.post("/generate-readme", response_model=ReadmeGenerationResponse)
-async def generate_repository_readme(
-    request: ReadmeGenerationRequest,
-    recommendation_service: RecommendationService = Depends(get_recommendation_service),
-):
-    """Generate a README.md file for a GitHub repository."""
-    try:
-        logger.info("📖 README GENERATION API REQUEST")
-        logger.info("=" * 80)
-        logger.info(f"📁 Repository: {request.repository_full_name}")
-        logger.info(f"🎨 Style: {request.style}")
-        logger.info(f"👥 Target Audience: {request.target_audience}")
-        logger.info(f"📋 Include Sections: {request.include_sections or []}")
-
-        readme_result = await recommendation_service.generate_repository_readme(
-            repository_full_name=request.repository_full_name,
-            style=request.style,
-            include_sections=request.include_sections,
-            target_audience=request.target_audience or "developers",
-        )
-
-        logger.info("✅ README GENERATION API COMPLETED SUCCESSFULLY")
-        logger.info("📊 Final Results:")
-        logger.info(f"   • Repository: {readme_result['repository_full_name']}")
-        logger.info(f"   • Generated Content: {readme_result['word_count']} words")
-        logger.info(f"   • Sections: {len(readme_result['sections'])}")
-        logger.info("=" * 80)
-
-        return ReadmeGenerationResponse(
-            repository_name=readme_result["repository_name"],
-            repository_full_name=readme_result["repository_full_name"],
-            generated_content=readme_result["generated_content"],
-            sections=readme_result["sections"],
-            word_count=readme_result["word_count"],
-            generation_parameters=readme_result["generation_parameters"],
-            analysis_summary=readme_result["analysis_summary"],
-        )
-
-    except ValueError as e:
-        logger.error(f"❌ Validation Error: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"💥 CRITICAL ERROR in README generation: {e}")
-        logger.error("=" * 80)
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-
 @router.post("/analyze-skill-gaps", response_model=SkillGapAnalysisResponse)
 async def analyze_skill_gaps(
     request: SkillGapAnalysisRequest,
@@ -515,6 +466,7 @@ async def regenerate_recommendation(
         length = request.get("length", "medium")
         analysis_context_type = request.get("analysis_context_type", "profile")
         repository_url = request.get("repository_url")
+        display_name = request.get("display_name")  # Optional display name parameter
 
         if not original_content or not refinement_instructions or not github_username:
             raise HTTPException(status_code=400, detail="Missing required fields")
@@ -540,6 +492,7 @@ async def regenerate_recommendation(
             length=length,
             analysis_context_type=analysis_context_type,
             repository_url=repository_url,
+            display_name=display_name,
         )
 
         # Only increment after successful generation

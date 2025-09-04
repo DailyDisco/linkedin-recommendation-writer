@@ -38,13 +38,21 @@ export const RecommendationOptionsCard: React.FC<
       </div>
 
       <div className='bg-gray-50 p-4 rounded-md mb-4 border-l-4 border-blue-200'>
-        <p className='text-gray-900 leading-relaxed'>
-          {isViewingFull
+        <div className='text-gray-900 leading-relaxed space-y-4'>
+          {(isViewingFull
             ? option.content
             : option.content.length > 400
               ? option.content.substring(0, 400) + '...'
-              : option.content}
-        </p>
+              : option.content
+          )
+            .split('\n\n')
+            .filter(paragraph => paragraph.trim())
+            .map((paragraph, index) => (
+              <p key={index} className='text-gray-900 leading-relaxed'>
+                {paragraph.trim()}
+              </p>
+            ))}
+        </div>
       </div>
 
       {option.explanation && (

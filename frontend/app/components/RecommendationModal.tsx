@@ -265,6 +265,10 @@ Key Achievements: ${state.formData.notableAchievements}
       analysis_context_type: state.formData.analysis_context_type,
       repository_url: state.formData.repository_url,
       force_refresh: state.formData.force_refresh || false,
+      display_name:
+        contributor.first_name ||
+        contributor.full_name?.split(' ')[0] ||
+        contributor.username,
     };
 
     // Use streaming version for real-time progress updates
@@ -327,6 +331,10 @@ Key Achievements: ${state.formData.notableAchievements}
       tone: state.formData.tone,
       length: state.formData.length,
       force_refresh: state.formData.force_refresh || false,
+      display_name:
+        contributor.first_name ||
+        contributor.full_name?.split(' ')[0] ||
+        contributor.username,
     };
 
     createFromOptionMutation.mutate(params, {
@@ -382,6 +390,10 @@ Key Achievements: ${state.formData.notableAchievements}
       include_keywords: dynamicParams.include_keywords,
       exclude_keywords: dynamicParams.exclude_keywords,
       force_refresh: state.formData.force_refresh || false,
+      display_name:
+        contributor.first_name ||
+        contributor.full_name?.split(' ')[0] ||
+        contributor.username,
     };
 
     dispatch({ type: 'SET_IS_REGENERATING', payload: true });

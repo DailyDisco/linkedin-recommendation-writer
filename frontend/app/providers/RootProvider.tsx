@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Toaster } from 'sonner';
 import UIErrorBoundary from '../components/ui/error-boundary';
 import { initializeGA4 } from '../utils/analytics';
 
@@ -27,10 +26,7 @@ export const RootProvider = ({ children }: RootProviderProps) => {
 
   return (
     <UIErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        {children}
-        <Toaster position='top-right' richColors />
-      </QueryClientProvider>
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     </UIErrorBoundary>
   );
 };

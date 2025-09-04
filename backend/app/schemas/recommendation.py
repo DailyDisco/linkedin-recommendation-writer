@@ -180,27 +180,6 @@ class RecommendationResponse(BaseModel):
     original_recommendation_id: Optional[int] = None
 
 
-class ReadmeGenerationRequest(BaseModel):
-    """Schema for README generation requests."""
-
-    repository_full_name: str = Field(..., description="Full repository name (owner/repo)")
-    style: str = Field("comprehensive", description="README style: comprehensive, minimal, or technical")
-    include_sections: Optional[List[str]] = Field(None, description="Specific sections to include")
-    target_audience: Optional[str] = Field("developers", description="Target audience: developers, users, or both")
-
-
-class ReadmeGenerationResponse(BaseModel):
-    """Schema for README generation responses."""
-
-    repository_name: str
-    repository_full_name: str
-    generated_content: str
-    sections: Dict[str, str] = Field(default_factory=dict, description="Generated sections with their content")
-    word_count: int
-    generation_parameters: Dict[str, Any]
-    analysis_summary: str = Field(..., description="Summary of repository analysis used for generation")
-
-
 class RecommendationVersionInfo(BaseModel):
     """Schema for recommendation version information."""
 

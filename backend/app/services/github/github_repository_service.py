@@ -1,6 +1,6 @@
 import re
 from datetime import datetime
-from typing import Any, Dict, List, Optional, TypedDict, cast
+from typing import Any, Dict, List, Optional, cast
 
 from github import Github
 from github.GithubException import GithubException
@@ -11,22 +11,6 @@ from app.core.config import settings
 from app.core.redis_client import get_cache, set_cache
 from app.schemas.github import LanguageStats
 from app.services.github.github_commit_service import GitHubCommitService
-
-
-# Define a TypedDict for the repository content analysis result
-class RepoAnalysisResult(TypedDict):
-    existing_readme: bool
-    readme_content: Optional[str]
-    main_files: List[str]
-    documentation_files: List[str]
-    configuration_files: List[str]
-    source_directories: List[str]
-    license_info: Optional[Dict[str, str]]
-    has_tests: bool
-    has_ci_cd: bool
-    has_docker: bool
-    api_endpoints: List[str]
-    key_features: List[str]
 
 
 class GitHubRepositoryService:
@@ -100,6 +84,13 @@ class GitHubRepositoryService:
                 try:
                     # Get detailed user info to get real name
                     user = self.github_client.get_user(contributor.login)
+
+                    # Debug logging to see what GitHub API returns
+                    logger.info(f"🔍 GitHub API response for {contributor.login}:")
+                    logger.info(f"   • user.name: '{user.name}'")
+                    logger.info(f"   • user.login: '{user.login}'")
+                    logger.info(f"   • name is None: {user.name is None}")
+                    logger.info(f"   • name is empty: {user.name == '' if user.name else 'N/A'}")
 
                     contributor_info = {
                         "username": contributor.login,
@@ -721,7 +712,7 @@ class GitHubRepositoryService:
                     "optimize",
                     "update",
                 ],
-                "documentation": ["doc", "readme", "comment", "document"],
+                "documentation": ["doc", "comment", "document"],
                 "testing": ["test", "spec", "assert", "mock"],
             }
 
@@ -833,114 +824,6 @@ class GitHubRepositoryService:
             logger.debug(f"Error extracting API endpoints: {e}")
 
         return endpoints
-
-    def _analyze_repository_content_for_readme(self, repo_data: Dict[str, Any], repository: GithubRepository) -> RepoAnalysisResult:
-        """Analyze repository content specifically for README generation."""
-        analysis: RepoAnalysisResult = {
-            "existing_readme": False,
-            "readme_content": None,
-            "main_files": [],
-            "documentation_files": [],
-            "configuration_files": [],
-            "source_directories": [],
-            "license_info": None,
-            "has_tests": False,
-            "has_ci_cd": False,
-            "has_docker": False,
-            "api_endpoints": [],
-            "key_features": [],
-        }
-
-        try:
-            # Check for existing README files
-            readme_files = ["README.md", "README.rst", "README.txt", "readme.md", "Readme.md"]
-            for readme_file in readme_files:
-                try:
-                    readme_content = repository.get_contents(readme_file)
-                    if readme_content and hasattr(readme_content, "decoded_content"):
-                        analysis["existing_readme"] = True
-                        analysis["readme_content"] = readme_content.decoded_content.decode("utf-8", errors="ignore")
-                        break
-                except Exception:
-                    continue
-
-            # Get repository structure (limited to avoid rate limits)
-            try:
-                contents_response = repository.get_contents("")
-                if not isinstance(contents_response, list):
-                    contents = [contents_response]
-                else:
-                    contents = contents_response
-
-                max_items = 50  # Limit to avoid processing too many files
-
-                for item in contents[:max_items]:
-                    if item.type == "file":
-                        filename = item.name.lower()
-
-                        # Main application files
-                        if any(ext for ext in [".py", ".js", ".ts", ".java", ".cpp", ".c", ".go", ".rs", ".php", ".rb"] if filename.endswith(ext)):
-                            analysis["main_files"].append(item.name)
-
-                        # Documentation files
-                        elif any(ext for ext in [".md", ".rst", ".txt"] if filename.endswith(ext)) or "doc" in filename:
-                            analysis["documentation_files"].append(item.name)
-
-                        # Configuration files
-                        elif any(conf_file for conf_file in ["package.json", "setup.py", "requirements.txt", "cargo.toml", "pom.xml", "build.gradle"] if filename == conf_file):
-                            analysis["configuration_files"].append(item.name)
-
-                        # CI/CD files
-                        elif any(term in filename for term in ["yml", "yaml", "ci", "cd", "github", "actions"]):
-                            analysis["has_ci_cd"] = True
-
-                        # Docker files
-                        elif "docker" in filename:
-                            analysis["has_docker"] = True
-
-                        # Test files
-                        elif "test" in filename or "spec" in filename:
-                            analysis["has_tests"] = True
-
-                    elif item.type == "dir":
-                        dirname = item.name.lower()
-
-                        # Source directories
-                        if any(term in dirname for term in ["src", "source", "lib", "core", "main"]):
-                            analysis["source_directories"].append(item.name)
-
-            except Exception as e:
-                logger.debug(f"Error analyzing repository structure: {e}")
-
-            # Extract license information
-            try:
-                license_info = repository.get_license()
-                if license_info:
-                    analysis["license_info"] = {
-                        "name": license_info.license.name if license_info.license else "Unknown",
-                        "key": license_info.license.key if license_info.license else "",  # Ensure key is always a string
-                    }
-            except Exception:
-                pass
-
-            # Extract key features from description and topics
-            description = repo_data.get("description", "")
-            topics = repo_data.get("topics", [])
-
-            if description:
-                # Simple feature extraction from description
-                sentences = [s.strip() for s in description.split(".") if s.strip()]
-                analysis["key_features"] = sentences[:3]  # First 3 sentences as features
-
-            # Add topics as features
-            for topic in topics[:5]:  # Top 5 topics
-                if len(analysis["key_features"]) < 5:
-                    analysis["key_features"].append(f"Built with {topic}")
-
-        except Exception as e:
-            logger.debug(f"Error analyzing repository content for README: {e}")
-
-        return analysis
 
     def _empty_commit_analysis(self) -> Dict[str, Any]:
         """Return empty commit analysis structure for repository-focused analysis, used as a fallback."""

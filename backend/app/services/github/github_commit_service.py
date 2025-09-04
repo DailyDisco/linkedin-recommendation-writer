@@ -632,7 +632,7 @@ class GitHubCommitService:
             "optimization": ["optimize", "improve", "enhance", "performance", "speed", "efficient", "faster", "quicker", "accelerate", "boost", "streamline", "refine", "tune", "polish"],
             "refactoring": ["refactor", "restructure", "reorganize", "clean", "simplify", "tidy", "modernize", "upgrade", "migrate", "consolidate", "extract", "split", "merge", "rename"],
             "testing": ["test", "testing", "spec", "coverage", "unit", "integration", "e2e", "qa", "verify", "validate", "assert", "mock", "stub", "fixture", "suite"],
-            "documentation": ["doc", "readme", "comment", "documentation", "guide", "wiki", "tutorial", "example", "sample", "demo", "explain", "describe", "clarify"],
+            "documentation": ["doc", "comment", "documentation", "guide", "wiki", "tutorial", "example", "sample", "demo", "explain", "describe", "clarify"],
             "security": ["security", "auth", "secure", "vulnerability", "encrypt", "protect", "safe", "access", "permission", "authorization", "authentication", "ssl", "https"],
             "ui_ux": ["ui", "ux", "interface", "design", "styling", "css", "frontend", "user", "experience", "interaction", "responsive", "mobile", "web", "layout", "theme"],
             "data_handling": ["data", "database", "query", "sql", "nosql", "migration", "schema", "model", "entity", "table", "collection", "index", "cache", "store"],

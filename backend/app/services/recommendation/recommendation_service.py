@@ -546,6 +546,7 @@ class RecommendationService:
         analysis_context_type: str = "profile",
         repository_url: Optional[str] = None,
         force_refresh: bool = False,
+        display_name: Optional[str] = None,
     ) -> RecommendationResponse:
         """Regenerate a recommendation with refinement instructions."""
 
@@ -609,6 +610,13 @@ class RecommendationService:
                 raise ValueError(f"Could not analyze {context_desc} for {github_username}")
             logger.debug(f"➡️ GitHub data used for recommendation regeneration: {github_data}")  # Log github_data
 
+            # Extract display name for consistent naming (prioritizes first name)
+            if display_name is None and github_data.get("user_data"):
+                from app.services.ai.prompt_service import PromptService
+
+                prompt_service = PromptService()
+                display_name = prompt_service._extract_display_name(github_data["user_data"])
+
             # Get or create GitHub profile record
             logger.info("💾 STEP 2: DATABASE OPERATIONS")
             logger.info("-" * 50)
@@ -634,6 +642,7 @@ class RecommendationService:
                 analysis_context_type=analysis_context_type,
                 repository_url=repository_url,
                 force_refresh=force_refresh,
+                display_name=display_name,
             )
 
             ai_end = time.time()
@@ -1236,7 +1245,7 @@ class RecommendationService:
             "backend": ["backend", "api", "server", "database", "sql", "python", "java", "node", "php"],
             "testing": ["test", "spec", "jest", "pytest", "selenium", "cypress", "coverage"],
             "devops": ["docker", "kubernetes", "ci", "cd", "pipeline", "deploy", "aws", "terraform"],
-            "documentation": ["readme", "docs", "documentation", "comment", "guide"],
+            "documentation": ["docs", "documentation", "comment", "guide"],
             "design": ["design", "architecture", "structure", "pattern", "system"],
         }
 
@@ -1321,17 +1330,20 @@ class RecommendationService:
             if "repository_info" in repository_data:
                 logger.info(f"🔍 REPO_ONLY: repository_info: {repository_data['repository_info']}")
 
-            # Start with ULTRA-MINIMAL contributor data - ONLY username for repo_only
-            logger.info("🔍 REPO_ONLY: Creating ULTRA-MINIMAL contributor data (NO PROFILE DATA)")
+            # Start with MINIMAL contributor data - include essential identity info for repo_only
+            logger.info("🔍 REPO_ONLY: Creating MINIMAL contributor data (essential identity + username)")
+            user_data_source = contributor_data.get("user_data", {})
             filtered_contributor_data = {
                 "user_data": {
-                    "github_username": contributor_data.get("user_data", {}).get("github_username") or contributor_username,
-                    "login": contributor_data.get("user_data", {}).get("login") or contributor_username,
-                    # CRITICAL: EXCLUDE ALL PROFILE DATA in repo_only mode
-                    # EXCLUDE: full_name, name, avatar_url, profile_url, bio, company, location, followers, etc.
+                    "github_username": user_data_source.get("github_username") or contributor_username,
+                    "login": user_data_source.get("login") or contributor_username,
+                    # Include essential identity information for natural recommendations
+                    "full_name": user_data_source.get("full_name"),  # Real name is essential for personal recommendations
+                    # EXCLUDE: bio, company, location, followers, etc. (general profile info)
+                    # EXCLUDE: avatar_url, profile_url (not needed for text recommendations)
                 }
             }
-            logger.info(f"🔍 REPO_ONLY: ULTRA-MINIMAL user_data: {filtered_contributor_data['user_data']}")
+            logger.info(f"🔍 REPO_ONLY: MINIMAL user_data: {filtered_contributor_data['user_data']}")
 
             merged_data = filtered_contributor_data.copy()
 
@@ -1627,6 +1639,7 @@ class RecommendationService:
         validation_result = {"is_valid": True, "issues": [], "warnings": []}
 
         # Define profile data fields that should NEVER appear in repo_only context
+        # Note: full_name is allowed as it's essential for personalized recommendations
         forbidden_profile_fields = [
             "bio",
             "company",
@@ -1641,8 +1654,7 @@ class RecommendationService:
             "organizations",
             "starred_technologies",
             "repositories",
-            "full_name",
-            "name",
+            "name",  # Keeping this since we use full_name instead
             "avatar_url",
         ]
 
@@ -1669,7 +1681,7 @@ class RecommendationService:
                 validation_result["issues"].append(f"Profile section '{section}' found in data")
 
         # Check user_data for non-empty profile fields (excluding allowed fields)
-        allowed_user_fields = {"github_username", "login"}
+        allowed_user_fields = {"github_username", "login", "full_name"}  # Allow full_name for personalized recommendations
         for field, value in user_data.items():
             if field not in allowed_user_fields and value:
                 # Allow empty strings but not actual data

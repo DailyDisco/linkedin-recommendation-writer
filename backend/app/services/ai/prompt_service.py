@@ -43,24 +43,15 @@ class PromptService:
         if display_name:  # Prioritize display_name if provided
             person_reference = display_name
         else:
-            # Extract first name for more personal recommendations
-            first_name = self._extract_first_name(user_data.get("full_name", ""))
+            # Use the enhanced display name extraction method
+            person_reference = self._extract_display_name(user_data)
 
-            # If no first name from full_name, try to extract from username
-            if not first_name:
-                base_username = user_data.get("github_username")
-                if not base_username and repository_info:
-                    # Only use repository owner as fallback if we don't have user_data
-                    base_username = repository_info.get("owner", {}).get("login")
-
-                if base_username:
-                    # Try to extract a name from username pattern
-                    extracted_name = self._extract_name_from_username(base_username)
-                    person_reference = extracted_name if extracted_name else base_username
-                else:
-                    person_reference = "the developer"
-            else:
-                person_reference = first_name
+            # Fallback to repository owner if we still don't have a good name
+            if person_reference == "the developer" and repository_info:
+                repo_owner = repository_info.get("owner", {}).get("login")
+                if repo_owner:
+                    extracted_name = self._extract_name_from_username(repo_owner)
+                    person_reference = extracted_name if extracted_name else repo_owner
 
         # Build human narrative sections using story generator
         narrative_sections = self.story_generator.build_human_prompt_sections(github_data, analysis_context_type, display_name=person_reference)
@@ -109,7 +100,8 @@ class PromptService:
                 logger.info(f"🔍 PROMPT SERVICE: skills keys: {list(github_data['skills'].keys())}")
 
             # Log forbidden profile data fields that should NOT be present
-            forbidden_fields = ["bio", "company", "location", "email", "followers", "following", "public_repos", "avatar_url", "full_name", "organizations", "starred_repositories"]
+            # Note: full_name is allowed as it's essential for personalized recommendations
+            forbidden_fields = ["bio", "company", "location", "email", "followers", "following", "public_repos", "avatar_url", "organizations", "starred_repositories"]
             for field in forbidden_fields:
                 if field in github_data.get("user_data", {}):
                     logger.error(f"🚨 CRITICAL: Forbidden profile field '{field}' found in repo_only data!")
@@ -301,7 +293,8 @@ class PromptService:
         if not context_handled and context_type == "profile":
             # Profile context (default) - only add if we haven't handled context-specific data and it's profile context
             prompt_parts.append("\nHere's what I know about them:")
-            if user_data.get("full_name"):
+            # Only include full name if display_name is not provided (to avoid duplication)
+            if user_data.get("full_name") and not display_name:
                 prompt_parts.append(f"- Name: {user_data['full_name']}")
 
             # Add starred repositories insights (shows interests and learning focus)
@@ -727,25 +720,16 @@ Create a recommendation that really highlights their {focus_formatted} skills wh
         analysis_context_type: str = "profile",
         repository_url: Optional[str] = None,
         exclude_keywords: Optional[list] = None,
+        display_name: Optional[str] = None,
     ) -> str:
         """Build prompt for regenerating a recommendation."""
         user_data = github_data.get("user_data", {})
-        repository_info = github_data.get("repository_info", {})
 
-        # Extract first name for more personal references
-        first_name = self._extract_first_name(user_data.get("full_name", ""))
+        # Use display_name if provided, otherwise extract it for consistent naming
+        if display_name is None:
+            display_name = self._extract_display_name(user_data)
 
-        # Fallback to username if no first name available
-        if not first_name:
-            username = user_data.get("github_username")
-            if not username and repository_info:
-                # Only use repository owner as fallback if we don't have user_data
-                username = repository_info.get("owner", {}).get("login")
-            if not username:
-                username = "the developer"
-            person_reference = username
-        else:
-            person_reference = first_name
+        person_reference = display_name
 
         target_length = self._get_length_guideline(length)
 
@@ -881,209 +865,30 @@ Just give me the updated recommendation text, nothing else.
 
         return "\n".join(prompt_parts)
 
-    def build_readme_generation_prompt(
-        self,
-        repository_data: Dict[str, Any],
-        repository_analysis: Dict[str, Any],
-        style: str = "comprehensive",
-        include_sections: Optional[List[str]] = None,
-        target_audience: str = "developers",
-    ) -> str:
-        """Build a prompt for README generation."""
-        repo_info = repository_data.get("repository_info", {})
-        repo_name = repo_info.get("name", "Project")
-        description = repo_info.get("description", "")
-
-        prompt_parts = [
-            f"Generate a comprehensive README.md file for the GitHub repository '{repo_name}'.",
-            "",
-            "REPOSITORY INFORMATION:",
-            f"- Name: {repo_name}",
-            f"- Description: {description}",
-            f"- Primary Language: {repo_info.get('language', 'Unknown')}",
-            f"- Stars: {repo_info.get('stars', 0)}",
-            f"- Forks: {repo_info.get('forks', 0)}",
-            "",
-        ]
-
-        # Add repository analysis insights
-        if repository_analysis.get("existing_readme"):
-            prompt_parts.extend(
-                [
-                    "NOTE: This repository already has a README. Generate an improved, more comprehensive version.",
-                    "",
-                ]
-            )
-
-        # Add technical context
-        languages = repository_data.get("languages", [])
-        if languages:
-            top_langs = [getattr(lang, "language", "") for lang in languages[:3]]
-            prompt_parts.append(f"- Technologies: {', '.join(top_langs)}")
-
-        skills = repository_data.get("skills", {})
-        frameworks = skills.get("frameworks", [])
-        if frameworks:
-            prompt_parts.append(f"- Frameworks/Libraries: {', '.join(frameworks[:5])}")
-
-        # Add repository structure insights
-        main_files = repository_analysis.get("main_files", [])
-        if main_files:
-            prompt_parts.append(f"- Main Files: {', '.join(main_files[:5])}")
-
-        source_dirs = repository_analysis.get("source_directories", [])
-        if source_dirs:
-            prompt_parts.append(f"- Source Directories: {', '.join(source_dirs)}")
-
-        # Add feature insights
-        key_features = repository_analysis.get("key_features", [])
-        if key_features:
-            prompt_parts.extend(
-                [
-                    "",
-                    "KEY FEATURES:",
-                ]
-                + [f"- {feature}" for feature in key_features[:5]]
-            )
-
-        # Add infrastructure insights
-        infra_parts = []
-        if repository_analysis.get("has_tests"):
-            infra_parts.append("Testing framework configured")
-        if repository_analysis.get("has_ci_cd"):
-            infra_parts.append("CI/CD pipeline configured")
-        if repository_analysis.get("has_docker"):
-            infra_parts.append("Docker containerization")
-        if repository_analysis.get("license_info"):
-            license_name = repository_analysis["license_info"].get("name", "Unknown")
-            infra_parts.append(f"Licensed under {license_name}")
-
-        if infra_parts:
-            prompt_parts.extend(
-                [
-                    "",
-                    "INFRASTRUCTURE:",
-                ]
-                + [f"- {item}" for item in infra_parts]
-            )
-
-        # Style and audience guidance
-        prompt_parts.extend(
-            [
-                "",
-                "GENERATION REQUIREMENTS:",
-            ]
-        )
-
-        if style == "comprehensive":
-            prompt_parts.extend(
-                [
-                    "- Create a complete, professional README with all standard sections",
-                    "- Include detailed setup and usage instructions",
-                    "- Add comprehensive API documentation if applicable",
-                    "- Include contribution guidelines and development information",
-                ]
-            )
-        elif style == "minimal":
-            prompt_parts.extend(
-                [
-                    "- Create a concise README with essential information only",
-                    "- Focus on core functionality and basic setup",
-                    "- Keep it brief but informative",
-                ]
-            )
-        elif style == "technical":
-            prompt_parts.extend(
-                [
-                    "- Focus on technical details and implementation",
-                    "- Include detailed API documentation and architecture information",
-                    "- Emphasize technical specifications and requirements",
-                    "- Include development and deployment technical details",
-                ]
-            )
-
-        if target_audience == "developers":
-            prompt_parts.append("- Tailor content for developers and technical users")
-        elif target_audience == "users":
-            prompt_parts.append("- Tailor content for end-users with simpler language")
-        else:
-            prompt_parts.append("- Balance technical and user-friendly content")
-
-        # Custom sections
-        if include_sections:
-            prompt_parts.extend(
-                [
-                    "",
-                    f"REQUIRED SECTIONS TO INCLUDE: {', '.join(include_sections)}",
-                ]
-            )
-
-        # Standard sections to include
-        standard_sections = [
-            "Project Title and Description",
-            "Installation Instructions",
-            "Usage Examples",
-            "API Documentation (if applicable)",
-            "Contributing Guidelines",
-            "License Information",
-        ]
-
-        if style == "comprehensive":
-            standard_sections.extend(
-                [
-                    "Features",
-                    "Requirements",
-                    "Configuration",
-                    "Testing",
-                    "Deployment",
-                    "Support",
-                ]
-            )
-
-        prompt_parts.extend(
-            [
-                "",
-                "STANDARD SECTIONS TO INCLUDE:",
-            ]
-            + [f"- {section}" for section in standard_sections]
-        )
-
-        prompt_parts.extend(
-            [
-                "",
-                "FORMATTING REQUIREMENTS:",
-                "- Use proper Markdown formatting with headers, code blocks, and links",
-                "- Include badges for language, license, build status if applicable",
-                "- Use clear, descriptive section headers",
-                "- Format code examples with proper syntax highlighting",
-                "- Include table of contents for longer READMEs",
-                "",
-                "IMPORTANT NOTES:",
-                "- Make the content engaging and professional",
-                "- Ensure all technical information is accurate based on the repository analysis",
-                "- Use active voice and clear, concise language",
-                "- Include placeholders for information that can't be determined from the analysis",
-                "- Generate the complete README content ready for use",
-            ]
-        )
-
-        return "\n".join(prompt_parts)
-
     def extract_title(self, content: str, username: str, first_name: Optional[str] = None, display_name: Optional[str] = None) -> str:
-        """Extract or generate a title for the recommendation."""
+        """Extract or generate a title for the recommendation using first name when possible."""
         # Simple title extraction - could be enhanced
         if content:
             first_sentence = content.split(".")[0]
             if len(first_sentence) < 100:
                 return first_sentence.strip()
 
-        # Use display_name if provided, else first name if available, otherwise fall back to username
-        person_name = display_name if display_name else (first_name if first_name else username)
+        # Prioritize display_name, then first_name, then try to extract name from username
+        if display_name:
+            person_name = display_name
+        elif first_name:
+            person_name = first_name
+        else:
+            # Try to extract a better name from username
+            extracted_name = self._extract_name_from_username(username)
+            person_name = extracted_name if extracted_name else username
+
         return f"Professional Recommendation for {person_name}"
 
     def _contains_profile_data(self, data: Dict[str, Any]) -> bool:
         """Check if data contains general profile information that should be excluded in repo_only mode."""
         # Define profile data fields that should NEVER appear in repo_only context
+        # Note: full_name is allowed as it's essential for personalized recommendations
         profile_indicators = [
             "bio",
             "company",
@@ -1098,8 +903,7 @@ Just give me the updated recommendation text, nothing else.
             "organizations",
             "starred_technologies",
             "repositories",
-            "full_name",
-            "name",
+            "name",  # Keep this since we use full_name instead
             "avatar_url",
         ]
 
@@ -1220,22 +1024,181 @@ Just give me the updated recommendation text, nothing else.
         return validation_result
 
     def _extract_first_name(self, full_name: str) -> str:
-        """Extract first name from full name."""
+        """Extract first name from full name with enhanced parsing."""
         if not full_name:
             return ""
-        parts = full_name.strip().split()
-        return parts[0] if parts else ""
+
+        # Clean and normalize the full name
+        full_name = full_name.strip()
+        if not full_name:
+            return ""
+
+        # Handle common patterns and edge cases
+        import re
+
+        # Remove common prefixes and suffixes
+        prefixes = ["mr", "mrs", "ms", "dr", "prof", "professor"]
+        suffixes = ["jr", "sr", "ii", "iii", "iv", "v", "phd", "md"]
+
+        # Split into parts
+        parts = full_name.lower().split()
+        cleaned_parts = []
+
+        for part in parts:
+            # Remove punctuation
+            clean_part = re.sub(r"[^\w]", "", part)
+            if clean_part and clean_part not in prefixes and clean_part not in suffixes:
+                cleaned_parts.append(clean_part)
+
+        if not cleaned_parts:
+            return ""
+
+        # Return the first meaningful part, properly capitalized
+        first_name = cleaned_parts[0]
+
+        # Handle special cases like hyphenated names (take first part)
+        if "-" in first_name:
+            first_name = first_name.split("-")[0]
+
+        # Capitalize properly
+        return first_name.capitalize()
+
+    def _extract_display_name(self, user_data: Dict[str, Any]) -> str:
+        """Extract the best display name for the user from available data."""
+        # Priority: full_name first name > username-derived name > username > fallback
+
+        full_name = user_data.get("full_name", "")
+        if full_name:
+            first_name = self._extract_first_name(full_name)
+            if first_name:
+                return first_name
+
+        # Fallback to username as-is (don't try to extract name from username)
+        username = user_data.get("github_username", "")
+        if username:
+            return username
+
+        return "the developer"
 
     def _extract_name_from_username(self, username: str) -> str:
-        """Extract a likely first name from username patterns."""
+        """Extract a likely first name from username patterns with enhanced detection."""
         if not username:
             return ""
 
-        # Common patterns: DailyDisco -> Diego, JohnSmith123 -> John, etc.
-        username_lower = username.lower()
+        import re
 
-        # Check for common name patterns in usernames
-        name_patterns = {"john": "John", "jane": "Jane", "mike": "Mike", "michael": "Michael", "chris": "Chris", "christopher": "Christopher", "alex": "Alex", "alexander": "Alexander"}
+        # Extended common name patterns
+        name_patterns = {
+            "john": "John",
+            "jane": "Jane",
+            "mike": "Mike",
+            "michael": "Michael",
+            "chris": "Chris",
+            "christopher": "Christopher",
+            "alex": "Alex",
+            "alexander": "Alexander",
+            "david": "David",
+            "dave": "Dave",
+            "sarah": "Sarah",
+            "sara": "Sara",
+            "james": "James",
+            "jim": "Jim",
+            "robert": "Robert",
+            "rob": "Rob",
+            "bob": "Bob",
+            "william": "William",
+            "will": "Will",
+            "bill": "Bill",
+            "elizabeth": "Elizabeth",
+            "liz": "Liz",
+            "beth": "Beth",
+            "richard": "Richard",
+            "rick": "Rick",
+            "dick": "Dick",
+            "jennifer": "Jennifer",
+            "jen": "Jen",
+            "jenny": "Jenny",
+            "daniel": "Daniel",
+            "dan": "Dan",
+            "matthew": "Matthew",
+            "matt": "Matt",
+            "anthony": "Anthony",
+            "tony": "Tony",
+            "mark": "Mark",
+            "steven": "Steven",
+            "steve": "Steve",
+            "paul": "Paul",
+            "andrew": "Andrew",
+            "andy": "Andy",
+            "joshua": "Joshua",
+            "josh": "Josh",
+            "kenneth": "Kenneth",
+            "ken": "Ken",
+            "kevin": "Kevin",
+            "brian": "Brian",
+            "george": "George",
+            "edward": "Edward",
+            "ed": "Ed",
+            "eddie": "Eddie",
+            "ronald": "Ronald",
+            "ron": "Ron",
+            "timothy": "Timothy",
+            "tim": "Tim",
+            "jason": "Jason",
+            "jeffrey": "Jeffrey",
+            "jeff": "Jeff",
+            "ryan": "Ryan",
+            "jacob": "Jacob",
+            "jake": "Jake",
+            "gary": "Gary",
+            "nicholas": "Nicholas",
+            "nick": "Nick",
+            "eric": "Eric",
+            "jonathan": "Jonathan",
+            "stephen": "Stephen",
+            "larry": "Larry",
+            "justin": "Justin",
+            "scott": "Scott",
+            "brandon": "Brandon",
+            "benjamin": "Benjamin",
+            "ben": "Ben",
+            "samuel": "Samuel",
+            "sam": "Sam",
+            "gregory": "Gregory",
+            "greg": "Greg",
+            "patrick": "Patrick",
+            "pat": "Pat",
+            "frank": "Frank",
+            "raymond": "Raymond",
+            "ray": "Ray",
+            "jack": "Jack",
+            "dennis": "Dennis",
+            "jerry": "Jerry",
+            "tyler": "Tyler",
+            "aaron": "Aaron",
+            "jose": "Jose",
+            "henry": "Henry",
+            "adam": "Adam",
+            "douglas": "Douglas",
+            "doug": "Doug",
+            "nathan": "Nathan",
+            "nate": "Nate",
+            "peter": "Peter",
+            "pete": "Pete",
+            "zachary": "Zachary",
+            "zach": "Zach",
+            "kyle": "Kyle",
+            "noah": "Noah",
+            "alan": "Alan",
+            "ethan": "Ethan",
+            "thomas": "Thomas",
+            "tom": "Tom",
+            "tommy": "Tommy",
+            "joe": "Joe",
+            "joseph": "Joseph",
+        }
+
+        username_lower = username.lower()
 
         # Direct match
         if username_lower in name_patterns:
@@ -1246,12 +1209,44 @@ Just give me the updated recommendation text, nothing else.
             if username_lower.startswith(pattern):
                 return name
 
-        # If no pattern match, try to capitalize first part of username
-        # Remove numbers and special characters, take first meaningful part
-        import re
+        # Try to extract from camelCase or PascalCase patterns
+        # e.g., JohnSmith123 -> John, camelCaseUser -> camel
+        camel_match = re.match(r"^([A-Z][a-z]+)", username)
+        if camel_match:
+            potential_name = camel_match.group(1).lower()
+            if potential_name in name_patterns:
+                return name_patterns[potential_name]
+            elif len(potential_name) >= 3:
+                return potential_name.capitalize()
 
-        clean_username = re.sub(r"[0-9_\-\.]+", "", username)
+        # Handle underscores and hyphens (take first part)
+        # e.g., john_doe -> john, mary-jane -> mary
+        separator_parts = re.split(r"[_\-]", username_lower)
+        if len(separator_parts) > 1 and separator_parts[0]:
+            first_part = separator_parts[0]
+            if first_part in name_patterns:
+                return name_patterns[first_part]
+            elif len(first_part) >= 3:
+                return first_part.capitalize()
+
+        # Clean username and try to extract meaningful first part
+        # Remove numbers and special characters
+        clean_username = re.sub(r"[0-9_\-\.\@\+]+", "", username)
+
         if len(clean_username) >= 3:
-            return clean_username[0].upper() + clean_username[1:].lower()
+            # Check if it's a recognizable name pattern
+            clean_lower = clean_username.lower()
+            if clean_lower in name_patterns:
+                return name_patterns[clean_lower]
+
+            # Try first 3-8 characters as potential name
+            for length in range(min(8, len(clean_username)), 2, -1):
+                potential = clean_lower[:length]
+                if potential in name_patterns:
+                    return name_patterns[potential]
+
+            # Last resort: capitalize the first part if it looks name-like
+            if clean_username.isalpha() and 3 <= len(clean_username) <= 12:
+                return clean_username.capitalize()
 
         return ""

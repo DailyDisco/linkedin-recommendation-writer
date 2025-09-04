@@ -1,11 +1,10 @@
 """AI service for generating recommendations using Google Gemini."""
 
 import logging
-from typing import Any, Dict, List, Optional, TypedDict
+from typing import Any, AsyncGenerator, Dict, List, Optional, TypedDict
 
 from app.services.ai.ai_recommendation_service import AIRecommendationService
 from app.services.ai.prompt_service import PromptService
-from app.services.ai.readme_generation_service import READMEGenerationService
 from app.services.analysis.keyword_refinement_service import KeywordRefinementService
 
 logger = logging.getLogger(__name__)
@@ -28,7 +27,6 @@ class AIService:
 
         # Initialize specialized AI services
         self.recommendation_service = AIRecommendationService(self.prompt_service)
-        self.readme_service = READMEGenerationService(self.prompt_service)
         self.keyword_refinement_service = KeywordRefinementService(self.prompt_service)
 
     async def generate_recommendation(
@@ -41,6 +39,12 @@ class AIService:
         target_role: Optional[str] = None,
         specific_skills: Optional[list] = None,
         exclude_keywords: Optional[list] = None,
+        focus_keywords: Optional[List[str]] = None,
+        focus_weights: Optional[Dict[str, float]] = None,
+        analysis_context_type: str = "profile",
+        repository_url: Optional[str] = None,
+        force_refresh: bool = False,
+        display_name: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Generate a LinkedIn recommendation using AI."""
         try:
@@ -54,6 +58,12 @@ class AIService:
                 target_role=target_role,
                 specific_skills=specific_skills,
                 exclude_keywords=exclude_keywords,
+                focus_keywords=focus_keywords,
+                focus_weights=focus_weights,
+                analysis_context_type=analysis_context_type,
+                repository_url=repository_url,
+                force_refresh=force_refresh,
+                display_name=display_name,
             )
 
             return result
@@ -119,6 +129,7 @@ class AIService:
         tone: str = "professional",
         length: str = "medium",
         exclude_keywords: Optional[list] = None,
+        display_name: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Regenerate a recommendation with refinement instructions."""
         return await self.recommendation_service.regenerate_recommendation(
@@ -129,7 +140,42 @@ class AIService:
             tone=tone,
             length=length,
             exclude_keywords=exclude_keywords,
+            display_name=display_name,
         )
+
+    async def regenerate_recommendation_stream(
+        self,
+        original_content: str,
+        refinement_instructions: str,
+        github_data: Dict[str, Any],
+        recommendation_type: str = "professional",
+        tone: str = "professional",
+        length: str = "medium",
+        analysis_context_type: str = "profile",
+        repository_url: Optional[str] = None,
+        dynamic_tone: Optional[str] = None,
+        dynamic_length: Optional[str] = None,
+        include_keywords: Optional[List[str]] = None,
+        exclude_keywords: Optional[List[str]] = None,
+        display_name: Optional[str] = None,
+    ) -> AsyncGenerator[Dict[str, Any], None]:
+        """Regenerate a recommendation with streaming progress."""
+        async for progress in self.recommendation_service.regenerate_recommendation_stream(
+            original_content=original_content,
+            refinement_instructions=refinement_instructions,
+            github_data=github_data,
+            recommendation_type=recommendation_type,
+            tone=tone,
+            length=length,
+            analysis_context_type=analysis_context_type,
+            repository_url=repository_url,
+            dynamic_tone=dynamic_tone,
+            dynamic_length=dynamic_length,
+            include_keywords=include_keywords,
+            exclude_keywords=exclude_keywords,
+            display_name=display_name,
+        ):
+            yield progress
 
     # Keyword refinement methods
     async def refine_recommendation_with_keywords(
@@ -153,24 +199,6 @@ class AIService:
             length=length,
             exclude_keywords=exclude_keywords,
             regeneration_params=regeneration_params,
-        )
-
-    # README generation methods
-    async def generate_repository_readme(
-        self,
-        repository_data: Dict[str, Any],
-        repository_analysis: Dict[str, Any],
-        style: str = "comprehensive",
-        include_sections: Optional[List[str]] = None,
-        target_audience: str = "developers",
-    ) -> Dict[str, Any]:
-        """Generate a README for a GitHub repository."""
-        return await self.readme_service.generate_repository_readme(
-            repository_data=repository_data,
-            repository_analysis=repository_analysis,
-            style=style,
-            include_sections=include_sections,
-            target_audience=target_audience,
         )
 
     # Backwards compatibility methods

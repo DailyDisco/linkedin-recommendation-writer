@@ -155,7 +155,10 @@ class AIRecommendationService:
             # Generate options with progress updates
             options = []
             base_username = github_data["user_data"]["github_username"]
-            first_name = self.prompt_service._extract_first_name(github_data["user_data"].get("full_name", ""))
+
+            # Extract display name for consistent naming (prioritizes first name)
+            if display_name is None:
+                display_name = self.prompt_service._extract_display_name(github_data["user_data"])
 
             option_configs = [
                 {
@@ -208,7 +211,7 @@ class AIRecommendationService:
                     "id": i,
                     "name": config["name"],
                     "content": option_content.strip(),
-                    "title": self.prompt_service.extract_title(option_content, base_username, first_name, display_name),
+                    "title": self.prompt_service.extract_title(option_content, base_username, None, display_name),
                     "word_count": len(option_content.split()),
                     "focus": config["focus"],
                     "validation_results": validation_results,
@@ -273,6 +276,7 @@ class AIRecommendationService:
         dynamic_length: Optional[str] = None,
         include_keywords: Optional[List[str]] = None,
         exclude_keywords: Optional[List[str]] = None,
+        display_name: Optional[str] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """Regenerate a recommendation with streaming progress and dynamic refinement parameters."""
 
@@ -280,8 +284,9 @@ class AIRecommendationService:
             raise ValueError("Gemini AI not configured")
 
         try:
-            # Extract first name for consistent naming
-            first_name = self.prompt_service._extract_first_name(github_data["user_data"].get("full_name", ""))
+            # Extract display name for consistent naming (prioritizes first name)
+            if display_name is None:
+                display_name = self.prompt_service._extract_display_name(github_data["user_data"])
 
             # Stage 1: Initializing
             yield {
@@ -319,6 +324,7 @@ class AIRecommendationService:
                 analysis_context_type=analysis_context_type,
                 repository_url=repository_url,
                 exclude_keywords=exclude_keywords,
+                display_name=display_name,
             )
 
             # Create regeneration parameters
@@ -351,7 +357,7 @@ class AIRecommendationService:
             # Return refined result
             result = {
                 "content": refined_content.strip(),
-                "title": self.prompt_service.extract_title(refined_content, github_data["user_data"]["github_username"], first_name),
+                "title": self.prompt_service.extract_title(refined_content, github_data["user_data"]["github_username"], None, display_name),
                 "word_count": len(refined_content.split()),
                 "generation_parameters": regeneration_params,
             }
@@ -510,7 +516,10 @@ class AIRecommendationService:
 
         options = []
         base_username = github_data["user_data"]["github_username"]
-        first_name = self.prompt_service._extract_first_name(github_data["user_data"].get("full_name", ""))
+
+        # Extract display name for consistent naming (prioritizes first name)
+        if display_name is None:
+            display_name = self.prompt_service._extract_display_name(github_data["user_data"])
 
         # Generate 2 different options with varying approaches
         option_configs = [
@@ -564,7 +573,7 @@ class AIRecommendationService:
                 "id": i,
                 "name": config["name"],
                 "content": option_content.strip(),
-                "title": self.prompt_service.extract_title(option_content, base_username, first_name, display_name),
+                "title": self.prompt_service.extract_title(option_content, base_username, None, display_name),
                 "word_count": len(option_content.split()),
                 "focus": config["focus"],
                 "validation_results": validation_results,
@@ -1114,6 +1123,7 @@ class AIRecommendationService:
         analysis_context_type: str = "profile",
         repository_url: Optional[str] = None,
         force_refresh: bool = False,
+        display_name: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Regenerate a recommendation with refinement instructions."""
 
@@ -1124,8 +1134,9 @@ class AIRecommendationService:
             logger.info("🔄 REGENERATING RECOMMENDATION")
             logger.info("=" * 60)
 
-            # Extract first name for consistent naming
-            first_name = self.prompt_service._extract_first_name(github_data["user_data"].get("full_name", ""))
+            # Extract display name for consistent naming (prioritizes first name)
+            if display_name is None:
+                display_name = self.prompt_service._extract_display_name(github_data["user_data"])
 
             # Build refinement prompt
             refinement_prompt = self.prompt_service.build_refinement_prompt_for_regeneration(
@@ -1136,6 +1147,7 @@ class AIRecommendationService:
                 tone=tone,
                 length=length,
                 exclude_keywords=exclude_keywords,
+                display_name=display_name,
             )
 
             # Create regeneration parameters
@@ -1158,7 +1170,7 @@ class AIRecommendationService:
             # Return refined result
             result = {
                 "content": refined_content.strip(),
-                "title": self.prompt_service.extract_title(refined_content, github_data["user_data"]["github_username"], first_name),
+                "title": self.prompt_service.extract_title(refined_content, github_data["user_data"]["github_username"], None, display_name),
                 "word_count": len(refined_content.split()),
                 "generation_parameters": regeneration_params,
             }

@@ -95,6 +95,7 @@ export interface RecommendationRequest {
   force_refresh?: boolean;
   include_keywords?: string[];
   exclude_keywords?: string[];
+  display_name?: string;
 }
 
 export interface Recommendation {
