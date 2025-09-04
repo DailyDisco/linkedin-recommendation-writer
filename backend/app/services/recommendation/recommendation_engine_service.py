@@ -34,6 +34,9 @@ class RecommendationEngineService:
         target_role: Optional[str] = None,
         specific_skills: Optional[List[str]] = None,
         exclude_keywords: Optional[List[str]] = None,
+        analysis_context_type: str = "profile",
+        repository_url: Optional[str] = None,
+        force_refresh: bool = False,
     ) -> Dict[str, Any]:
         """Generate a new recommendation using AI."""
         logger.info("🤖 Generating AI recommendation...")
@@ -47,6 +50,9 @@ class RecommendationEngineService:
             target_role=target_role,
             specific_skills=specific_skills,
             exclude_keywords=exclude_keywords,
+            analysis_context_type=analysis_context_type,
+            repository_url=repository_url,
+            force_refresh=force_refresh,
         )
 
         logger.info("✅ AI recommendation generated successfully")
@@ -60,6 +66,9 @@ class RecommendationEngineService:
         recommendation_type: str = "professional",
         tone: str = "professional",
         length: str = "medium",
+        analysis_context_type: str = "profile",
+        repository_url: Optional[str] = None,
+        force_refresh: bool = False,
     ) -> Dict[str, Any]:
         """Regenerate a recommendation with refinement instructions."""
         logger.info("🔄 Regenerating AI recommendation...")
@@ -71,6 +80,9 @@ class RecommendationEngineService:
             recommendation_type=recommendation_type,
             tone=tone,
             length=length,
+            analysis_context_type=analysis_context_type,
+            repository_url=repository_url,
+            force_refresh=force_refresh,
         )
 
         logger.info("✅ AI recommendation regenerated successfully")

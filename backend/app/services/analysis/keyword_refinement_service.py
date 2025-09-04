@@ -4,7 +4,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from app.core.config import settings
-from app.services.prompt_service import PromptService
+from app.services.ai.prompt_service import PromptService
 
 logger = logging.getLogger(__name__)
 

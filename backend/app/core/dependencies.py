@@ -12,15 +12,15 @@ from app.core.database import AsyncSessionLocal
 from app.core.exceptions import DatabaseError
 from app.core.redis_client import get_redis
 from app.models.user import User
-from app.services.ai_service import AIService
-from app.services.github_commit_service import GitHubCommitService
-from app.services.github_repository_service import GitHubRepositoryService
-from app.services.github_user_service import GitHubUserService
-from app.services.profile_analysis_service import ProfileAnalysisService
-from app.services.recommendation_engine_service import RecommendationEngineService
-from app.services.recommendation_service import RecommendationService
-from app.services.skill_analysis_service import SkillAnalysisService
-from app.services.user_service import UserService
+from app.services.ai.ai_service import AIService
+from app.services.analysis.profile_analysis_service import ProfileAnalysisService
+from app.services.analysis.skill_analysis_service import SkillAnalysisService
+from app.services.github.github_commit_service import GitHubCommitService
+from app.services.github.github_repository_service import GitHubRepositoryService
+from app.services.github.github_user_service import GitHubUserService
+from app.services.infrastructure.user_service import UserService
+from app.services.recommendation.recommendation_engine_service import RecommendationEngineService
+from app.services.recommendation.recommendation_service import RecommendationService
 
 T = TypeVar("T")
 

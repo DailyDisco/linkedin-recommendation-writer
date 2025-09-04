@@ -10,12 +10,13 @@ interface RecommendationSettingsSectionProps {
     | 'personal';
   tone: 'professional' | 'friendly' | 'formal' | 'casual';
   length: 'short' | 'medium' | 'long';
-  onChange: (field: string, value: string) => void;
+  forceRefresh?: boolean;
+  onChange: (field: string, value: string | boolean) => void;
 }
 
 export const RecommendationSettingsSection: React.FC<
   RecommendationSettingsSectionProps
-> = ({ recommendationType, tone, length, onChange }) => {
+> = ({ recommendationType, tone, length, forceRefresh = false, onChange }) => {
   return (
     <div className='bg-gray-50 p-4 rounded-lg space-y-4'>
       <h3 className='font-medium text-gray-900'>Recommendation Settings</h3>
@@ -103,6 +104,28 @@ export const RecommendationSettingsSection: React.FC<
             <option value='long'>Long</option>
           </select>
         </div>
+      </div>
+
+      {/* Force Refresh Option */}
+      <div className='border-t pt-4'>
+        <div className='flex items-center space-x-2'>
+          <input
+            type='checkbox'
+            id='force-refresh'
+            checked={forceRefresh}
+            onChange={e => onChange('force_refresh', e.target.checked)}
+            className='h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded'
+          />
+          <Label
+            htmlFor='force-refresh'
+            className='text-sm font-medium text-gray-700'
+          >
+            Force fresh generation
+          </Label>
+        </div>
+        <p className='text-xs text-gray-500 mt-1'>
+          Bypass cached results and generate a completely new recommendation
+        </p>
       </div>
     </div>
   );

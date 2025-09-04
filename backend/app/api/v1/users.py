@@ -7,7 +7,7 @@ from app.api.v1.auth import get_current_active_user
 from app.core.dependencies import get_database_session
 from app.models.user import User
 from app.schemas.user import UserResponse
-from app.services.user_service import UserService
+from app.services.infrastructure.user_service import UserService
 
 logger = logging.getLogger(__name__)
 

@@ -3,10 +3,12 @@
 import logging
 from typing import Any, Dict, List, Optional, TypedDict
 
-from app.services.ai_recommendation_service import AIRecommendationService
-from app.services.keyword_refinement_service import KeywordRefinementService
-from app.services.prompt_service import PromptService
-from app.services.readme_generation_service import READMEGenerationService
+from app.schemas.recommendation import ChatAssistantResponse, PromptSuggestionsResponse
+from app.services.ai.ai_recommendation_service import AIRecommendationService
+from app.services.ai.prompt_generator_service import PromptGeneratorService
+from app.services.ai.prompt_service import PromptService
+from app.services.ai.readme_generation_service import READMEGenerationService
+from app.services.analysis.keyword_refinement_service import KeywordRefinementService
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +27,7 @@ class AIService:
         """Initialize AI service with all specialized services."""
         # Initialize the core prompt service
         self.prompt_service = PromptService()
+        self.prompt_generator_service = PromptGeneratorService()
 
         # Initialize specialized AI services
         self.recommendation_service = AIRecommendationService(self.prompt_service)
@@ -41,6 +44,9 @@ class AIService:
         target_role: Optional[str] = None,
         specific_skills: Optional[list] = None,
         exclude_keywords: Optional[list] = None,
+        analysis_context_type: str = "profile",
+        repository_url: Optional[str] = None,
+        force_refresh: bool = False,
     ) -> Dict[str, Any]:
         """Generate a LinkedIn recommendation using AI."""
         try:
@@ -54,6 +60,9 @@ class AIService:
                 target_role=target_role,
                 specific_skills=specific_skills,
                 exclude_keywords=exclude_keywords,
+                analysis_context_type=analysis_context_type,
+                repository_url=repository_url,
+                force_refresh=force_refresh,
             )
 
             return result
@@ -119,6 +128,9 @@ class AIService:
         tone: str = "professional",
         length: str = "medium",
         exclude_keywords: Optional[list] = None,
+        analysis_context_type: str = "profile",
+        repository_url: Optional[str] = None,
+        force_refresh: bool = False,
     ) -> Dict[str, Any]:
         """Regenerate a recommendation with refinement instructions."""
         return await self.recommendation_service.regenerate_recommendation(
@@ -129,6 +141,9 @@ class AIService:
             tone=tone,
             length=length,
             exclude_keywords=exclude_keywords,
+            analysis_context_type=analysis_context_type,
+            repository_url=repository_url,
+            force_refresh=force_refresh,
         )
 
     # Keyword refinement methods
@@ -140,6 +155,7 @@ class AIService:
         recommendation_type: str,
         tone: str,
         length: str,
+        include_keywords: Optional[List[str]] = None,
         exclude_keywords: Optional[List[str]] = None,
         regeneration_params: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
@@ -151,6 +167,7 @@ class AIService:
             recommendation_type=recommendation_type,
             tone=tone,
             length=length,
+            include_keywords=include_keywords,
             exclude_keywords=exclude_keywords,
             regeneration_params=regeneration_params,
         )
@@ -171,6 +188,50 @@ class AIService:
             style=style,
             include_sections=include_sections,
             target_audience=target_audience,
+        )
+
+    # Prompt Assistant methods
+    async def get_initial_prompt_suggestions(
+        self,
+        github_data: Dict[str, Any],
+        recommendation_type: str,
+        tone: str,
+        length: str,
+    ) -> PromptSuggestionsResponse:
+        """Get initial prompt suggestions for form fields."""
+        return await self.prompt_generator_service.get_initial_prompt_suggestions(
+            github_data=github_data,
+            recommendation_type=recommendation_type,
+            tone=tone,
+            length=length,
+        )
+
+    async def get_autocomplete_suggestions(
+        self,
+        github_data: Dict[str, Any],
+        field_name: str,
+        current_input: str,
+    ) -> List[str]:
+        """Get auto-completion suggestions for form fields."""
+        return await self.prompt_generator_service.get_autocomplete_suggestions(
+            github_data=github_data,
+            field_name=field_name,
+            current_input=current_input,
+        )
+
+    async def chat_with_assistant(
+        self,
+        github_data: Dict[str, Any],
+        conversation_history: List[Dict[str, str]],
+        user_message: str,
+        current_form_data: Dict[str, Any],
+    ) -> ChatAssistantResponse:
+        """Handle conversational AI assistance for the recommendation form."""
+        return await self.prompt_generator_service.chat_with_assistant(
+            github_data=github_data,
+            conversation_history=conversation_history,
+            user_message=user_message,
+            current_form_data=current_form_data,
         )
 
     # Backwards compatibility methods

@@ -16,17 +16,28 @@ class PromptService:
         target_role: Optional[str] = None,
         specific_skills: Optional[list] = None,
         exclude_keywords: Optional[list] = None,
+        analysis_context_type: str = "profile",
+        repository_url: Optional[str] = None,
     ) -> str:
         """Build the AI generation prompt."""
 
-        user_data = github_data["user_data"]
-        languages = github_data["languages"]
-        skills = github_data["skills"]
+        user_data = github_data.get("user_data", {})
+        languages = github_data.get("languages", [])
+        skills = github_data.get("skills", {})
         commit_analysis = github_data.get("commit_analysis", {})
+        repository_info = github_data.get("repository_info", {})
+
+        # Safely get username: always prioritize the person's GitHub username from user_data
+        base_username = user_data.get("github_username")
+        if not base_username and repository_info:
+            # Only use repository owner as fallback if we don't have user_data
+            base_username = repository_info.get("owner", {}).get("login")
+        if not base_username:  # Final fallback
+            base_username = "the developer"
 
         # Base prompt structure
         prompt_parts = [
-            f"Write a {length} LinkedIn recommendation for {user_data['github_username']}.",
+            f"Write a {length} LinkedIn recommendation for {base_username}.",
             f"Make it {tone} and suitable for {recommendation_type} purposes.",
         ]
 
@@ -34,32 +45,118 @@ class PromptService:
             prompt_parts.append(f"Highlight why they'd be great for a {target_role} position.")
 
         # Add GitHub context based on standardized analysis type
-        analysis_context_type = github_data.get("analysis_context_type", "profile")
+        # Use parameter if provided, otherwise fall back to data
+        context_type = analysis_context_type or github_data.get("analysis_context_type", "profile")
 
-        if analysis_context_type == "repository":
-            # Repository-specific context
-            repo_info = github_data["repository_info"]
-            prompt_parts.extend(
-                [
-                    "\nHere's what I know about this repository:",
-                    f"- Project: {repo_info.get('name', 'Not provided')}",
-                    f"- What it's about: {repo_info.get('description', 'Not provided')}",
-                    f"- Main programming language: {repo_info.get('language', 'Not provided')}",
-                ]
-            )
-        elif analysis_context_type == "repository_contributor":
-            # Repository-contributor merged context
-            repo_info = github_data["repository_info"]
-            prompt_parts.extend(
-                [
-                    "\nHere's what I know about their work on this project:",
-                    f"- Project: {repo_info.get('name', 'Not provided')}",
-                    f"- What it's about: {repo_info.get('description', 'Not provided')}",
-                    f"- Main programming language: {repo_info.get('language', 'Not provided')}",
-                ]
-            )
-        else:
-            # Profile context (default)
+        # Flag to track if we've handled context-specific data
+        context_handled = False
+
+        # Handle different analysis contexts
+        if context_type == "repo_only":
+            # Build repository-only prompt and skip all general profile logic
+            repo_info = github_data.get("repository_info", {})
+            if repo_info:
+                prompt_parts.extend(
+                    [
+                        "\nCRITICAL: ONLY DISCUSS THIS SPECIFIC REPOSITORY - NO OTHER PROJECTS ALLOWED",
+                        "",
+                        "REPOSITORY DETAILS:",
+                        f"- Repository Name: {repo_info.get('name', 'Not provided')}",
+                        f"- Description: {repo_info.get('description', 'Not provided')}",
+                        f"- Main Language: {repo_info.get('language', 'Not provided')}",
+                        f"- Repository URL: {repository_url or 'Not provided'}",
+                        "",
+                        "STRICT INSTRUCTIONS:",
+                        "- ONLY mention work, skills, and contributions from THIS SPECIFIC REPOSITORY",
+                        "- DO NOT reference any other projects, repositories, or general GitHub profile",
+                        "- DO NOT talk about commits, PRs, or work outside of this repository",
+                        "- DO NOT mention their overall coding activity, experience, or background",
+                        "- DO NOT reference their starred repositories, organizations, or general profile data",
+                        "- DO NOT mention any technologies, frameworks, or languages that are NOT used in THIS repository",
+                        "- If you don't have specific information about this repository, be honest about limitations",
+                        "- Focus exclusively on what they've done in THIS repository only",
+                        "- IGNORE any general guidelines about overall experience or background",
+                        "- DO NOT infer or assume technologies based on the person's general profile",
+                        "",
+                        "WHAT TO INCLUDE (ONLY FROM THIS REPOSITORY):",
+                    ]
+                )
+
+                # Only include repository-specific data
+                repo_languages = github_data.get("repository_languages", [])
+                repo_skills = github_data.get("repository_skills", {})
+                repo_commit_analysis = github_data.get("repository_commit_analysis", {})
+
+                if repo_languages:
+                    top_repo_languages = [lang.get("language", "") for lang in repo_languages[:3]]
+                    prompt_parts.append(f"- Languages used in this repository: {', '.join(top_repo_languages)}")
+                    prompt_parts.append(f"- IMPORTANT: Only mention these languages: {', '.join(top_repo_languages)}")
+
+                if repo_skills.get("technical_skills"):
+                    skills_list = repo_skills["technical_skills"][:8]
+                    prompt_parts.append(f"- Technical skills demonstrated in this repository: {', '.join(skills_list)}")
+                    prompt_parts.append(f"- IMPORTANT: Only mention these technical skills: {', '.join(skills_list)}")
+
+                if repo_skills.get("frameworks"):
+                    frameworks_list = repo_skills["frameworks"][:5]
+                    prompt_parts.append(f"- Frameworks/tools used in this repository: {', '.join(frameworks_list)}")
+                    prompt_parts.append(f"- IMPORTANT: Only mention these frameworks: {', '.join(frameworks_list)}")
+                else:
+                    prompt_parts.append("- IMPORTANT: No specific frameworks detected in this repository - do not mention any frameworks")
+
+                # Only include repository-specific commit analysis
+                if repo_commit_analysis and repo_commit_analysis.get("total_commits", 0) > 0:
+                    prompt_parts.append("")
+                    prompt_parts.append("REPOSITORY-SPECIFIC CONTRIBUTIONS:")
+                    prompt_parts.append(f"- Number of commits to this repository: {repo_commit_analysis.get('total_commits', 0)}")
+
+                    # Add repository-specific commit patterns if available
+                    if repo_commit_analysis.get("patterns"):
+                        patterns = repo_commit_analysis["patterns"]
+                        if patterns.get("most_active_month"):
+                            prompt_parts.append(f"- Most active development period: {patterns['most_active_month']}")
+
+                # Add repository-specific user data if available
+                if github_data.get("contributor_info"):
+                    contributor = github_data["contributor_info"]
+                    prompt_parts.append("")
+                    prompt_parts.append("CONTRIBUTOR DETAILS FOR THIS REPOSITORY:")
+                    prompt_parts.append(f"- Total contributions to this repository: {contributor.get('contributions', 0)} commits")
+                    if contributor.get("full_name"):
+                        prompt_parts.append(f"- Contributor: {contributor['full_name']}")
+
+                prompt_parts.append("")
+                prompt_parts.append("FINAL WARNING:")
+                prompt_parts.append("- DO NOT mention any work outside of this specific repository")
+                prompt_parts.append("- If information is limited, focus on what you do know about this repository")
+                prompt_parts.append("- Stay focused on THIS repository's work only")
+
+            else:
+                prompt_parts.append("\nRepository information is not available for this specific repository.")
+
+            # For repo_only context, skip ALL general profile logic
+            # Jump directly to custom prompt and guidelines sections
+            context_handled = True
+
+        elif context_type == "repository_contributor":
+            # Repository-contributor merged context - balance both
+            repo_info = github_data.get("repository_info", {})
+            if repo_info:
+                prompt_parts.extend(
+                    [
+                        "\nFOCUS ON THEIR WORK IN THIS CONTEXT:",
+                        f"- Project: {repo_info.get('name', 'Not provided')}",
+                        f"- What it's about: {repo_info.get('description', 'Not provided')}",
+                        f"- Main programming language: {repo_info.get('language', 'Not provided')}",
+                        f"- Repository URL: {repository_url or 'Not provided'}",
+                        "\nBalance their specific contributions to this repository with relevant aspects of their overall profile.",
+                        "Emphasize how their work on this project demonstrates their broader skills and expertise.",
+                    ]
+                )
+            else:
+                prompt_parts.append("\nConsider both their specific project contributions and overall professional background.")
+        if not context_handled and context_type == "profile":
+            # Profile context (default) - only add if we haven't handled context-specific data and it's profile context
             prompt_parts.append("\nHere's what I know about them:")
             if user_data.get("full_name"):
                 prompt_parts.append(f"- Name: {user_data['full_name']}")
@@ -89,108 +186,90 @@ class PromptService:
                     prompt_parts.append("- Demonstrates community involvement and collaboration skills")
 
         # Add technical skills based on standardized analysis context
-        if analysis_context_type in ["repository", "repository_contributor"]:
-            # Repository-specific skills
-            repo_languages = github_data.get("languages", [])
-            repo_skills = github_data.get("skills", {})
-
-            if repo_languages:
-                top_languages = [lang["language"] for lang in repo_languages[:5]]
-                prompt_parts.append(f"- Programming languages they work with: {', '.join(top_languages)}")
-
-            if repo_skills.get("technical_skills"):
-                prompt_parts.append(f"- Technical skills: {', '.join(repo_skills['technical_skills'][:10])}")
-
-            if repo_skills.get("frameworks"):
-                prompt_parts.append(f"- Frameworks and tools: {', '.join(repo_skills['frameworks'])}")
-
-            if repo_skills.get("domains"):
-                prompt_parts.append(f"- Areas they specialize in: {', '.join(repo_skills['domains'])}")
-        else:
+        # This section handles skills for contexts that haven't been fully handled by the repo_only block above
+        if context_type == "profile":
             # Profile-based skills
             if languages:
                 top_languages = [lang["language"] for lang in languages[:5]]
                 prompt_parts.append(f"- Programming languages they work with: {', '.join(top_languages)}")
 
-            if skills["technical_skills"]:
+            if skills.get("technical_skills"):
                 prompt_parts.append(f"- Technical skills: {', '.join(skills['technical_skills'][:10])}")
 
-            if skills["frameworks"]:
+            if skills.get("frameworks"):
                 prompt_parts.append(f"- Frameworks and tools: {', '.join(skills['frameworks'])}")
 
-            if skills["domains"]:
+            if skills.get("domains"):
                 prompt_parts.append(f"- Areas they specialize in: {', '.join(skills['domains'])}")
 
-        # Add commit analysis insights with specific examples
-        if commit_analysis and commit_analysis.get("total_commits_analyzed", 0) > 0:
-            if analysis_context_type == "repository":
-                # Repository-specific insights
-                prompt_parts.append("\nWhat the repository's commit history shows:")
-            elif analysis_context_type == "repository_contributor":
-                # Repository-contributor insights
-                prompt_parts.append("\nWhat their contributions to this project show:")
-            else:
-                # Profile-based insights
+            # Add commit analysis insights with specific examples for profile
+            if commit_analysis and commit_analysis.get("total_commits", 0) > 0:
                 prompt_parts.append("\nWhat their overall coding work shows:")
-
-            # Inject specific commit examples for evidence-based writing
-            if analysis_context_type != "repository":  # Don't inject examples for pure repository analysis
                 specific_examples = self._extract_commit_examples(commit_analysis)
                 if specific_examples:
                     prompt_parts.append("\nSpecific examples of their work:")
                     for example in specific_examples[:3]:  # Limit to 3 examples
                         prompt_parts.append(f"- {example}")
 
-            excellence_areas = commit_analysis.get("excellence_areas", {})
-            if excellence_areas.get("primary_strength"):
-                primary_strength = excellence_areas["primary_strength"].replace("_", " ").title()
-                prompt_parts.append(f"- Primary strength: {primary_strength}")
+                excellence_areas = commit_analysis.get("excellence_areas", {})
+                if excellence_areas.get("primary_strength"):
+                    primary_strength = excellence_areas["primary_strength"].replace("_", " ").title()
+                    prompt_parts.append(f"- Primary strength: {primary_strength}")
 
-            # Add conventional commit insights
-            conventional_analysis = commit_analysis.get("conventional_commit_analysis", {})
-            if conventional_analysis and conventional_analysis.get("quality_score", 0) > 60:
-                prompt_parts.append("- Uses professional commit message standards (conventional commits)")
-                prompt_parts.append("- Demonstrates attention to code quality and documentation")
+                # Add conventional commit insights
+                conventional_analysis = commit_analysis.get("conventional_commit_analysis", {})
+                if conventional_analysis and conventional_analysis.get("quality_score", 0) > 60:
+                    prompt_parts.append("- Uses professional commit message standards (conventional commits)")
+                    prompt_parts.append("- Demonstrates attention to code quality and documentation")
 
-            patterns = excellence_areas.get("patterns", {})
-            if patterns:
-                top_patterns = list(patterns.keys())[:2]
-                pattern_str = ", ".join([p.replace("_", " ").title() for p in top_patterns])
-                prompt_parts.append(f"- How they approach development: {pattern_str}")
+                patterns = excellence_areas.get("patterns", {})
+                if patterns:
+                    top_patterns = list(patterns.keys())[:2]
+                    pattern_str = ", ".join([p.replace("_", " ").title() for p in top_patterns])
+                    prompt_parts.append(f"- How they approach development: {pattern_str}")
 
-            tech_contributions = commit_analysis.get("technical_contributions", {})
-            if tech_contributions:
-                top_contributions = sorted(
-                    tech_contributions.items(),
-                    key=lambda x: x[1],
-                    reverse=True,
-                )[:2]
-                contrib_str = ", ".join([contrib[0].replace("_", " ").title() for contrib in top_contributions])
-                prompt_parts.append(f"- Technical areas they focus on: {contrib_str}")
-        else:
-            # Profile-based insights
-            prompt_parts.append("\nWhat their overall coding work shows:")
+                tech_contributions = commit_analysis.get("technical_contributions", {})
+                if tech_contributions:
+                    top_contributions = sorted(
+                        tech_contributions.items(),
+                        key=lambda x: x[1],
+                        reverse=True,
+                    )[:2]
+                    contrib_str = ", ".join([contrib[0].replace("_", " ").title() for contrib in top_contributions])
+                    prompt_parts.append(f"- Technical areas they focus on: {contrib_str}")
 
-            excellence_areas = commit_analysis.get("excellence_areas", {})
-            if excellence_areas.get("primary_strength"):
-                primary_strength = excellence_areas["primary_strength"].replace("_", " ").title()
-                prompt_parts.append(f"- What they're really good at: {primary_strength}")
+        elif context_type == "repository_contributor":
+            # Repository-contributor context - blend repository and profile data
+            repo_languages = github_data.get("languages", [])
+            repo_skills = github_data.get("skills", {})
+            repo_commit_analysis = github_data.get("commit_analysis", {})
 
-            patterns = excellence_areas.get("patterns", {})
-            if patterns:
-                top_patterns = list(patterns.keys())[:3]
-                pattern_str = ", ".join([p.replace("_", " ").title() for p in top_patterns])
-                prompt_parts.append(f"- How they approach development: {pattern_str}")
+            if repo_languages:
+                top_languages = [lang["language"] for lang in repo_languages[:5]]
+                prompt_parts.append(f"- Programming languages they work with in this project: {', '.join(top_languages)}")
 
-            tech_contributions = commit_analysis.get("technical_contributions", {})
-            if tech_contributions:
-                top_contributions = sorted(
-                    tech_contributions.items(),
-                    key=lambda x: x[1],
-                    reverse=True,
-                )[:2]
-                contrib_str = ", ".join([contrib[0].replace("_", " ").title() for contrib in top_contributions])
-                prompt_parts.append(f"- Technical areas they focus on: {contrib_str}")
+            if repo_skills.get("technical_skills"):
+                prompt_parts.append(f"- Technical skills demonstrated in this project: {', '.join(repo_skills['technical_skills'][:10])}")
+
+            if repo_skills.get("frameworks"):
+                prompt_parts.append(f"- Frameworks and tools used in this project: {', '.join(repo_skills['frameworks'])}")
+
+            if repo_skills.get("domains"):
+                prompt_parts.append(f"- Areas they specialize in within this project: {', '.join(repo_skills['domains'])}")
+
+            # Add repository-specific commit analysis for repository_contributor
+            if repo_commit_analysis and repo_commit_analysis.get("total_commits", 0) > 0:
+                prompt_parts.append("\nWhat their contributions to this project show:")
+                specific_examples = self._extract_commit_examples(repo_commit_analysis)
+                if specific_examples:
+                    prompt_parts.append("\nSpecific examples of their work on this project:")
+                    for example in specific_examples[:3]:
+                        prompt_parts.append(f"- {example}")
+
+                excellence_areas = repo_commit_analysis.get("excellence_areas", {})
+                if excellence_areas.get("primary_strength"):
+                    primary_strength = excellence_areas["primary_strength"].replace("_", " ").title()
+                    prompt_parts.append(f"- Primary strength demonstrated in this project: {primary_strength}")
 
         # Add specific skills if requested
         if specific_skills:
@@ -205,52 +284,123 @@ class PromptService:
         if custom_prompt:
             prompt_parts.append(f"\nAdditional information to include: {custom_prompt}")
 
+        # Add context-specific restrictions for repo_only
+        if context_type == "repo_only":
+            prompt_parts.extend(
+                [
+                    "",
+                    "REPO-ONLY SPECIFIC GUIDELINES:",
+                    "- ONLY discuss the specific repository mentioned above",
+                    "- DO NOT reference any other repositories or projects",
+                    "- DO NOT mention general GitHub profile information",
+                    "- If you lack specific details about this repository, acknowledge that limitation",
+                    "- Stay focused on what the person did in THIS repository only",
+                    "- Do not extrapolate or assume work outside of this repository",
+                    "- CRITICAL: If no frameworks are listed above, do not mention ANY frameworks",
+                    "- CRITICAL: Only mention technologies that are explicitly listed in the repository data above",
+                    "- CRITICAL: Do not infer or assume additional technologies based on general knowledge",
+                ]
+            )
+
         # Add guidelines based on length
         base_guidelines = [
             "\nGuidelines:",
             "- Write in first person as someone who has worked with this developer",
-            "- Be specific about technical achievements and skills",
-            "- Use natural, conversational language, like you're talking to a colleague.",
-            "- Focus on both technical competence and collaborative abilities, providing specific examples and positive anecdotes from their work.",
-            "- DO NOT mention any company names, employers, or employment history",
-            "- Focus on technical skills and collaborative abilities only",
-            "- Separate the recommendation into clear, distinct paragraphs to improve readability.",
-            f"- Target length: {self._get_length_guideline(length)} words",
-            "- Do not include any placeholders or template text",
-            "- Make it sound natural and personal, like a real recommendation",
         ]
 
-        # Add paragraph structure guidelines based on length
-        if length == "short":
+        # Add context-specific guidelines
+        if context_type == "repo_only":
             base_guidelines.extend(
                 [
-                    "- Structure as 2 paragraphs: introduction with key skills and a specific example,",
-                    " then a concluding positive anecdote.",
-                    "- Keep it concise but impactful",
-                    "- Focus on 1-2 key strengths with concrete evidence",
+                    "- Be specific about technical achievements and skills demonstrated in THIS SPECIFIC REPOSITORY",
+                    "- Use natural, conversational language, like you're talking to a colleague.",
+                    "- Focus on technical competence and collaborative abilities shown in this repository only",
+                    "- Provide specific examples and positive anecdotes from their work in THIS repository",
+                    "- DO NOT mention any company names, employers, or employment history",
+                    "- DO NOT reference work outside of this specific repository",
+                    "- Focus on technical skills and collaborative abilities demonstrated in this repository only",
+                    "- Separate the recommendation into clear, distinct paragraphs to improve readability.",
+                    f"- Target length: {self._get_length_guideline(length)} words",
+                    "- Do not include any placeholders or template text",
+                    "- Make it sound natural and personal, like a real recommendation",
                 ]
             )
-        elif length == "medium":
+        else:
             base_guidelines.extend(
                 [
-                    "- Structure as 3 paragraphs: introduction, 2-3 specific technical achievements with examples,",
-                    " and a concluding paragraph on personal qualities/collaboration with an anecdote.",
-                    "- Provide 2-3 specific examples or achievements",
-                    "- Balance technical expertise with personal qualities",
-                ]
-            )
-        else:  # long
-            base_guidelines.extend(
-                [
-                    "- Structure as 4-5 paragraphs: introduction, detailed technical background with 2-3 achievements,",
-                    " specific project contributions/problem-solving, collaboration skills with an anecdote,",
-                    " and a strong conclusion.",
-                    "- Include 3-4 detailed examples",
-                    "- Show development journey and growth",
+                    "- Be specific about technical achievements and skills",
+                    "- Use natural, conversational language, like you're talking to a colleague.",
+                    "- Focus on both technical competence and collaborative abilities, providing specific examples and positive anecdotes from their work.",
+                    "- DO NOT mention any company names, employers, or employment history",
+                    "- Focus on technical skills and collaborative abilities only",
+                    "- Separate the recommendation into clear, distinct paragraphs to improve readability.",
+                    f"- Target length: {self._get_length_guideline(length)} words",
+                    "- Do not include any placeholders or template text",
+                    "- Make it sound natural and personal, like a real recommendation",
                 ]
             )
 
-        if analysis_context_type in ["repository", "repository_contributor"]:
+        # Add paragraph structure guidelines based on length
+        if context_type == "repo_only":
+            if length == "short":
+                base_guidelines.extend(
+                    [
+                        "- Structure as 2 paragraphs: introduction with key skills from this repository and a specific example from their work here,",
+                        " then a concluding positive anecdote about their contribution to this project.",
+                        "- Keep it concise but impactful",
+                        "- Focus on 1-2 key strengths demonstrated in this repository with concrete evidence",
+                    ]
+                )
+            elif length == "medium":
+                base_guidelines.extend(
+                    [
+                        "- Structure as 3 paragraphs: introduction to their work on this repository, 2-3 specific technical achievements in this project with examples,",
+                        " and a concluding paragraph on personal qualities/collaboration shown in this repository with an anecdote.",
+                        "- Provide 2-3 specific examples or achievements from this repository only",
+                        "- Balance technical expertise with personal qualities demonstrated in this project",
+                    ]
+                )
+            else:  # long
+                base_guidelines.extend(
+                    [
+                        "- Structure as 4-5 paragraphs: introduction to their role in this repository, detailed technical background with 2-3 achievements in this project,",
+                        " specific contributions/problem-solving in this repository, collaboration skills with an anecdote from this project,",
+                        " and a strong conclusion about their impact on this repository.",
+                        "- Include 3-4 detailed examples from this repository only",
+                        "- Show their contributions and growth within this project",
+                    ]
+                )
+        else:
+            if length == "short":
+                base_guidelines.extend(
+                    [
+                        "- Structure as 2 paragraphs: introduction with key skills and a specific example,",
+                        " then a concluding positive anecdote.",
+                        "- Keep it concise but impactful",
+                        "- Focus on 1-2 key strengths with concrete evidence",
+                    ]
+                )
+            elif length == "medium":
+                base_guidelines.extend(
+                    [
+                        "- Structure as 3 paragraphs: introduction, 2-3 specific technical achievements with examples,",
+                        " and a concluding paragraph on personal qualities/collaboration with an anecdote.",
+                        "- Provide 2-3 specific examples or achievements",
+                        "- Balance technical expertise with personal qualities",
+                    ]
+                )
+            else:  # long
+                base_guidelines.extend(
+                    [
+                        "- Structure as 4-5 paragraphs: introduction, detailed technical background with 2-3 achievements,",
+                        " specific project contributions/problem-solving, collaboration skills with an anecdote,",
+                        " and a strong conclusion.",
+                        "- Include 3-4 detailed examples",
+                        "- Show development journey and growth",
+                    ]
+                )
+
+        if analysis_context_type in ["repository", "repository_contributor", "repo_only"]:
             # Repository-specific guidelines
             repo_info = github_data["repository_info"]
             repo_name = repo_info.get("name", "the repository")
@@ -262,6 +412,15 @@ class PromptService:
                 base_guidelines.insert(
                     4,
                     "- Highlight the project's technical achievements and impact",
+                )
+            elif analysis_context_type == "repo_only":
+                base_guidelines.insert(
+                    3,
+                    f"- ONLY focus on skills and technologies demonstrated in {repo_name}",
+                )
+                base_guidelines.insert(
+                    4,
+                    f"- DO NOT mention any work outside of {repo_name}",
                 )
             else:  # repository_contributor
                 base_guidelines.insert(
@@ -383,10 +542,21 @@ Create a recommendation that really highlights their {focus_formatted} skills wh
         recommendation_type: str,
         tone: str,
         length: str,
+        analysis_context_type: str = "profile",
+        repository_url: Optional[str] = None,
         exclude_keywords: Optional[list] = None,
     ) -> str:
         """Build prompt for regenerating a recommendation."""
-        username = github_data["user_data"]["github_username"]
+        user_data = github_data.get("user_data", {})
+        repository_info = github_data.get("repository_info", {})
+
+        username = user_data.get("github_username")
+        if not username and repository_info:
+            # Only use repository owner as fallback if we don't have user_data
+            username = repository_info.get("owner", {}).get("login")
+        if not username:
+            username = "the developer"
+
         target_length = self._get_length_guideline(length)
 
         exclude_section = ""

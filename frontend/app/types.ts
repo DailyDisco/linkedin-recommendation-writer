@@ -144,6 +144,7 @@ export interface RecommendationRequest {
   exclude_keywords?: string[];
   analysis_context_type?: string;
   repository_url?: string;
+  force_refresh?: boolean;
 }
 
 export interface RecommendationOption {

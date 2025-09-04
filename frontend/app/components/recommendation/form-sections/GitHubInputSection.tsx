@@ -8,6 +8,8 @@ interface GitHubInputSectionProps {
   parsedGitHubInput: ParsedGitHubInput | null;
   errors: Record<string, string>;
   onChange: (field: string, value: string) => void;
+  initialInputValue: string;
+  mode: 'user' | 'repository';
 }
 
 export const GitHubInputSection: React.FC<GitHubInputSectionProps> = ({
@@ -15,6 +17,8 @@ export const GitHubInputSection: React.FC<GitHubInputSectionProps> = ({
   parsedGitHubInput,
   errors,
   onChange,
+  initialInputValue,
+  mode,
 }) => {
   return (
     <div>
@@ -22,24 +26,43 @@ export const GitHubInputSection: React.FC<GitHubInputSectionProps> = ({
         htmlFor='github-input'
         className='block text-sm font-medium text-gray-700 mb-2'
       >
-        GitHub Username or Repository URL *
+        {initialInputValue
+          ? `Analyzing ${mode === 'repository' ? 'Repository' : 'User Profile'} *`
+          : 'GitHub Username or Repository URL *'
+        }
       </label>
       <Input
         id='github-input'
         type='text'
         required
-        className={`w-full ${
-          errors.github_input
+        readOnly={!!initialInputValue}
+        className={`w-full ${initialInputValue
+            ? 'bg-gray-50 text-gray-700 cursor-not-allowed'
+            : ''
+          } ${errors.github_input
             ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
             : 'border-gray-300'
-        }`}
-        placeholder='e.g., johnsmith or https://github.com/johnsmith/myproject'
+          }`}
+        placeholder={
+          initialInputValue
+            ? 'Auto-populated from your search'
+            : 'e.g., johnsmith or https://github.com/johnsmith/myproject'
+        }
         value={githubInput}
-        onChange={e => onChange('github_input', e.target.value)}
+        onChange={e => !initialInputValue && onChange('github_input', e.target.value)}
         aria-describedby={
           errors.github_input ? 'github-input-error' : undefined
         }
       />
+      {initialInputValue && (
+        <p className='mt-1 text-sm text-gray-600'>
+          🔗 This field is auto-populated from your repository/user search.
+          {mode === 'repository'
+            ? ' The AI will focus only on contributions to this repository.'
+            : ' The AI will analyze the full user profile.'
+          }
+        </p>
+      )}
       {errors.github_input && (
         <div
           id='github-input-error'

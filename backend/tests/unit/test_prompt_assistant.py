@@ -35,6 +35,9 @@ MOCK_GITHUB_DATA = {
     "analysis_context_type": "profile"
 }
 
+import pytest
+
+@pytest.mark.asyncio
 async def test_prompt_generator_service():
     """Test the PromptGeneratorService functionality."""
     print("Testing PromptGeneratorService...")
@@ -65,6 +68,7 @@ async def test_prompt_generator_service():
         print(f"✗ Error testing PromptGeneratorService: {e}")
         return False
 
+@pytest.mark.asyncio
 async def test_schemas():
     """Test that all schemas can be created and validated."""
     print("\nTesting schemas...")
@@ -125,6 +129,7 @@ async def test_schemas():
         print(f"✗ Error testing schemas: {e}")
         return False
 
+@pytest.mark.asyncio
 async def test_ai_service():
     """Test that AIService can be imported and has new methods."""
     print("\nTesting AIService...")

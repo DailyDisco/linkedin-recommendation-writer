@@ -39,6 +39,8 @@ interface RecommendationModalProps {
   isOpen: boolean;
   onClose: () => void;
   isLoggedIn: boolean;
+  initialInputValue: string;
+  mode: 'user' | 'repository';
 }
 
 export default function RecommendationModal({
@@ -46,6 +48,8 @@ export default function RecommendationModal({
   isOpen,
   onClose,
   isLoggedIn,
+  initialInputValue,
+  mode,
 }: RecommendationModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const firstInputRef = useRef<HTMLTextAreaElement>(null);
@@ -76,6 +80,21 @@ export default function RecommendationModal({
         dispatch({ type: 'SET_SHOW_LIMIT_EXCEEDED', payload: false });
       }
 
+      // Set initial input value based on props
+      if (initialInputValue) {
+        dispatch({ type: 'UPDATE_FORM', payload: { github_input: initialInputValue } });
+        if (mode === 'repository') {
+          dispatch({
+            type: 'UPDATE_FORM', payload: {
+              analysis_type: 'repo_only',
+              repository_url: initialInputValue
+            }
+          });
+        } else if (mode === 'user') {
+          dispatch({ type: 'UPDATE_FORM', payload: { analysis_type: 'profile' } });
+        }
+      }
+
       // Pre-warm cache by fetching initial suggestions
       const preWarmCache = async () => {
         try {
@@ -102,6 +121,8 @@ export default function RecommendationModal({
     state.formData.recommendation_type,
     state.formData.tone,
     state.formData.length,
+    initialInputValue,
+    mode,
   ]);
 
   useEffect(() => {
@@ -297,6 +318,7 @@ Key Achievements: ${state.formData.notableAchievements}
       recommendation_type: state.formData.recommendation_type,
       tone: state.formData.tone,
       length: state.formData.length,
+      force_refresh: state.formData.force_refresh || false,
     };
 
     createFromOptionMutation.mutate(params, {
@@ -318,7 +340,7 @@ Key Achievements: ${state.formData.notableAchievements}
 
         dispatch({ type: 'SET_STEP', payload: 'result' });
       },
-      onError: () => {},
+      onError: () => { },
     });
   };
 
@@ -427,6 +449,8 @@ Key Achievements: ${state.formData.notableAchievements}
                 }
                 onSubmit={handleSubmit}
                 onCancel={onClose}
+                initialInputValue={initialInputValue}
+                mode={mode}
               />
             ) : state.step === 'generating' ? (
               <RecommendationGeneratingState

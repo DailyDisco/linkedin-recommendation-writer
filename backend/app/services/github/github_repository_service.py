@@ -10,7 +10,7 @@ from loguru import logger
 from app.core.config import settings
 from app.core.redis_client import get_cache, set_cache
 from app.schemas.github import LanguageStats
-from app.services.github_commit_service import GitHubCommitService
+from app.services.github.github_commit_service import GitHubCommitService
 
 
 # Define a TypedDict for the repository content analysis result
@@ -179,7 +179,9 @@ class GitHubRepositoryService:
         parts = full_name.strip().split()
         return parts[-1] if len(parts) > 1 else ""
 
-    async def analyze_repository(self, repository_full_name: str, force_refresh: bool = False) -> Optional[Dict[str, Any]]:
+    async def analyze_repository(
+        self, repository_full_name: str, force_refresh: bool = False, analysis_context_type: str = "profile", repository_url: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
         """Analyze a specific GitHub repository and return comprehensive data."""
         import time
 
@@ -189,7 +191,17 @@ class GitHubRepositoryService:
         logger.info(f"🔄 Force refresh: {force_refresh}")
 
         analysis_start = time.time()
-        cache_key = f"repository:{repository_full_name}"
+
+        # Create context-aware cache key
+        context_suffix = ""
+        if analysis_context_type != "profile":
+            context_suffix = f":{analysis_context_type}"
+            if repository_url:
+                # Use the provided repository URL for consistency
+                repo_path = repository_url.replace("https://github.com/", "").split("?")[0]
+                context_suffix += f":{repo_path}"
+
+        cache_key = f"repository:{repository_full_name}{context_suffix}"
 
         # Check cache first
         if not force_refresh:

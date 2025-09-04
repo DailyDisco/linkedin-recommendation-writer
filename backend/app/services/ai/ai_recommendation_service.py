@@ -5,7 +5,7 @@ from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from app.core.config import settings
 from app.core.redis_client import get_cache, set_cache
-from app.services.prompt_service import PromptService
+from app.services.ai.prompt_service import PromptService
 
 # Handle optional Google Generative AI import
 try:
@@ -49,6 +49,9 @@ class AIRecommendationService:
         specific_skills: Optional[list] = None,
         exclude_keywords: Optional[list] = None,
         dynamic_params: Optional[Dict[str, Any]] = None,
+        analysis_context_type: str = "profile",
+        repository_url: Optional[str] = None,
+        force_refresh: bool = False,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """Generate a LinkedIn recommendation with streaming progress updates."""
 
@@ -80,6 +83,8 @@ class AIRecommendationService:
                 target_role=target_role,
                 specific_skills=specific_skills,
                 exclude_keywords=exclude_keywords,
+                analysis_context_type=analysis_context_type,
+                repository_url=repository_url,
             )
 
             # Stage 3: Identifying key contributions
@@ -89,25 +94,36 @@ class AIRecommendationService:
                 "status": "processing",
             }
 
-            # Check cache for final result
-            cache_key = f"ai_recommendation_v3:{hash(initial_prompt)}"
+            # Check cache for final result - include analysis context in cache key
+            context_suffix = ""
+            if analysis_context_type != "profile":
+                context_suffix = f":{analysis_context_type}"
+                if repository_url:
+                    repo_path = repository_url.replace("https://github.com/", "").split("?")[0]
+                    context_suffix += f":{repo_path}"
 
-            cached_result = await get_cache(cache_key)
-            if cached_result and isinstance(cached_result, dict):
-                logger.info("Cache hit for AI recommendation")
-                yield {
-                    "stage": "Generating recommendation options...",
-                    "progress": 70,
-                    "status": "generating",
-                }
-                # Return cached result with final progress
-                yield {
-                    "stage": "Recommendation ready!",
-                    "progress": 100,
-                    "status": "complete",
-                    "result": cached_result,
-                }
-                return
+            cache_key = f"ai_recommendation_v3:{hash(initial_prompt)}{context_suffix}"
+
+            # Skip cache if force_refresh is requested
+            if not force_refresh:
+                cached_result = await get_cache(cache_key)
+                if cached_result and isinstance(cached_result, dict):
+                    logger.info("Cache hit for AI recommendation")
+                    yield {
+                        "stage": "Generating recommendation options...",
+                        "progress": 70,
+                        "status": "generating",
+                    }
+                    # Return cached result with final progress
+                    yield {
+                        "stage": "Recommendation ready!",
+                        "progress": 100,
+                        "status": "complete",
+                        "result": cached_result,
+                    }
+                    return
+            else:
+                logger.info("Force refresh requested - skipping cache")
 
             # Stage 4: Generating options
             yield {
@@ -233,6 +249,8 @@ class AIRecommendationService:
         recommendation_type: str = "professional",
         tone: str = "professional",
         length: str = "medium",
+        analysis_context_type: str = "profile",
+        repository_url: Optional[str] = None,
         dynamic_tone: Optional[str] = None,
         dynamic_length: Optional[str] = None,
         include_keywords: Optional[List[str]] = None,
@@ -277,7 +295,8 @@ class AIRecommendationService:
                 recommendation_type=recommendation_type,
                 tone=final_tone,
                 length=final_length,
-                include_keywords=include_keywords,
+                analysis_context_type=analysis_context_type,
+                repository_url=repository_url,
                 exclude_keywords=exclude_keywords,
             )
 
@@ -344,6 +363,9 @@ class AIRecommendationService:
         target_role: Optional[str] = None,
         specific_skills: Optional[list] = None,
         exclude_keywords: Optional[list] = None,
+        analysis_context_type: str = "profile",
+        repository_url: Optional[str] = None,
+        force_refresh: bool = False,
     ) -> Dict[str, Any]:
         """Generate a LinkedIn recommendation using AI."""
 
@@ -364,21 +386,35 @@ class AIRecommendationService:
                 target_role=target_role,
                 specific_skills=specific_skills,
                 exclude_keywords=exclude_keywords,
+                analysis_context_type=analysis_context_type,
+                repository_url=repository_url,
             )
 
             if settings.ENVIRONMENT == "development":
                 logger.info(f"✅ Prompt built with {len(initial_prompt)} characters")
 
-            # Check cache for final result
-            cache_key = f"ai_recommendation_v3:{hash(initial_prompt)}"
+            # Check cache for final result - include analysis context in cache key
+            context_suffix = ""
+            if analysis_context_type != "profile":
+                context_suffix = f":{analysis_context_type}"
+                if repository_url:
+                    repo_path = repository_url.replace("https://github.com/", "").split("?")[0]
+                    context_suffix += f":{repo_path}"
 
-            cached_result = await get_cache(cache_key)
-            if cached_result and isinstance(cached_result, dict):
-                logger.info("Cache hit for AI recommendation")
-                return cached_result
+            cache_key = f"ai_recommendation_v3:{hash(initial_prompt)}{context_suffix}"
+
+            # Skip cache if force_refresh is requested
+            if not force_refresh:
+                cached_result = await get_cache(cache_key)
+                if cached_result and isinstance(cached_result, dict):
+                    logger.info("Cache hit for AI recommendation")
+                    return cached_result
 
             if settings.ENVIRONMENT == "development":
-                logger.info("🚀 CACHE MISS: Starting multi-option generation...")
+                if force_refresh:
+                    logger.info("🔄 FORCE REFRESH: Bypassing cache for fresh generation...")
+                else:
+                    logger.info("🚀 CACHE MISS: Starting multi-option generation...")
 
             # Generate 3 different recommendation options with explanations
             options = await self._generate_multiple_options_with_explanations(
@@ -782,6 +818,9 @@ class AIRecommendationService:
         tone: str = "professional",
         length: str = "medium",
         exclude_keywords: Optional[list] = None,
+        analysis_context_type: str = "profile",
+        repository_url: Optional[str] = None,
+        force_refresh: bool = False,
     ) -> Dict[str, Any]:
         """Regenerate a recommendation with refinement instructions."""
 

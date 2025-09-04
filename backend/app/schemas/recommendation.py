@@ -307,6 +307,8 @@ class DynamicRefinementRequest(BaseModel):
     recommendation_type: Optional[str] = Field("professional", description="Type of recommendation")
     tone: Optional[str] = Field("professional", description="Tone of the recommendation")
     length: Optional[str] = Field("medium", description="Length of the recommendation")
+    analysis_context_type: Optional[str] = Field("profile", description="Type of analysis performed")
+    repository_url: Optional[str] = Field(None, description="Repository URL if repo-specific analysis")
     dynamic_tone: Optional[str] = Field(None, description="Dynamic tone override")
     dynamic_length: Optional[str] = Field(None, description="Dynamic length override")
     include_keywords: Optional[List[str]] = Field(None, description="Keywords to include")

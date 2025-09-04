@@ -23,6 +23,7 @@ export interface RecommendationFormData {
   github_input: string;
   analysis_type: 'profile' | 'repo_only';
   repository_url?: string;
+  force_refresh?: boolean;
 }
 
 // Define the overall state shape
@@ -103,6 +104,7 @@ const initialFormData: RecommendationFormData = {
   github_input: '',
   analysis_type: 'profile',
   repository_url: '',
+  force_refresh: false,
 };
 
 const initialState: RecommendationState = {

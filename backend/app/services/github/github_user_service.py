@@ -8,8 +8,8 @@ from loguru import logger
 
 from app.core.config import settings
 from app.core.redis_client import get_cache, set_cache
-from app.services.github_commit_service import GitHubCommitService
-from app.services.profile_analysis_service import ProfileAnalysisService
+from app.services.analysis.profile_analysis_service import ProfileAnalysisService
+from app.services.github.github_commit_service import GitHubCommitService
 
 
 class GitHubUserService:
@@ -33,6 +33,8 @@ class GitHubUserService:
         username: str,
         force_refresh: bool = False,
         max_repositories: int = 10,
+        analysis_context_type: str = "profile",
+        repository_url: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """Analyze a GitHub profile and return comprehensive data."""
         import time
@@ -44,7 +46,17 @@ class GitHubUserService:
         logger.info(f"📦 Max repositories: {max_repositories}")
 
         analysis_start = time.time()
-        cache_key = f"github_profile:{username}"
+
+        # Create context-aware cache key
+        context_suffix = ""
+        if analysis_context_type != "profile":
+            context_suffix = f":{analysis_context_type}"
+            if repository_url:
+                # Extract repo name from URL for cache key
+                repo_path = repository_url.replace("https://github.com/", "").split("?")[0]
+                context_suffix += f":{repo_path}"
+
+        cache_key = f"github_profile:{username}{context_suffix}"
 
         # Check cache first
         if not force_refresh:

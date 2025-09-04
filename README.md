@@ -40,28 +40,37 @@ This project leverages a modern full-stack architecture with the following key t
 
 **Frontend:**
 
-- **React**: A JavaScript library for building user interfaces.
-- **Vite**: A fast frontend build tool.
-- **Tailwind CSS**: A utility-first CSS framework for styling.
+- **React 19**: A JavaScript library for building user interfaces.
+- **React Router 7**: Full-stack web framework with file-based routing.
+- **Tailwind CSS 4**: A utility-first CSS framework for styling.
 - **ShadCN UI**: A collection of reusable components built with Radix UI and Tailwind CSS.
+- **Vite 7**: Fast build tool and development server.
+- **TypeScript**: Type-safe JavaScript development.
+- **Vitest**: Modern testing framework for unit and integration tests.
 
 **Backend:**
 
-- **FastAPI**: A modern, fast (high-performance) web framework for building APIs with Python.
-- **Pydantic**: Data validation and settings management using Python type hints.
-- **SQLAlchemy**: An SQL toolkit and Object-Relational Mapper (ORM) for Python.
+- **FastAPI 0.116**: A modern, fast web framework for building APIs with Python.
+- **Python 3.11+**: Modern Python with type hints and async support.
+- **Pydantic 2.11**: Data validation and settings management using Python type hints.
+- **SQLAlchemy 2.0**: Async-capable SQL toolkit and Object-Relational Mapper (ORM).
 - **PostgreSQL**: A powerful, open-source object-relational database system.
-- **Redis**: An open-source, in-memory data store, used as a cache and message broker.
+- **Redis 6.4**: In-memory data store for caching and session management.
+- **Alembic**: Database migration tool for SQLAlchemy.
+- **Celery**: Distributed task queue for background processing.
 
 **AI/Machine Learning:**
 
-- **Google Gemini API**: For natural language processing and recommendation generation.
+- **Google Gemini 2.5 Flash**: Advanced AI model for natural language processing and recommendation generation.
+- **PyGithub**: Python library for GitHub API integration and repository analysis.
+- **Structured Analysis**: Advanced GitHub profile and repository analysis with skill extraction.
 
 **Deployment & Containerization:**
 
-- **Docker**: For containerizing the application and its services.
-- **Railway**: Recommended platform for full-stack deployment.
+- **Docker & Docker Compose**: Multi-service containerization with development and production configurations.
+- **Railway**: Recommended platform for full-stack deployment with auto-scaling.
 - **Vercel**: Optional platform for frontend deployment.
+- **Nginx**: Production-ready reverse proxy and static file serving.
 
 ## 🚀 Deployment
 
@@ -109,15 +118,60 @@ Clone the repository and set up your local environment:
 ```bash
 git clone https://github.com/day0009/linkedin-recommendation-writer-app
 cd linkedin-recommendation-writer-app
-cp env.example .env
+cp .env.example .env
 # Edit .env with your GITHUB_TOKEN and GEMINI_API_KEY
-make setup
+make build
+make up
 ```
 
 Access your local app:
 
 - **Frontend**: [http://localhost:5173](http://localhost:5173)
-- **Backend**: [http://localhost:8000](http://localhost:8000)
+- **Backend API**: [http://localhost:8000](http://localhost:8000)
+- **API Documentation**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **PostgreSQL**: localhost:5432
+- **Redis**: localhost:6379
+
+### Development Workflow
+
+The project includes a comprehensive Makefile for managing development tasks:
+
+**Container Management:**
+```bash
+make build          # Build all services for development
+make build-no-cache # Build without cache
+make up             # Start all services in detached mode
+make up-logs        # Start services and show logs
+make down           # Stop all services and remove volumes
+make restart        # Restart all services
+make logs           # Show application logs
+make shell          # Open shell in app container
+```
+
+**Testing & Code Quality:**
+```bash
+make test-frontend    # Run frontend tests
+make test-backend     # Run backend tests
+make lint-frontend    # Run frontend linting
+make lint-backend     # Run backend linting
+make format-frontend  # Format frontend code
+make format-backend   # Format backend code
+```
+
+**Production Commands:**
+```bash
+make prod-build  # Build for production
+make prod-up     # Start production services
+make prod-down   # Stop production services
+make prod-logs   # Show production logs
+```
+
+**Utility Commands:**
+```bash
+make clean       # Remove all containers, volumes, and images
+make db-connect  # Connect to development database
+make help        # Show all available commands
+```
 
 ## ⚙️ Configuration & API Keys
 
@@ -128,18 +182,46 @@ Create a `.env` file from `env.example` for local development. For production, c
 **Required:**
 
 ```bash
+# External API Keys
 GITHUB_TOKEN=your_github_personal_access_token
 GEMINI_API_KEY=your_google_gemini_api_key
-POSTGRES_PASSWORD=your_secure_database_password # Only for Railway full-stack or Docker
+
+# Database Configuration
+POSTGRES_PASSWORD=your_secure_database_password
+DATABASE_URL=postgresql+asyncpg://postgres:password@postgres:5432/github_recommender
+
+# Redis Configuration
+REDIS_URL=redis://redis:6379/0
+
+# Security
+SECRET_KEY=your_super_secure_unique_key_here_at_least_32_characters_long
 ```
 
-**Railway Auto-configured (for Railway deployments):**
+**Development Environment:**
 
-`DATABASE_URL`, `REDIS_URL`
+```bash
+# API Configuration
+API_HOST=0.0.0.0
+API_PORT=8000
+API_DEBUG=true
+ENVIRONMENT=development
 
-**Vercel Frontend (for Vercel deployments):**
+# Frontend Configuration
+VITE_API_BASE_URL=http://backend:8000
+NODE_ENV=development
+```
 
-`VITE_API_URL`, `VITE_APP_ENV`
+**Production Environment:**
+
+```bash
+# Railway Auto-configured
+DATABASE_URL=<auto-configured>
+REDIS_URL=<auto-configured>
+
+# Vercel Frontend
+VITE_API_URL=<your-railway-backend-url>
+VITE_APP_ENV=production
+```
 
 ### Getting API Keys
 
@@ -160,7 +242,7 @@ We welcome contributions to the LinkedIn Recommendation Writer! To ensure a smoo
     git clone https://github.com/day0009/linkedin-recommendation-writer-app
     cd linkedin-recommendation-writer-app
     ```
-3.  **Set up your development environment** by following the [Local Development](#local-development) instructions.
+3.  **Set up your development environment** by following the [Installation & Local Development](#️-installation--local-development) instructions.
 4.  **Create a new feature branch** for your changes:
     ```bash
     git checkout -b feature/your-feature-name

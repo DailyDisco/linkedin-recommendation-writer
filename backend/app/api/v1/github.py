@@ -11,8 +11,8 @@ from app.core.dependencies import get_github_service, get_repository_service, va
 from app.core.redis_client import get_cache, set_cache
 from app.schemas.github import GitHubAnalysisRequest, ProfileAnalysisResponse, RepositoryAnalysisRequest, RepositoryAnalysisResponse, RepositoryContributorsRequest
 from app.schemas.repository import RepositoryContributorsResponse
-from app.services.github_repository_service import GitHubRepositoryService
-from app.services.github_user_service import GitHubUserService
+from app.services.github.github_repository_service import GitHubRepositoryService
+from app.services.github.github_user_service import GitHubUserService
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ async def _process_github_analysis_background(task_id: str, username: str, force
         logger.info(f"🔄 Starting background analysis for {username} (task: {task_id})")
 
         # Initialize services
-        from app.services.github_commit_service import GitHubCommitService
+        from app.services.github.github_commit_service import GitHubCommitService
 
         commit_service = GitHubCommitService()
         github_service = GitHubUserService(commit_service)
@@ -104,8 +104,15 @@ async def analyze_github_profile(
 ) -> Optional[ProfileAnalysisResponse]:
     """Analyze a GitHub profile - uses background processing for heavy analysis."""
 
-    # Check cache first for quick response
-    cache_key = f"github_profile:{request.username}"
+    # Check cache first for quick response - include analysis context in cache key
+    context_suffix = ""
+    if hasattr(request, "analysis_context_type") and request.analysis_context_type != "profile":
+        context_suffix = f":{request.analysis_context_type}"
+        if hasattr(request, "repository_url") and request.repository_url:
+            repo_path = request.repository_url.replace("https://github.com/", "").split("?")[0]
+            context_suffix += f":{repo_path}"
+
+    cache_key = f"github_profile:{request.username}{context_suffix}"
     cached_analysis = await get_cache(cache_key)
 
     if cached_analysis and not request.force_refresh:

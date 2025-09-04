@@ -45,9 +45,9 @@ from app.schemas.recommendation import (
     StreamProgressResponse,
     VersionComparisonResponse,
 )
-from app.services.ai_service import AIService
-from app.services.github_user_service import GitHubUserService
-from app.services.recommendation_service import RecommendationService
+from app.services.ai.ai_service import AIService
+from app.services.github.github_user_service import GitHubUserService
+from app.services.recommendation.recommendation_service import RecommendationService
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +111,8 @@ async def generate_recommendation(
     logger.info(f"   • Type: {request.recommendation_type}")
     logger.info(f"   • Tone: {request.tone}")
     logger.info(f"   • Length: {request.length}")
+    logger.info(f"   • Analysis Context: {request.analysis_context_type or 'profile'}")
+    logger.info(f"   • Repository URL: {request.repository_url or 'N/A'}")
     logger.info(f"   • Custom Prompt: {'Yes' if request.custom_prompt else 'No'}")
     logger.info(f"   • Specific Skills: " f"{len(request.include_specific_skills or [])} skills")
 
@@ -128,6 +130,8 @@ async def generate_recommendation(
             specific_skills=request.include_specific_skills,
             include_keywords=request.include_keywords,
             exclude_keywords=request.exclude_keywords,
+            analysis_context_type=request.analysis_context_type,
+            repository_url=request.repository_url,
         )
 
         # Only increment after successful generation
@@ -515,6 +519,8 @@ async def regenerate_recommendation(
         recommendation_type = request.get("recommendation_type", "professional")
         tone = request.get("tone", "professional")
         length = request.get("length", "medium")
+        analysis_context_type = request.get("analysis_context_type", "profile")
+        repository_url = request.get("repository_url")
 
         if not original_content or not refinement_instructions or not github_username:
             raise HTTPException(status_code=400, detail="Missing required fields")
@@ -524,6 +530,8 @@ async def regenerate_recommendation(
         logger.info(f"   • Type: {recommendation_type}")
         logger.info(f"   • Tone: {tone}")
         logger.info(f"   • Length: {length}")
+        logger.info(f"   • Analysis Context: {analysis_context_type}")
+        logger.info(f"   • Repository URL: {repository_url or 'N/A'}")
         logger.info(f"   • Original Content Length: {len(original_content)} characters")
         logger.info(f"   • Refinement Instructions: {refinement_instructions[:100]}...")
 
@@ -536,6 +544,8 @@ async def regenerate_recommendation(
             recommendation_type=recommendation_type,
             tone=tone,
             length=length,
+            analysis_context_type=analysis_context_type,
+            repository_url=repository_url,
         )
 
         # Only increment after successful generation
@@ -591,7 +601,7 @@ async def generate_recommendation_options_stream(
     target_role: Optional[str] = Query(None, max_length=200),
     include_specific_skills: Optional[str] = Query(None),  # Comma-separated string
     exclude_keywords: Optional[str] = Query(None),  # Comma-separated string
-    analysis_type: str = Query("profile", pattern="^(profile|repo_only)$"),
+    analysis_context_type: str = Query("profile", pattern="^(profile|repo_only)$"),
     repository_url: Optional[str] = Query(None, max_length=500),
     req: Request = None,
     db: AsyncSession = Depends(get_database_session),
@@ -610,7 +620,7 @@ async def generate_recommendation_options_stream(
         target_role=target_role,
         include_specific_skills=include_specific_skills.split(",") if include_specific_skills else None,
         exclude_keywords=exclude_keywords.split(",") if exclude_keywords else None,
-        analysis_type=analysis_type,
+        analysis_context_type=analysis_context_type,
         repository_url=repository_url,
     )
 
@@ -634,8 +644,8 @@ async def generate_recommendation_options_stream(
             logger.info(f"✅ GitHub data retrieved for user: {request.github_username}")
 
             # Create AI recommendation service directly
-            from app.services.ai_recommendation_service import AIRecommendationService
-            from app.services.prompt_service import PromptService
+            from app.services.ai.ai_recommendation_service import AIRecommendationService
+            from app.services.ai.prompt_service import PromptService
 
             prompt_service = PromptService()
             ai_recommendation_service = AIRecommendationService(prompt_service)
@@ -709,7 +719,9 @@ async def regenerate_recommendation_stream(
     async def regenerate_stream():
         try:
             # Get GitHub data
-            github_data = await recommendation_service._get_or_create_github_profile_data(db=db, github_username=request.github_username)
+            github_data = await recommendation_service._get_or_create_github_profile_data(
+                db=db, github_username=request.github_username, analysis_context_type=request.analysis_context_type, repository_url=request.repository_url
+            )
 
             # Stream the regeneration process
             async for progress_update in recommendation_service.ai_service.regenerate_recommendation_stream(
@@ -719,6 +731,8 @@ async def regenerate_recommendation_stream(
                 recommendation_type=request.recommendation_type,
                 tone=request.tone,
                 length=request.length,
+                analysis_context_type=request.analysis_context_type,
+                repository_url=request.repository_url,
                 dynamic_tone=request.dynamic_tone,
                 dynamic_length=request.dynamic_length,
                 include_keywords=request.include_keywords,
