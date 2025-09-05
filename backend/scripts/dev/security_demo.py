@@ -2,9 +2,11 @@
 """Security enhancements demonstration script."""
 
 import asyncio
+
+from fastapi.responses import JSONResponse
+
 from app.core.security_config import security_utils
 from app.core.security_middleware import InputSanitizationMiddleware
-from fastapi.responses import JSONResponse
 
 
 async def demo_security_features():
@@ -40,12 +42,7 @@ async def demo_security_features():
 
     # 3. PII Detection
     print("\n3. PII Detection:")
-    test_texts = [
-        "Contact user@example.com for support",
-        "API key: sk-1234567890abcdefghijklmnopqrstuvwx",
-        "Token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9",
-        "Normal text without PII"
-    ]
+    test_texts = ["Contact user@example.com for support", "API key: sk-1234567890abcdefghijklmnopqrstuvwx", "Token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9", "Normal text without PII"]
 
     for text in test_texts:
         pii_found = security_utils.detect_pii(text)
@@ -65,11 +62,7 @@ async def demo_security_features():
 
     # 5. Input Sanitization
     print("\n5. Input Sanitization:")
-    dangerous_inputs = [
-        "Hello<script>alert('xss')</script>World",
-        "Normal text",
-        "Text with null byte\x00here"
-    ]
+    dangerous_inputs = ["Hello<script>alert('xss')</script>World", "Normal text", "Text with null byte\x00here"]
 
     for input_text in dangerous_inputs:
         sanitized = security_utils.sanitize_text(input_text)
@@ -95,7 +88,7 @@ async def demo_security_features():
         "X-Content-Type-Options: nosniff",
         "Strict-Transport-Security (Production only)",
         "Permissions-Policy",
-        "Referrer-Policy"
+        "Referrer-Policy",
     ]
 
     for header in headers:

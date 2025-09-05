@@ -58,19 +58,23 @@ def mock_external_dependencies(mock_redis, mock_database_session):
 
     # Mock Redis
     original_get_redis = get_redis
+
     async def mock_get_redis():
         return mock_redis
 
     # Mock Redis client
     original_get_redis_client = get_redis_client
+
     async def mock_get_redis_client():
         return mock_redis
 
     # Apply mocks
     import app.core.redis_client
+
     app.core.redis_client.get_redis = mock_get_redis_client
 
     import app.core.dependencies
+
     app.core.dependencies.get_redis = mock_get_redis
 
     yield

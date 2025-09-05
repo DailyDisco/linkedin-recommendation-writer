@@ -3,20 +3,14 @@
 
 import asyncio
 import logging
-import sys
 import os
+import sys
 
 # Add the current directory to the path
 sys.path.insert(0, os.path.dirname(__file__))
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout)
-    ]
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", handlers=[logging.StreamHandler(sys.stdout)])
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +41,7 @@ async def test_repo_only():
 
     logger.info("=" * 60)
     logger.info("🧪 REPO_ONLY DEBUG TEST COMPLETED")
+
 
 if __name__ == "__main__":
     asyncio.run(test_repo_only())

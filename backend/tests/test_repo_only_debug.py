@@ -2,24 +2,19 @@
 
 import asyncio
 import logging
-import sys
 import os
+import sys
 
 # Add the backend directory to the path so we can import modules
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from app.services.recommendation.recommendation_service import RecommendationService
 from app.services.ai.prompt_service import PromptService
+from app.services.recommendation.recommendation_service import RecommendationService
 
 # Configure logging to see all debug messages
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout)
-    ]
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", handlers=[logging.StreamHandler(sys.stdout)])
 logger = logging.getLogger(__name__)
+
 
 def create_test_data():
     """Create test data that might contain profile information."""
@@ -37,24 +32,11 @@ def create_test_data():
             "public_repos": 25,  # This should be filtered out
             "avatar_url": "https://example.com/avatar.jpg",  # This should be filtered out
         },
-        "repositories": [  # This should be filtered out
-            {"name": "repo1", "description": "First repo"},
-            {"name": "repo2", "description": "Second repo"}
-        ],
-        "languages": [  # This should be filtered out (general profile languages)
-            {"language": "JavaScript", "percentage": 40.0},
-            {"language": "Python", "percentage": 30.0}
-        ],
-        "skills": {  # This should be filtered out (general profile skills)
-            "technical_skills": ["JavaScript", "Python", "React"],
-            "frameworks": ["React", "Django"]
-        },
-        "organizations": [  # This should be filtered out
-            {"name": "Test Org", "login": "testorg"}
-        ],
-        "starred_technologies": {  # This should be filtered out
-            "languages": {"Go": 5, "Rust": 3}
-        }
+        "repositories": [{"name": "repo1", "description": "First repo"}, {"name": "repo2", "description": "Second repo"}],  # This should be filtered out
+        "languages": [{"language": "JavaScript", "percentage": 40.0}, {"language": "Python", "percentage": 30.0}],  # This should be filtered out (general profile languages)
+        "skills": {"technical_skills": ["JavaScript", "Python", "React"], "frameworks": ["React", "Django"]},  # This should be filtered out (general profile skills)
+        "organizations": [{"name": "Test Org", "login": "testorg"}],  # This should be filtered out
+        "starred_technologies": {"languages": {"Go": 5, "Rust": 3}},  # This should be filtered out
     }
 
     # Repository-specific data (this should be kept)
@@ -64,30 +46,23 @@ def create_test_data():
             "full_name": "testuser/fitmax",
             "description": "A gym management application serving both members and administrators",
             "language": "TypeScript",
-            "html_url": "https://github.com/testuser/fitmax"
+            "html_url": "https://github.com/testuser/fitmax",
         },
         "languages": [
             {"language": "TypeScript", "percentage": 60.0, "lines_of_code": 5000},
             {"language": "JavaScript", "percentage": 30.0, "lines_of_code": 2500},
-            {"language": "Python", "percentage": 10.0, "lines_of_code": 800}
+            {"language": "Python", "percentage": 10.0, "lines_of_code": 800},
         ],
         "skills": {
             "technical_skills": ["TypeScript", "JavaScript", "Python", "React", "Django"],
             "frameworks": ["React", "Django", "ShadCN", "Docker"],
-            "domains": ["Web Development", "API Development"]
+            "domains": ["Web Development", "API Development"],
         },
-        "commit_analysis": {
-            "total_commits": 45,
-            "excellence_areas": {
-                "primary_strength": "frontend_development",
-                "patterns": {
-                    "most_active_month": "December 2023"
-                }
-            }
-        }
+        "commit_analysis": {"total_commits": 45, "excellence_areas": {"primary_strength": "frontend_development", "patterns": {"most_active_month": "December 2023"}}},
     }
 
     return contributor_data, repository_data
+
 
 async def test_repo_only_data_flow():
     """Test the repo_only data flow with logging."""
@@ -108,31 +83,39 @@ async def test_repo_only_data_flow():
             logger.info("🔍 MOCK VALIDATION: Validating repo_only data isolation")
             logger.info(f"🔍 MOCK VALIDATION: Data keys: {list(data.keys())}")
 
-            validation_result = {
-                "is_valid": True,
-                "issues": [],
-                "warnings": []
-            }
+            validation_result = {"is_valid": True, "issues": [], "warnings": []}
 
             # Check for profile data fields
             profile_indicators = [
-                'bio', 'company', 'location', 'email', 'blog',
-                'followers', 'following', 'public_repos', 'public_gists',
-                'starred_repositories', 'organizations', 'starred_technologies',
-                'repositories', 'full_name', 'name', 'avatar_url'
+                "bio",
+                "company",
+                "location",
+                "email",
+                "blog",
+                "followers",
+                "following",
+                "public_repos",
+                "public_gists",
+                "starred_repositories",
+                "organizations",
+                "starred_technologies",
+                "repositories",
+                "full_name",
+                "name",
+                "avatar_url",
             ]
 
-            user_data = data.get('user_data', {})
+            user_data = data.get("user_data", {})
             for field in profile_indicators:
                 if field in user_data and user_data[field]:
                     validation_result["is_valid"] = False
                     validation_result["issues"].append(f"Profile field '{field}' found in user_data")
 
-            if data.get('contributor_info'):
+            if data.get("contributor_info"):
                 validation_result["is_valid"] = False
                 validation_result["issues"].append("contributor_info found - should not exist in repo_only")
 
-            profile_sections = ['organizations', 'starred_technologies', 'starred_repositories', 'repositories']
+            profile_sections = ["organizations", "starred_technologies", "starred_repositories", "repositories"]
             for section in profile_sections:
                 if data.get(section):
                     validation_result["is_valid"] = False
@@ -156,10 +139,10 @@ async def test_repo_only_data_flow():
 
                 # Log input data
                 logger.info(f"🔍 MOCK MERGING: Input contributor_data keys: {list(contributor_data.keys())}")
-                if 'user_data' in contributor_data:
+                if "user_data" in contributor_data:
                     logger.info(f"🔍 MOCK MERGING: contributor user_data keys: {list(contributor_data['user_data'].keys())}")
                 logger.info(f"🔍 MOCK MERGING: Input repository_data keys: {list(repository_data.keys())}")
-                if 'repository_info' in repository_data:
+                if "repository_info" in repository_data:
                     logger.info(f"🔍 MOCK MERGING: repository_info: {repository_data['repository_info']}")
 
                 # Create filtered data (simulate the actual logic)
@@ -192,9 +175,9 @@ async def test_repo_only_data_flow():
 
                 logger.info("✅ MOCK MERGING: Filtered merged data created - general profile data excluded")
                 logger.info(f"🔍 MOCK MERGING: Final merged_data keys: {list(merged_data.keys())}")
-                if 'user_data' in merged_data:
+                if "user_data" in merged_data:
                     logger.info(f"🔍 MOCK MERGING: Final user_data: {merged_data['user_data']}")
-                if 'repo_contributor_stats' in merged_data:
+                if "repo_contributor_stats" in merged_data:
                     logger.info(f"🔍 MOCK MERGING: repo_contributor_stats: {merged_data['repo_contributor_stats']}")
 
                 # Validate the result
@@ -210,9 +193,7 @@ async def test_repo_only_data_flow():
 
     # Test the data flow
     mock_service = MockRecommendationService()
-    result = mock_service._merge_repository_and_contributor_data(
-        contributor_data, repository_data, "testuser", "repo_only"
-    )
+    result = mock_service._merge_repository_and_contributor_data(contributor_data, repository_data, "testuser", "repo_only")
 
     logger.info("\n📋 FINAL RESULT ANALYSIS")
     logger.info("=" * 50)
@@ -220,20 +201,20 @@ async def test_repo_only_data_flow():
 
     # Check if profile data leaked through
     profile_data_found = []
-    if 'user_data' in result:
-        user_data = result['user_data']
-        profile_fields = ['full_name', 'bio', 'company', 'location', 'followers', 'following', 'public_repos', 'avatar_url']
+    if "user_data" in result:
+        user_data = result["user_data"]
+        profile_fields = ["full_name", "bio", "company", "location", "followers", "following", "public_repos", "avatar_url"]
         for field in profile_fields:
             if field in user_data and user_data[field]:
                 profile_data_found.append(f"user_data.{field} = {user_data[field]}")
 
-    if 'repositories' in result:
+    if "repositories" in result:
         profile_data_found.append("repositories section found")
-    if 'organizations' in result:
+    if "organizations" in result:
         profile_data_found.append("organizations section found")
-    if 'starred_technologies' in result:
+    if "starred_technologies" in result:
         profile_data_found.append("starred_technologies section found")
-    if 'contributor_info' in result:
+    if "contributor_info" in result:
         profile_data_found.append("contributor_info section found")
 
     if profile_data_found:
@@ -253,12 +234,7 @@ async def test_repo_only_data_flow():
     # Test the prompt building
     try:
         prompt = prompt_service.build_prompt(
-            github_data=result,
-            recommendation_type="professional",
-            tone="professional",
-            length="medium",
-            analysis_context_type="repo_only",
-            repository_url="https://github.com/testuser/fitmax"
+            github_data=result, recommendation_type="professional", tone="professional", length="medium", analysis_context_type="repo_only", repository_url="https://github.com/testuser/fitmax"
         )
 
         logger.info("✅ PROMPT GENERATED SUCCESSFULLY")
@@ -269,7 +245,7 @@ async def test_repo_only_data_flow():
         # Check the full prompt for where profile keywords appear
         logger.info("\n🔍 ANALYZING WHERE PROFILE KEYWORDS APPEAR IN PROMPT:")
         prompt_lower = prompt.lower()
-        profile_keywords = ['bio', 'company', 'location', 'followers', 'following', 'public repos']
+        profile_keywords = ["bio", "company", "location", "followers", "following", "public repos"]
 
         for keyword in profile_keywords:
             if keyword in prompt_lower:
@@ -282,7 +258,7 @@ async def test_repo_only_data_flow():
                 logger.info(f"   Context: ...{context}...")
 
         # Check for profile keywords in the prompt - but distinguish between instructions and actual data
-        profile_keywords = ['bio', 'company', 'location', 'followers', 'following', 'public repos']
+        profile_keywords = ["bio", "company", "location", "followers", "following", "public repos"]
         prompt_lower = prompt.lower()
 
         # Check if profile keywords appear in the main content (not just instructions)
@@ -324,6 +300,7 @@ async def test_repo_only_data_flow():
     logger.info("\n🎉 ALL TESTS COMPLETED SUCCESSFULLY!")
     logger.info("✅ REPO_ONLY ISOLATION IS WORKING CORRECTLY")
     return True
+
 
 if __name__ == "__main__":
     success = asyncio.run(test_repo_only_data_flow())

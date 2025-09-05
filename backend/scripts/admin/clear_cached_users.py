@@ -7,18 +7,15 @@ This removes cached GitHub profiles and other user-related cached data.
 import asyncio
 import logging
 import sys
-from typing import Dict, Any, List
+from typing import Any, Dict, List
 
 # Add the backend directory to the Python path
-sys.path.insert(0, '/home/day/ProgrammingProjects/github_repo_linkedin_recommendation_writer_app/backend')
+sys.path.insert(0, "/home/day/ProgrammingProjects/github_repo_linkedin_recommendation_writer_app/backend")
 
 from app.core.redis_client import get_redis, init_redis
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -36,11 +33,9 @@ async def clear_cached_users() -> Dict[str, Any]:
         all_keys = await redis_client.keys("*")
 
         for key in all_keys:
-            key_str = key.decode('utf-8') if isinstance(key, bytes) else key
+            key_str = key.decode("utf-8") if isinstance(key, bytes) else key
             # Look for user-related patterns
-            if any(pattern in key_str.lower() for pattern in [
-                'user', 'profile', 'github_profile', 'anonymous'
-            ]):
+            if any(pattern in key_str.lower() for pattern in ["user", "profile", "github_profile", "anonymous"]):
                 user_keys.append(key_str)
 
         logger.info(f"Found {len(user_keys)} cached user keys")
@@ -71,16 +66,12 @@ async def clear_cached_users() -> Dict[str, Any]:
             "keys_deleted": deleted_count,
             "remaining_user_keys": remaining_count,
             "deleted_keys": user_keys[:20],  # Show first 20 for reference
-            "message": f"Successfully cleared {deleted_count} cached user entries from Redis"
+            "message": f"Successfully cleared {deleted_count} cached user entries from Redis",
         }
 
     except Exception as e:
         logger.error(f"Failed to clear cached users: {e}")
-        return {
-            "success": False,
-            "error": str(e),
-            "message": "Failed to clear cached users"
-        }
+        return {"success": False, "error": str(e), "message": "Failed to clear cached users"}
 
 
 async def show_cached_users() -> Dict[str, Any]:
@@ -95,10 +86,8 @@ async def show_cached_users() -> Dict[str, Any]:
         all_keys = await redis_client.keys("*")
 
         for key in all_keys:
-            key_str = key.decode('utf-8') if isinstance(key, bytes) else key
-            if any(pattern in key_str.lower() for pattern in [
-                'user', 'profile', 'github_profile', 'anonymous'
-            ]):
+            key_str = key.decode("utf-8") if isinstance(key, bytes) else key
+            if any(pattern in key_str.lower() for pattern in ["user", "profile", "github_profile", "anonymous"]):
                 user_keys.append(key_str)
 
         # Get some sample data
@@ -109,14 +98,11 @@ async def show_cached_users() -> Dict[str, Any]:
                 if data:
                     # Try to parse as JSON for better display
                     import json
+
                     try:
-                        parsed_data = json.loads(data.decode('utf-8') if isinstance(data, bytes) else data)
-                        if 'user_data' in parsed_data and 'full_name' in parsed_data['user_data']:
-                            sample_data[key] = {
-                                "type": "github_profile",
-                                "name": parsed_data['user_data']['full_name'],
-                                "username": parsed_data['user_data']['github_username']
-                            }
+                        parsed_data = json.loads(data.decode("utf-8") if isinstance(data, bytes) else data)
+                        if "user_data" in parsed_data and "full_name" in parsed_data["user_data"]:
+                            sample_data[key] = {"type": "github_profile", "name": parsed_data["user_data"]["full_name"], "username": parsed_data["user_data"]["github_username"]}
                         else:
                             sample_data[key] = {"type": "cached_data", "size": len(data)}
                     except:
@@ -130,16 +116,12 @@ async def show_cached_users() -> Dict[str, Any]:
             "user_related_keys": len(user_keys),
             "sample_cached_users": sample_data,
             "all_user_keys": user_keys[:10],  # Show first 10
-            "message": f"Found {len(user_keys)} cached user-related keys out of {len(all_keys)} total keys"
+            "message": f"Found {len(user_keys)} cached user-related keys out of {len(all_keys)} total keys",
         }
 
     except Exception as e:
         logger.error(f"Failed to show cached users: {e}")
-        return {
-            "success": False,
-            "error": str(e),
-            "message": "Failed to retrieve cached user information"
-        }
+        return {"success": False, "error": str(e), "message": "Failed to retrieve cached user information"}
 
 
 async def main():
@@ -155,15 +137,15 @@ async def main():
         print(f"   📁 Total Redis keys: {show_result['total_cached_keys']}")
         print(f"   👤 User-related keys: {show_result['user_related_keys']}")
 
-        if show_result['user_related_keys'] > 0:
+        if show_result["user_related_keys"] > 0:
             print("\n   Cached user profiles found:")
-            for key, info in show_result['sample_cached_users'].items():
-                if info.get('type') == 'github_profile':
+            for key, info in show_result["sample_cached_users"].items():
+                if info.get("type") == "github_profile":
                     print(f"     • {info['name']} ({info['username']}) - {key}")
                 else:
                     print(f"     • {key} ({info.get('type', 'unknown')})")
 
-            if len(show_result['all_user_keys']) > 3:
+            if len(show_result["all_user_keys"]) > 3:
                 print(f"     ... and {len(show_result['all_user_keys']) - 3} more")
 
             # Automatically proceed with clearing if users are found
@@ -175,11 +157,11 @@ async def main():
                 print(f"   Deleted: {result['keys_deleted']} cached user keys")
                 print(f"   Remaining user keys: {result['remaining_user_keys']}")
 
-                if result['keys_deleted'] > 0:
+                if result["keys_deleted"] > 0:
                     print("\n   Deleted keys include:")
-                    for key in result['deleted_keys'][:5]:  # Show first 5
+                    for key in result["deleted_keys"][:5]:  # Show first 5
                         print(f"     • {key}")
-                    if len(result['deleted_keys']) > 5:
+                    if len(result["deleted_keys"]) > 5:
                         print(f"     ... and {len(result['deleted_keys']) - 5} more")
             else:
                 print(f"❌ Cache clearing failed: {result.get('error', 'Unknown error')}")

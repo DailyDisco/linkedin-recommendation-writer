@@ -5,11 +5,11 @@ import asyncio
 import json
 from datetime import datetime
 
-from app.core.security_config import security_utils
-from app.core.security_monitoring import SecurityMonitor, SecurityEvent
 from app.core.api_key_security import APIKeyManager, CircuitBreaker
 from app.core.database_security import SecureQueryBuilder
-from app.core.input_validation import InputValidator, FileUploadValidator
+from app.core.input_validation import FileUploadValidator, InputValidator
+from app.core.security_config import security_utils
+from app.core.security_monitoring import SecurityEvent, SecurityMonitor
 
 
 async def demonstrate_security_features():
@@ -85,13 +85,7 @@ async def demonstrate_security_features():
     print("  ✅ Automated responses")
 
     # Create a demo security event
-    event = SecurityEvent(
-        event_type="demo_security_event",
-        severity="low",
-        message="Security features demonstration",
-        source_ip="127.0.0.1",
-        user_id="demo_user"
-    )
+    event = SecurityEvent(event_type="demo_security_event", severity="low", message="Security features demonstration", source_ip="127.0.0.1", user_id="demo_user")
     print(f"  Demo Event: {event.event_type} ({event.severity})")
 
     # 5. Input Validation Suite
@@ -100,16 +94,11 @@ async def demonstrate_security_features():
 
     validator = InputValidator()
     print("Input Validation Types:")
-    validations = [
-        ("email", "user@example.com"),
-        ("url", "https://github.com/user/repo"),
-        ("phone", "555-123-4567"),
-        ("text", "Normal text input", {"max_length": 100})
-    ]
+    validations = [("email", "user@example.com"), ("url", "https://github.com/user/repo"), ("phone", "555-123-4567"), ("text", "Normal text input", {"max_length": 100})]
 
     for val_type, value, *kwargs in validations:
         result = validator.validate(val_type, value, **(kwargs[0] if kwargs else {}))
-        status = "✅" if result['valid'] else "❌"
+        status = "✅" if result["valid"] else "❌"
         print(f"  {status} {val_type}: '{value[:30]}...' -> {result['valid']}")
 
     # 6. File Upload Security
@@ -137,7 +126,7 @@ async def demonstrate_security_features():
         "CSRFProtectionMiddleware",
         "APICSRFProtectionMiddleware",
         "ErrorHandlingMiddleware",
-        "LoggingMiddleware"
+        "LoggingMiddleware",
     ]
 
     for mw in middleware:
@@ -153,7 +142,7 @@ async def demonstrate_security_features():
         "X-Content-Type-Options: nosniff",
         "Permissions-Policy",
         "Referrer-Policy",
-        "X-Request-ID"
+        "X-Request-ID",
     ]
 
     for header in headers:
@@ -185,7 +174,7 @@ async def demonstrate_security_features():
         "Error Handling Tests",
         "Rate Limiting Tests",
         "Security Headers Tests",
-        "CORS Security Tests"
+        "CORS Security Tests",
     ]
 
     for category in test_categories:
@@ -228,7 +217,7 @@ async def demonstrate_security_features():
         ("Error Handling", "Secure error messages without data leakage"),
         ("Monitoring", "Real-time security event logging and alerts"),
         ("Container Security", "Non-root execution, minimal attack surface"),
-        ("Testing", "Comprehensive security test suite")
+        ("Testing", "Comprehensive security test suite"),
     ]
 
     for feature, description in features:

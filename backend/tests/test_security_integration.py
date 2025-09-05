@@ -1,14 +1,15 @@
 """Integration tests for security features."""
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import AsyncMock, patch
 
 from app.core.api_key_security import APIKeyManager, CircuitBreaker
 from app.core.csrf_protection import CSRFTokenManager
 from app.core.database_security import DatabaseSecurityMonitor, SecureQueryBuilder
 from app.core.input_validation import FileUploadValidator, InputValidator
-from app.core.security_monitoring import SecurityMonitor, SecurityEvent
+from app.core.security_monitoring import SecurityEvent, SecurityMonitor
 from app.main import app
 
 
@@ -27,7 +28,7 @@ class TestAPIKeySecurity:
         manager = APIKeyManager()
 
         # Mock Redis for testing
-        with patch('app.core.api_key_security.get_redis') as mock_get_redis:
+        with patch("app.core.api_key_security.get_redis") as mock_get_redis:
             mock_redis = AsyncMock()
             mock_get_redis.return_value = mock_redis
 
@@ -43,8 +44,6 @@ class TestAPIKeySecurity:
             retrieved_key = await manager.get_api_key(key_id)
 
             assert retrieved_key == test_key
-
-
 
     def test_circuit_breaker_functionality(self):
         """Test circuit breaker pattern."""
@@ -77,7 +76,7 @@ class TestCSRFProtection:
         """Test CSRF token generation and validation."""
         manager = CSRFTokenManager()
 
-        with patch('app.core.csrf_protection.get_redis') as mock_get_redis:
+        with patch("app.core.csrf_protection.get_redis") as mock_get_redis:
             mock_redis = AsyncMock()
             mock_get_redis.return_value = mock_redis
 
@@ -101,7 +100,7 @@ class TestCSRFProtection:
         """Test CSRF token invalidation."""
         manager = CSRFTokenManager()
 
-        with patch('app.core.csrf_protection.get_redis') as mock_get_redis:
+        with patch("app.core.csrf_protection.get_redis") as mock_get_redis:
             mock_redis = AsyncMock()
             mock_get_redis.return_value = mock_redis
 
@@ -141,23 +140,18 @@ class TestDatabaseSecurity:
         suspicious_query = "SELECT * FROM users WHERE id = 1; DROP TABLE users;"
         analysis = monitor._analyze_query_security(suspicious_query)
 
-        assert analysis['risk_level'] == 'high'
-        assert len(analysis['issues']) > 0
+        assert analysis["risk_level"] == "high"
+        assert len(analysis["issues"]) > 0
 
     def test_parameterized_query_protection(self):
         """Test protection against SQL injection."""
         builder = SecureQueryBuilder()
 
         # Test safe parameterized query
-        query, params = builder.build_select_query(
-            "users",
-            ["id", "username"],
-            "username = :username",
-            limit=1
-        )
+        query, params = builder.build_select_query("users", ["id", "username"], "username = :username", limit=1)
 
         assert ":username" in query
-        assert query.count(';') <= 1  # Should not have multiple statements
+        assert query.count(";") <= 1  # Should not have multiple statements
 
 
 class TestFileUploadSecurity:
@@ -181,11 +175,11 @@ class TestFileUploadSecurity:
                 pass
 
         # Test valid image
-        jpeg_content = b'\xff\xd8\xff\xe0\x00\x10JFIF'  # JPEG header
+        jpeg_content = b"\xff\xd8\xff\xe0\x00\x10JFIF"  # JPEG header
         mock_file = MockFile(jpeg_content, "test.jpg")
 
         result = await validator.validate_upload(mock_file)
-        assert result['is_valid']
+        assert result["is_valid"]
 
         # Test malicious file
         malicious_content = b'<script>alert("xss")</script>'
@@ -217,36 +211,36 @@ class TestInputValidationSecurity:
         validator = InputValidator()
 
         # Valid emails
-        result = validator.validate('email', 'user@example.com')
-        assert result['valid']
+        result = validator.validate("email", "user@example.com")
+        assert result["valid"]
 
         # Invalid emails
-        result = validator.validate('email', 'invalid-email')
-        assert not result['valid']
+        result = validator.validate("email", "invalid-email")
+        assert not result["valid"]
 
     def test_credit_card_validation(self):
         """Test credit card validation."""
         validator = InputValidator()
 
         # Valid card number (test number)
-        result = validator.validate('credit_card', '4532015112830366')
-        assert result['valid']
-        assert 'masked' in result
+        result = validator.validate("credit_card", "4532015112830366")
+        assert result["valid"]
+        assert "masked" in result
 
         # Invalid card number
-        result = validator.validate('credit_card', '1234567890123456')
-        assert not result['valid']
+        result = validator.validate("credit_card", "1234567890123456")
+        assert not result["valid"]
 
     def test_text_sanitization(self):
         """Test text sanitization."""
         validator = InputValidator()
 
         malicious_text = "<script>alert('xss')</script>Hello World"
-        result = validator.validate('text', malicious_text)
+        result = validator.validate("text", malicious_text)
 
-        assert result['valid']
+        assert result["valid"]
         # Should be sanitized (depending on implementation)
-        assert isinstance(result.get('sanitized'), str)
+        assert isinstance(result.get("sanitized"), str)
 
 
 class TestSecurityMonitoring:
@@ -257,15 +251,9 @@ class TestSecurityMonitoring:
         """Test security event logging."""
         monitor = SecurityMonitor()
 
-        event = SecurityEvent(
-            event_type="failed_login",
-            severity="medium",
-            message="Failed login attempt",
-            source_ip="192.168.1.100",
-            user_id="test_user"
-        )
+        event = SecurityEvent(event_type="failed_login", severity="medium", message="Failed login attempt", source_ip="192.168.1.100", user_id="test_user")
 
-        with patch('app.core.security_monitoring.get_redis') as mock_get_redis:
+        with patch("app.core.security_monitoring.get_redis") as mock_get_redis:
             mock_redis = AsyncMock()
             mock_get_redis.return_value = mock_redis
 
@@ -280,7 +268,7 @@ class TestSecurityMonitoring:
         """Test security report generation."""
         monitor = SecurityMonitor()
 
-        with patch('app.core.security_monitoring.get_redis') as mock_get_redis:
+        with patch("app.core.security_monitoring.get_redis") as mock_get_redis:
             mock_redis = AsyncMock()
             mock_get_redis.return_value = mock_redis
 
@@ -290,9 +278,9 @@ class TestSecurityMonitoring:
 
             report = await monitor.get_security_report(hours=24)
 
-            assert 'total_events' in report
-            assert 'events_by_type' in report
-            assert 'events_by_severity' in report
+            assert "total_events" in report
+            assert "events_by_type" in report
+            assert "events_by_severity" in report
 
 
 class TestIntegrationSecurity:
@@ -320,8 +308,7 @@ class TestIntegrationSecurity:
         """Test input validation in API endpoints."""
         # This would require setting up proper test data and mocking
         # For now, just test that the endpoint exists and handles validation
-        response = client.post("/api/v1/recommendations/generate",
-                             json={"invalid": "data"})
+        response = client.post("/api/v1/recommendations/generate", json={"invalid": "data"})
 
         # Should return validation error
         assert response.status_code >= 400

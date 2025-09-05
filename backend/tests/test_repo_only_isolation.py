@@ -8,6 +8,7 @@ from typing import Any, Dict
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 def create_mock_contributor_data_with_profile():
     """Create mock contributor data that includes profile information."""
     return {
@@ -30,6 +31,7 @@ def create_mock_contributor_data_with_profile():
         "organizations": [],  # This should be filtered out
         "starred_technologies": {},  # This should be filtered out
     }
+
 
 def create_mock_repository_data():
     """Create mock repository data."""
@@ -57,6 +59,7 @@ def create_mock_repository_data():
             },
         },
     }
+
 
 def simulate_repo_only_data_filtering(contributor_data: Dict[str, Any], repository_data: Dict[str, Any], contributor_username: str):
     """Simulate the repo_only data filtering logic from recommendation_service.py"""
@@ -99,55 +102,65 @@ def simulate_repo_only_data_filtering(contributor_data: Dict[str, Any], reposito
 
     return merged_data
 
+
 def validate_repo_only_isolation(data: Dict[str, Any]):
     """Validate that repo_only data contains no profile information."""
     logger.info("🔍 VALIDATING REPO_ONLY DATA ISOLATION")
 
-    validation_result = {
-        "is_valid": True,
-        "issues": [],
-        "warnings": []
-    }
+    validation_result = {"is_valid": True, "issues": [], "warnings": []}
 
     # Define profile data fields that should NEVER appear in repo_only context
     forbidden_profile_fields = [
-        'bio', 'company', 'location', 'email', 'blog',
-        'followers', 'following', 'public_repos', 'public_gists',
-        'starred_repositories', 'organizations', 'starred_technologies',
-        'repositories', 'full_name', 'name', 'avatar_url'
+        "bio",
+        "company",
+        "location",
+        "email",
+        "blog",
+        "followers",
+        "following",
+        "public_repos",
+        "public_gists",
+        "starred_repositories",
+        "organizations",
+        "starred_technologies",
+        "repositories",
+        "full_name",
+        "name",
+        "avatar_url",
     ]
 
     # Check user_data section for profile data
-    user_data = data.get('user_data', {})
+    user_data = data.get("user_data", {})
     for field in forbidden_profile_fields:
         if field in user_data and user_data[field]:
             validation_result["is_valid"] = False
             validation_result["issues"].append(f"🚨 Profile field '{field}' found in user_data")
 
     # Check for profile data sections that should be excluded
-    profile_sections = ['organizations', 'starred_technologies', 'starred_repositories', 'repositories']
+    profile_sections = ["organizations", "starred_technologies", "starred_repositories", "repositories"]
     for section in profile_sections:
         if data.get(section):
             validation_result["is_valid"] = False
             validation_result["issues"].append(f"🚨 Profile section '{section}' found in data")
 
     # Check for contributor_info (should not exist in repo_only)
-    if data.get('contributor_info'):
+    if data.get("contributor_info"):
         validation_result["is_valid"] = False
         validation_result["issues"].append("🚨 contributor_info found - should not exist in repo_only")
 
     # Ensure required repository data is present
-    required_repo_fields = ['repository_info', 'languages', 'skills', 'commit_analysis', 'repo_contributor_stats']
+    required_repo_fields = ["repository_info", "languages", "skills", "commit_analysis", "repo_contributor_stats"]
     for field in required_repo_fields:
         if not data.get(field):
             validation_result["warnings"].append(f"⚠️ Missing required repository field: '{field}'")
 
     # Validate analysis_context_type
-    if data.get('analysis_context_type') != 'repo_only':
+    if data.get("analysis_context_type") != "repo_only":
         validation_result["is_valid"] = False
         validation_result["issues"].append("🚨 analysis_context_type is not 'repo_only'")
 
     return validation_result
+
 
 def simulate_prompt_generation(data: Dict[str, Any]):
     """Simulate the prompt generation logic for repo_only context."""
@@ -172,48 +185,60 @@ def simulate_prompt_generation(data: Dict[str, Any]):
     ]
 
     # Add repository-specific languages
-    if data.get('languages'):
-        languages = [lang.get("language", "") for lang in data['languages'][:3]]
+    if data.get("languages"):
+        languages = [lang.get("language", "") for lang in data["languages"][:3]]
         prompt_parts.append(f"- Languages used in this repository: {', '.join(languages)}")
 
     # Add repository-specific skills
-    if data.get('skills', {}).get('technical_skills'):
-        skills = data['skills']['technical_skills'][:5]
+    if data.get("skills", {}).get("technical_skills"):
+        skills = data["skills"]["technical_skills"][:5]
         prompt_parts.append(f"- Technical skills demonstrated in this repository: {', '.join(skills)}")
 
     # Add contributor stats
-    if data.get('repo_contributor_stats'):
-        stats = data['repo_contributor_stats']
-        prompt_parts.extend([
-            "",
-            "CONTRIBUTOR DETAILS FOR THIS REPOSITORY:",
-            f"- Total contributions to this repository: {stats.get('contributions_to_repo', 0)} commits",
-            f"- Contributor: {stats.get('username', 'Unknown')}",
-        ])
+    if data.get("repo_contributor_stats"):
+        stats = data["repo_contributor_stats"]
+        prompt_parts.extend(
+            [
+                "",
+                "CONTRIBUTOR DETAILS FOR THIS REPOSITORY:",
+                f"- Total contributions to this repository: {stats.get('contributions_to_repo', 0)} commits",
+                f"- Contributor: {stats.get('username', 'Unknown')}",
+            ]
+        )
 
     final_prompt = "\n".join(prompt_parts)
     return final_prompt
+
 
 def validate_prompt_for_profile_data(prompt: str):
     """Validate that the final prompt doesn't contain profile data."""
     logger.info("🔍 VALIDATING PROMPT FOR PROFILE DATA")
 
-    validation_result = {
-        "is_valid": True,
-        "issues": [],
-        "warnings": []
-    }
+    validation_result = {"is_valid": True, "issues": [], "warnings": []}
 
     prompt_lower = prompt.lower()
 
     # Profile data keywords that should never appear in repo_only prompts
     # Note: 'linkedin' is excluded because it's part of legitimate "LinkedIn recommendation" context
     profile_keywords = [
-        'bio', 'company', 'location', 'email', 'blog',
-        'followers', 'following', 'public repos', 'public_repos',
-        'starred', 'organizations', 'orgs',
-        'full name', 'full_name', 'avatar',
-        'hireable', 'website', 'twitter'
+        "bio",
+        "company",
+        "location",
+        "email",
+        "blog",
+        "followers",
+        "following",
+        "public repos",
+        "public_repos",
+        "starred",
+        "organizations",
+        "orgs",
+        "full name",
+        "full_name",
+        "avatar",
+        "hireable",
+        "website",
+        "twitter",
     ]
 
     # Check for profile keywords in the prompt
@@ -224,11 +249,12 @@ def validate_prompt_for_profile_data(prompt: str):
 
     # Check for specific patterns that indicate profile data
     import re
+
     profile_patterns = [
-        r'\d+\s+followers',  # "123 followers"
-        r'\d+\s+following',  # "456 following"
-        r'\d+\s+public\s+repos',  # "78 public repos"
-        r'@[\w.-]+\s',  # Email-like patterns
+        r"\d+\s+followers",  # "123 followers"
+        r"\d+\s+following",  # "456 following"
+        r"\d+\s+public\s+repos",  # "78 public repos"
+        r"@[\w.-]+\s",  # Email-like patterns
     ]
 
     for pattern in profile_patterns:
@@ -238,6 +264,7 @@ def validate_prompt_for_profile_data(prompt: str):
             validation_result["issues"].append(f"🚨 Profile pattern '{pattern}' found: {matches}")
 
     return validation_result
+
 
 async def run_test():
     """Run the repo_only isolation test."""
@@ -301,12 +328,12 @@ async def run_test():
 
     # Verify key isolation aspects
     isolation_checks = [
-        ("Username only in user_data", filtered_data['user_data'].keys() == {'github_username', 'login'}),
-        ("No profile fields in user_data", not any(key in filtered_data['user_data'] for key in ['bio', 'company', 'location', 'email', 'followers'])),
-        ("Repository data present", 'repository_info' in filtered_data and 'languages' in filtered_data),
-        ("Repo contributor stats present", 'repo_contributor_stats' in filtered_data),
-        ("No contributor_info", 'contributor_info' not in filtered_data),
-        ("Analysis context is repo_only", filtered_data.get('analysis_context_type') == 'repo_only'),
+        ("Username only in user_data", filtered_data["user_data"].keys() == {"github_username", "login"}),
+        ("No profile fields in user_data", not any(key in filtered_data["user_data"] for key in ["bio", "company", "location", "email", "followers"])),
+        ("Repository data present", "repository_info" in filtered_data and "languages" in filtered_data),
+        ("Repo contributor stats present", "repo_contributor_stats" in filtered_data),
+        ("No contributor_info", "contributor_info" not in filtered_data),
+        ("Analysis context is repo_only", filtered_data.get("analysis_context_type") == "repo_only"),
     ]
 
     all_checks_passed = True
@@ -324,6 +351,7 @@ async def run_test():
     else:
         logger.error("💥 TESTS FAILED: repo_only isolation has issues")
         return False
+
 
 if __name__ == "__main__":
     success = asyncio.run(run_test())

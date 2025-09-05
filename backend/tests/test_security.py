@@ -107,9 +107,7 @@ class TestSecurityMiddleware:
 
     def test_cors_headers(self, client):
         """Test CORS headers are properly configured."""
-        response = client.options("/health",
-                                headers={"Origin": "http://localhost:3000",
-                                        "Access-Control-Request-Method": "GET"})
+        response = client.options("/health", headers={"Origin": "http://localhost:3000", "Access-Control-Request-Method": "GET"})
 
         assert "access-control-allow-origin" in response.headers
         assert "access-control-allow-methods" in response.headers
@@ -119,8 +117,7 @@ class TestSecurityMiddleware:
         # Create a large payload (over 10MB)
         large_data = "x" * (11 * 1024 * 1024)  # 11MB
 
-        response = client.post("/api/v1/recommendations/generate",
-                             json={"github_username": "test", "data": large_data})
+        response = client.post("/api/v1/recommendations/generate", json={"github_username": "test", "data": large_data})
 
         # Should be rejected with 413 Request Entity Too Large
         assert response.status_code == 413
@@ -131,26 +128,14 @@ class TestInputValidation:
 
     def test_invalid_github_username(self, client):
         """Test rejection of invalid GitHub usernames."""
-        response = client.post("/api/v1/recommendations/generate",
-                             json={
-                                 "github_username": "invalid--username",
-                                 "recommendation_type": "professional",
-                                 "tone": "professional",
-                                 "length": "medium"
-                             })
+        response = client.post("/api/v1/recommendations/generate", json={"github_username": "invalid--username", "recommendation_type": "professional", "tone": "professional", "length": "medium"})
 
         assert response.status_code == 422  # Validation error
 
     def test_valid_github_username(self, client):
         """Test acceptance of valid GitHub usernames."""
         # This will fail due to missing auth, but should pass validation
-        response = client.post("/api/v1/recommendations/generate",
-                             json={
-                                 "github_username": "valid-username",
-                                 "recommendation_type": "professional",
-                                 "tone": "professional",
-                                 "length": "medium"
-                             })
+        response = client.post("/api/v1/recommendations/generate", json={"github_username": "valid-username", "recommendation_type": "professional", "tone": "professional", "length": "medium"})
 
         # Should pass validation (may fail due to other reasons like auth)
         assert response.status_code in [200, 401, 403, 422]  # 422 would be auth/validation failure
@@ -159,14 +144,9 @@ class TestInputValidation:
         """Test input length limits."""
         long_prompt = "x" * 1001  # Over limit
 
-        response = client.post("/api/v1/recommendations/generate",
-                             json={
-                                 "github_username": "testuser",
-                                 "recommendation_type": "professional",
-                                 "tone": "professional",
-                                 "length": "medium",
-                                 "custom_prompt": long_prompt
-                             })
+        response = client.post(
+            "/api/v1/recommendations/generate", json={"github_username": "testuser", "recommendation_type": "professional", "tone": "professional", "length": "medium", "custom_prompt": long_prompt}
+        )
 
         # Should either be truncated by validation or rejected
         assert response.status_code in [200, 401, 403, 422]
@@ -175,14 +155,10 @@ class TestInputValidation:
         """Test that malicious input is sanitized."""
         malicious_prompt = "<script>alert('xss')</script>Hello<script>alert('xss')</script>"
 
-        response = client.post("/api/v1/recommendations/generate",
-                             json={
-                                 "github_username": "testuser",
-                                 "recommendation_type": "professional",
-                                 "tone": "professional",
-                                 "length": "medium",
-                                 "custom_prompt": malicious_prompt
-                             })
+        response = client.post(
+            "/api/v1/recommendations/generate",
+            json={"github_username": "testuser", "recommendation_type": "professional", "tone": "professional", "length": "medium", "custom_prompt": malicious_prompt},
+        )
 
         # Should not fail due to script tags (they should be sanitized)
         assert response.status_code in [200, 401, 403, 422]
@@ -194,8 +170,7 @@ class TestErrorHandling:
     def test_error_response_format(self, client):
         """Test that error responses follow secure format."""
         # Trigger a validation error
-        response = client.post("/api/v1/recommendations/generate",
-                             json={"invalid": "data"})
+        response = client.post("/api/v1/recommendations/generate", json={"invalid": "data"})
 
         assert response.status_code >= 400
         data = response.json()

@@ -3,11 +3,13 @@
 Test script to demonstrate the new strict repo_only prompt functionality.
 """
 
-import sys
 import os
+import sys
+
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from app.services.ai.prompt_service import PromptService
+
 
 def test_repo_only_prompt():
     """Test that repo_only context creates strict repository-focused prompts."""
@@ -18,69 +20,33 @@ def test_repo_only_prompt():
 
     # Test data with both repository-specific and general profile information
     github_data = {
-        "user_data": {
-            "github_username": "testuser",
-            "full_name": "Test User",
-            "bio": "Software developer with 5 years experience"
-        },
+        "user_data": {"github_username": "testuser", "full_name": "Test User", "bio": "Software developer with 5 years experience"},
         "repository_info": {
             "name": "smart-gym",
             "description": "A fitness tracking application built with React and Node.js",
             "language": "JavaScript",
-            "html_url": "https://github.com/testuser/smart-gym"
+            "html_url": "https://github.com/testuser/smart-gym",
         },
-        "repository_languages": [
-            {"language": "JavaScript", "percentage": 70.0},
-            {"language": "TypeScript", "percentage": 20.0},
-            {"language": "CSS", "percentage": 10.0}
-        ],
-        "repository_skills": {
-            "technical_skills": ["JavaScript", "React", "Node.js", "Express"],
-            "frameworks": ["React", "Express"],
-            "tools": ["Git", "Docker"]
-        },
-        "repository_commit_analysis": {
-            "total_commits": 45,
-            "patterns": {
-                "most_active_month": "December 2024"
-            }
-        },
-        "contributor_info": {
-            "contributions": 45,
-            "full_name": "Test User"
-        },
+        "repository_languages": [{"language": "JavaScript", "percentage": 70.0}, {"language": "TypeScript", "percentage": 20.0}, {"language": "CSS", "percentage": 10.0}],
+        "repository_skills": {"technical_skills": ["JavaScript", "React", "Node.js", "Express"], "frameworks": ["React", "Express"], "tools": ["Git", "Docker"]},
+        "repository_commit_analysis": {"total_commits": 45, "patterns": {"most_active_month": "December 2024"}},
+        "contributor_info": {"contributions": 45, "full_name": "Test User"},
         # General profile data (should NOT be included in repo_only)
-        "languages": [
-            {"language": "Python", "percentage": 40.0},
-            {"language": "JavaScript", "percentage": 35.0},
-            {"language": "Java", "percentage": 25.0}
-        ],
+        "languages": [{"language": "Python", "percentage": 40.0}, {"language": "JavaScript", "percentage": 35.0}, {"language": "Java", "percentage": 25.0}],
         "skills": {
             "technical_skills": ["Python", "JavaScript", "Java", "C++"],
             "frameworks": ["Django", "React", "Spring"],
             "tools": ["Git", "Docker", "AWS"],
-            "domains": ["Web Development", "Data Science"]
+            "domains": ["Web Development", "Data Science"],
         },
-        "commit_analysis": {
-            "total_commits_analyzed": 150,
-            "excellence_areas": {
-                "primary_strength": "full_stack_development"
-            }
-        }
+        "commit_analysis": {"total_commits_analyzed": 150, "excellence_areas": {"primary_strength": "full_stack_development"}},
     }
 
     # Generate repo_only prompt
-    repo_only_prompt = prompt_service.build_prompt(
-        github_data=github_data,
-        analysis_context_type="repo_only",
-        repository_url="https://github.com/testuser/smart-gym"
-    )
+    repo_only_prompt = prompt_service.build_prompt(github_data=github_data, analysis_context_type="repo_only", repository_url="https://github.com/testuser/smart-gym")
 
     # Generate profile prompt for comparison
-    profile_prompt = prompt_service.build_prompt(
-        github_data=github_data,
-        analysis_context_type="profile"
-    )
+    profile_prompt = prompt_service.build_prompt(github_data=github_data, analysis_context_type="profile")
 
     print("📋 REPO-ONLY PROMPT ANALYSIS:")
     print("=" * 50)
@@ -128,6 +94,7 @@ def test_repo_only_prompt():
     else:
         print("❌ FAILURE: Repo-only prompt still includes general profile information!")
         return False
+
 
 if __name__ == "__main__":
     success = test_repo_only_prompt()

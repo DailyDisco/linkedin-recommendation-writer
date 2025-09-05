@@ -4,6 +4,7 @@ Test script to demonstrate cache key differences for different analysis contexts
 """
 from typing import Optional
 
+
 def generate_github_profile_cache_key(username: str, analysis_context_type: str = "profile", repository_url: Optional[str] = None) -> str:
     """Generate GitHub profile cache key with context awareness."""
     context_suffix = ""
@@ -15,6 +16,7 @@ def generate_github_profile_cache_key(username: str, analysis_context_type: str 
             context_suffix += f":{repo_path}"
 
     return f"github_profile:{username}{context_suffix}"
+
 
 def generate_repository_cache_key(repository_full_name: str, analysis_context_type: str = "profile", repository_url: Optional[str] = None) -> str:
     """Generate repository cache key with context awareness."""
@@ -28,6 +30,7 @@ def generate_repository_cache_key(repository_full_name: str, analysis_context_ty
 
     return f"repository:{repository_full_name}{context_suffix}"
 
+
 def generate_ai_recommendation_cache_key(prompt_hash: str, analysis_context_type: str = "profile", repository_url: Optional[str] = None) -> str:
     """Generate AI recommendation cache key with context awareness."""
     context_suffix = ""
@@ -38,6 +41,7 @@ def generate_ai_recommendation_cache_key(prompt_hash: str, analysis_context_type
             context_suffix += f":{repo_path}"
 
     return f"ai_recommendation_v3:{prompt_hash}{context_suffix}"
+
 
 if __name__ == "__main__":
     print("🧪 Testing Cache Key Generation for Different Contexts\n")

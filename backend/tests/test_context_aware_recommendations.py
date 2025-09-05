@@ -1,9 +1,11 @@
 """Tests for context-aware recommendation functionality."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from app.services.recommendation_service import RecommendationService
+
+import pytest
+
 from app.services.prompt_service import PromptService
+from app.services.recommendation_service import RecommendationService
 
 
 class TestContextAwareRecommendations:
@@ -96,17 +98,17 @@ class TestContextAwareRecommendations:
         # Mock the create_recommendation_data method
         mock_recommendation_data = MagicMock()
         mock_recommendation_data.dict.return_value = {
-            'id': 1,
-            'title': 'Test Recommendation',
-            'content': 'Test recommendation content',
-            'recommendation_type': 'professional',
-            'tone': 'professional',
-            'length': 'medium',
-            'word_count': 50,
-            'ai_model': 'gemini',
-            'generation_parameters': {},
-            'created_at': '2024-01-01T00:00:00Z',
-            'updated_at': '2024-01-01T00:00:00Z'
+            "id": 1,
+            "title": "Test Recommendation",
+            "content": "Test recommendation content",
+            "recommendation_type": "professional",
+            "tone": "professional",
+            "length": "medium",
+            "word_count": 50,
+            "ai_model": "gemini",
+            "generation_parameters": {},
+            "created_at": "2024-01-01T00:00:00Z",
+            "updated_at": "2024-01-01T00:00:00Z",
         }
         service.recommendation_engine_service.create_recommendation_data = MagicMock(return_value=mock_recommendation_data)
 
@@ -124,10 +126,7 @@ class TestContextAwareRecommendations:
         )
 
         # Verify GitHub profile service was called
-        mock_github_service.analyze_github_profile.assert_called_once_with(
-            username="testuser",
-            force_refresh=False
-        )
+        mock_github_service.analyze_github_profile.assert_called_once_with(username="testuser", force_refresh=False)
 
         # Verify repository service was not called
         mock_github_service.repository_service.analyze_repository.assert_not_called()
@@ -147,16 +146,10 @@ class TestContextAwareRecommendations:
         )
 
         # Verify repository service was called
-        mock_repository_service.analyze_repository.assert_called_once_with(
-            "testuser/test-repo",
-            force_refresh=False
-        )
+        mock_repository_service.analyze_repository.assert_called_once_with("testuser/test-repo", force_refresh=False)
 
         # Verify GitHub profile service was also called (for contributor data)
-        mock_github_service.analyze_github_profile.assert_called_once_with(
-            username="testuser",
-            force_refresh=False
-        )
+        mock_github_service.analyze_github_profile.assert_called_once_with(username="testuser", force_refresh=False)
 
         assert result.content == "Test recommendation content"
 
@@ -173,14 +166,8 @@ class TestContextAwareRecommendations:
         )
 
         # Verify both services were called
-        mock_github_service.analyze_github_profile.assert_called_once_with(
-            username="testuser",
-            force_refresh=False
-        )
-        mock_repository_service.analyze_repository.assert_called_once_with(
-            "testuser/test-repo",
-            force_refresh=False
-        )
+        mock_github_service.analyze_github_profile.assert_called_once_with(username="testuser", force_refresh=False)
+        mock_repository_service.analyze_repository.assert_called_once_with("testuser/test-repo", force_refresh=False)
 
         assert result.content == "Test recommendation content"
 

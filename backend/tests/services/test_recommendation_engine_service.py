@@ -1,10 +1,11 @@
 """Tests for RecommendationEngineService."""
 
-import pytest
 from unittest.mock import AsyncMock, Mock, patch
 
+import pytest
+
+from app.schemas.recommendation import RecommendationCreate, RecommendationOption, RecommendationOptionsResponse
 from app.services.recommendation_engine_service import RecommendationEngineService
-from app.schemas.recommendation import RecommendationCreate, RecommendationOptionsResponse, RecommendationOption
 
 
 class TestRecommendationEngineService:
@@ -28,16 +29,8 @@ class TestRecommendationEngineService:
     def sample_github_data(self):
         """Sample GitHub data for testing."""
         return {
-            "skills": {
-                "technical_skills": ["Python", "JavaScript"],
-                "frameworks": ["Django", "React"],
-                "tools": ["Git", "Docker"],
-                "domains": ["Web Development"],
-                "dependencies_found": []
-            },
-            "repositories": [
-                {"name": "test-repo", "language": "Python", "description": "A test repo"}
-            ]
+            "skills": {"technical_skills": ["Python", "JavaScript"], "frameworks": ["Django", "React"], "tools": ["Git", "Docker"], "domains": ["Web Development"], "dependencies_found": []},
+            "repositories": [{"name": "test-repo", "language": "Python", "description": "A test repo"}],
         }
 
     @pytest.fixture
@@ -47,11 +40,8 @@ class TestRecommendationEngineService:
             "title": "Test Recommendation",
             "content": "This is a test recommendation content.",
             "word_count": 50,
-            "generation_parameters": {
-                "model": "test-model",
-                "temperature": 0.7
-            },
-            "generation_prompt": "Test prompt"
+            "generation_parameters": {"model": "test-model", "temperature": 0.7},
+            "generation_prompt": "Test prompt",
         }
 
     def test_init(self, engine_service, mock_ai_service):
@@ -64,23 +54,11 @@ class TestRecommendationEngineService:
         """Test generating a recommendation."""
         mock_ai_service.generate_recommendation.return_value = sample_ai_result
 
-        result = await engine_service.generate_recommendation(
-            github_data=sample_github_data,
-            recommendation_type="professional",
-            tone="professional",
-            length="medium"
-        )
+        result = await engine_service.generate_recommendation(github_data=sample_github_data, recommendation_type="professional", tone="professional", length="medium")
 
         assert result == sample_ai_result
         mock_ai_service.generate_recommendation.assert_called_once_with(
-            github_data=sample_github_data,
-            recommendation_type="professional",
-            tone="professional",
-            length="medium",
-            custom_prompt=None,
-            target_role=None,
-            specific_skills=None,
-            exclude_keywords=None
+            github_data=sample_github_data, recommendation_type="professional", tone="professional", length="medium", custom_prompt=None, target_role=None, specific_skills=None, exclude_keywords=None
         )
 
     @pytest.mark.asyncio
@@ -96,7 +74,7 @@ class TestRecommendationEngineService:
             custom_prompt="Custom prompt",
             target_role="developer",
             specific_skills=["Python", "React"],
-            exclude_keywords=["bad", "word"]
+            exclude_keywords=["bad", "word"],
         )
 
         assert result == sample_ai_result
@@ -108,7 +86,7 @@ class TestRecommendationEngineService:
             custom_prompt="Custom prompt",
             target_role="developer",
             specific_skills=["Python", "React"],
-            exclude_keywords=["bad", "word"]
+            exclude_keywords=["bad", "word"],
         )
 
     @pytest.mark.asyncio
@@ -117,22 +95,12 @@ class TestRecommendationEngineService:
         mock_ai_service.regenerate_recommendation.return_value = sample_ai_result
 
         result = await engine_service.regenerate_recommendation(
-            original_content="Original content",
-            refinement_instructions="Make it better",
-            github_data=sample_github_data,
-            recommendation_type="professional",
-            tone="professional",
-            length="medium"
+            original_content="Original content", refinement_instructions="Make it better", github_data=sample_github_data, recommendation_type="professional", tone="professional", length="medium"
         )
 
         assert result == sample_ai_result
         mock_ai_service.regenerate_recommendation.assert_called_once_with(
-            original_content="Original content",
-            refinement_instructions="Make it better",
-            github_data=sample_github_data,
-            recommendation_type="professional",
-            tone="professional",
-            length="medium"
+            original_content="Original content", refinement_instructions="Make it better", github_data=sample_github_data, recommendation_type="professional", tone="professional", length="medium"
         )
 
     @pytest.mark.asyncio
@@ -148,7 +116,7 @@ class TestRecommendationEngineService:
             tone="professional",
             length="medium",
             include_keywords=["leadership", "teamwork"],
-            exclude_keywords=["negative"]
+            exclude_keywords=["negative"],
         )
 
         assert result == sample_ai_result
@@ -160,18 +128,12 @@ class TestRecommendationEngineService:
             tone="professional",
             length="medium",
             include_keywords=["leadership", "teamwork"],
-            exclude_keywords=["negative"]
+            exclude_keywords=["negative"],
         )
 
     def test_create_recommendation_data(self, engine_service, sample_ai_result):
         """Test creating recommendation data structure."""
-        recommendation_data = engine_service.create_recommendation_data(
-            ai_result=sample_ai_result,
-            github_profile_id=123,
-            recommendation_type="professional",
-            tone="professional",
-            length="medium"
-        )
+        recommendation_data = engine_service.create_recommendation_data(ai_result=sample_ai_result, github_profile_id=123, recommendation_type="professional", tone="professional", length="medium")
 
         assert isinstance(recommendation_data, RecommendationCreate)
         assert recommendation_data.github_profile_id == 123
@@ -196,7 +158,7 @@ class TestRecommendationEngineService:
                 "generation_parameters": {"model": "test-model"},
                 "name": "Professional Option",
                 "focus": "Professional tone",
-                "explanation": "Best for formal business communications"
+                "explanation": "Best for formal business communications",
             },
             {
                 "title": "Friendly Recommendation",
@@ -205,7 +167,7 @@ class TestRecommendationEngineService:
                 "generation_parameters": {"model": "test-model"},
                 "name": "Friendly Option",
                 "focus": "Friendly tone",
-                "explanation": "Best for networking and personal connections"
+                "explanation": "Best for networking and personal connections",
             },
             {
                 "title": "Formal Recommendation",
@@ -214,7 +176,7 @@ class TestRecommendationEngineService:
                 "generation_parameters": {"model": "test-model"},
                 "name": "Formal Option",
                 "focus": "Formal tone",
-                "explanation": "Best for academic and senior-level positions"
+                "explanation": "Best for academic and senior-level positions",
             },
             {
                 "title": "Casual Recommendation",
@@ -223,16 +185,11 @@ class TestRecommendationEngineService:
                 "generation_parameters": {"model": "test-model"},
                 "name": "Casual Option",
                 "focus": "Casual tone",
-                "explanation": "Best for startup and creative environments"
-            }
+                "explanation": "Best for startup and creative environments",
+            },
         ]
 
-        result = await engine_service.generate_recommendation_options(
-            github_data=sample_github_data,
-            base_recommendation_type="professional",
-            base_tone="professional",
-            base_length="medium"
-        )
+        result = await engine_service.generate_recommendation_options(github_data=sample_github_data, base_recommendation_type="professional", base_tone="professional", base_length="medium")
 
         assert isinstance(result, RecommendationOptionsResponse)
         assert len(result.options) == 4
@@ -260,16 +217,11 @@ class TestRecommendationEngineService:
             "generation_parameters": {"model": "test-model"},
             "name": "Test Option",
             "focus": "Test focus",
-            "explanation": "Test explanation"
+            "explanation": "Test explanation",
         }
 
         result = await engine_service.generate_recommendation_options(
-            github_data=sample_github_data,
-            base_recommendation_type="technical",
-            base_tone="casual",
-            base_length="short",
-            target_role="developer",
-            specific_skills=["Python"]
+            github_data=sample_github_data, base_recommendation_type="technical", base_tone="casual", base_length="short", target_role="developer", specific_skills=["Python"]
         )
 
         assert isinstance(result, RecommendationOptionsResponse)
@@ -307,11 +259,13 @@ class TestRecommendationEngineService:
 
     def test_analyze_recommendation_quality_perfect_score(self, engine_service):
         """Test analyzing recommendation quality with perfect content."""
-        content = ("John Doe is an exceptional software engineer with extensive experience in full-stack development. "
-                  "His technical expertise includes Python, JavaScript, React, and Node.js. "
-                  "John has successfully delivered multiple complex projects, demonstrating strong problem-solving skills "
-                  "and the ability to work effectively in team environments. His GitHub contributions showcase clean, "
-                  "well-documented code and consistent commitment to best practices.")
+        content = (
+            "John Doe is an exceptional software engineer with extensive experience in full-stack development. "
+            "His technical expertise includes Python, JavaScript, React, and Node.js. "
+            "John has successfully delivered multiple complex projects, demonstrating strong problem-solving skills "
+            "and the ability to work effectively in team environments. His GitHub contributions showcase clean, "
+            "well-documented code and consistent commitment to best practices."
+        )
 
         result = engine_service.analyze_recommendation_quality(content, 85)
 
@@ -323,6 +277,7 @@ class TestRecommendationEngineService:
     async def test_create_recommendation_from_option(self, engine_service):
         """Test creating a recommendation from a selected option."""
         from unittest.mock import AsyncMock
+
         from sqlalchemy.ext.asyncio import AsyncSession
 
         # Mock database session
@@ -332,43 +287,35 @@ class TestRecommendationEngineService:
         mock_db.refresh = AsyncMock()
 
         # Mock the Recommendation class
-        with patch('app.services.recommendation_engine_service.Recommendation') as mock_recommendation_class:
+        with patch("app.services.recommendation_engine_service.Recommendation") as mock_recommendation_class:
             mock_recommendation = Mock()
             mock_recommendation.id = 456
             mock_recommendation_class.return_value = mock_recommendation
 
             # Mock RecommendationResponse
-            with patch('app.services.recommendation_engine_service.RecommendationResponse') as mock_response_class:
+            with patch("app.services.recommendation_engine_service.RecommendationResponse") as mock_response_class:
                 mock_response = Mock()
                 mock_response_class.from_orm.return_value = mock_response
 
                 option = RecommendationOption(
-                    id=1,
-                    name="Test Option",
-                    title="Test Option",
-                    content="Full content",
-                    focus="Professional focus",
-                    explanation="Best for professional communications",
-                    word_count=50
+                    id=1, name="Test Option", title="Test Option", content="Full content", focus="Professional focus", explanation="Best for professional communications", word_count=50
                 )
 
-                result = await engine_service.create_recommendation_from_option(
-                    db=mock_db,
-                    github_profile_id=123,
-                    option=option,
-                    recommendation_type="professional"
-                )
+                result = await engine_service.create_recommendation_from_option(db=mock_db, github_profile_id=123, option=option, recommendation_type="professional")
 
                 assert result is not None
                 mock_db.add.assert_called_once()
                 mock_db.commit.assert_called_once()
                 mock_db.refresh.assert_called_once()
 
-    @pytest.mark.parametrize("content_length,expected_issues", [
-        (5, ["Content is too short"]),
-        (150, []),  # Normal length
-        (600, ["Content is too long"]),  # Too long
-    ])
+    @pytest.mark.parametrize(
+        "content_length,expected_issues",
+        [
+            (5, ["Content is too short"]),
+            (150, []),  # Normal length
+            (600, ["Content is too long"]),  # Too long
+        ],
+    )
     def test_analyze_recommendation_quality_length_analysis(self, engine_service, content_length, expected_issues):
         """Test recommendation quality analysis for different content lengths."""
         content = " ".join(["word"] * content_length)
@@ -438,7 +385,7 @@ class TestRecommendationEngineService:
                 }
             ],
             "generation_parameters": {},
-            "generation_prompt": "mocked prompt"
+            "generation_prompt": "mocked prompt",
         }
 
         # Call the service with repo_only context

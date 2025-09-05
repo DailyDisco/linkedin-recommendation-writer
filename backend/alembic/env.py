@@ -1,8 +1,7 @@
 import asyncio
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
+from sqlalchemy import engine_from_config, pool
 
 from alembic import context
 
@@ -15,12 +14,14 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
+from app.core.database import Base
+from app.models.github_profile import GitHubProfile
+from app.models.recommendation import Recommendation
+
 # add your model's MetaData object here
 # for 'autogenerate' support
 from app.models.user import User
-from app.models.recommendation import Recommendation
-from app.models.github_profile import GitHubProfile
-from app.core.database import Base
+
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,

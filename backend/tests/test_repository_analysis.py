@@ -4,14 +4,15 @@ Test script to directly test repository analysis.
 """
 
 import asyncio
-import sys
 import os
+import sys
 
 # Add backend to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'backend'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "backend"))
 
-from app.services.github.github_repository_service import GitHubRepositoryService
 from app.services.github.github_commit_service import GitHubCommitService
+from app.services.github.github_repository_service import GitHubRepositoryService
+
 
 async def test_repository_analysis():
     """Test repository analysis directly."""
@@ -43,7 +44,9 @@ async def test_repository_analysis():
     except Exception as e:
         print(f"💥 Exception during repository analysis: {e}")
         import traceback
+
         traceback.print_exc()
+
 
 if __name__ == "__main__":
     asyncio.run(test_repository_analysis())

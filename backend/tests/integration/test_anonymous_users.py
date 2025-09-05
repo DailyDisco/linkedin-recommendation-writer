@@ -94,13 +94,7 @@ async def test_limit_checking():
     print("\nTest 3: Authenticated user within limits")
     print("-" * 40)
 
-    auth_user = User(
-        email="test@example.com",
-        username="testuser",
-        hashed_password="hashed",
-        recommendation_count=2,  # 2 out of 5 used
-        daily_limit=5
-    )
+    auth_user = User(email="test@example.com", username="testuser", hashed_password="hashed", recommendation_count=2, daily_limit=5)  # 2 out of 5 used
 
     try:
         await check_generation_limit(auth_user, mock_db)
@@ -146,13 +140,7 @@ async def test_increment_count():
     print("Test 1: Authenticated user increment")
     print("-" * 40)
 
-    auth_user = User(
-        email="test@example.com",
-        username="testuser",
-        hashed_password="hashed",
-        recommendation_count=2,
-        daily_limit=5
-    )
+    auth_user = User(email="test@example.com", username="testuser", hashed_password="hashed", recommendation_count=2, daily_limit=5)
 
     try:
         await increment_generation_count(auth_user, mock_request, mock_db)
@@ -213,6 +201,7 @@ async def main():
     except Exception as e:
         print(f"\n❌ Test suite failed with error: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 

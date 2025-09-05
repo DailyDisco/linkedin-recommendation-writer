@@ -4,9 +4,11 @@ Test script to verify repository-focused AI recommendations.
 """
 
 import asyncio
-import httpx
 import json
 import sys
+
+import httpx
+
 
 async def test_basic_functionality():
     """Test basic functionality without external API dependencies."""
@@ -55,10 +57,12 @@ async def test_basic_functionality():
             try:
                 # Try to import our modified modules
                 import sys
-                sys.path.append('./backend')
+
+                sys.path.append("./backend")
 
                 # Test if we can import the recommendation service
                 from app.services.recommendation_service import RecommendationService
+
                 print("✅ Recommendation service imports successfully")
 
                 # Test if we can create an instance
@@ -73,6 +77,7 @@ async def test_basic_functionality():
 
     except Exception as e:
         import traceback
+
         print(f"💥 Test failed with error: {e}")
         print("Full traceback:")
         traceback.print_exc()
@@ -81,6 +86,7 @@ async def test_basic_functionality():
     print("=" * 60)
     print("✅ Basic functionality test completed successfully!")
     return True
+
 
 async def test_repo_focus_logic():
     """Test the repository focus logic in isolation."""
@@ -91,7 +97,8 @@ async def test_repo_focus_logic():
     try:
         # Import our services
         import sys
-        sys.path.append('./backend')
+
+        sys.path.append("./backend")
 
         from app.services.recommendation_service import RecommendationService
 
@@ -108,11 +115,7 @@ async def test_repo_focus_logic():
 
         # Test parsing repository URL logic
         print("2. Testing repository URL parsing...")
-        test_urls = [
-            "https://github.com/microsoft/vscode",
-            "https://github.com/facebook/react/tree/main",
-            "microsoft/vscode"
-        ]
+        test_urls = ["https://github.com/microsoft/vscode", "https://github.com/facebook/react/tree/main", "microsoft/vscode"]
 
         for url in test_urls:
             # Simulate the parsing logic from our code
@@ -127,6 +130,7 @@ async def test_repo_focus_logic():
 
     except Exception as e:
         import traceback
+
         print(f"💥 Logic test failed with error: {e}")
         print("Full traceback:")
         traceback.print_exc()
@@ -136,13 +140,14 @@ async def test_repo_focus_logic():
     print("✅ Repository focus logic test completed successfully!")
     return True
 
+
 if __name__ == "__main__":
     print("🚀 Starting comprehensive tests...\n")
 
     # Test 1: Basic functionality
     test1_success = asyncio.run(test_basic_functionality())
 
-    print("\n" + "="*80 + "\n")
+    print("\n" + "=" * 80 + "\n")
 
     # Test 2: Repository focus logic
     test2_success = asyncio.run(test_repo_focus_logic())

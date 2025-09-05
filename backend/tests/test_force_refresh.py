@@ -3,13 +3,14 @@
 Test script to verify that force_refresh parameter bypasses caching.
 """
 
-import sys
 import os
+import sys
 
 # Add the backend directory to the Python path
-sys.path.append(os.path.join(os.path.dirname(__file__), 'backend'))
+sys.path.append(os.path.join(os.path.dirname(__file__), "backend"))
 
 from app.services.ai.prompt_service import PromptService
+
 
 def test_force_refresh_functionality():
     """Test that force_refresh parameter works for bypassing cache."""
@@ -18,27 +19,10 @@ def test_force_refresh_functionality():
 
     # Mock GitHub data for testing
     github_data = {
-        "user_data": {
-            "github_username": "testuser",
-            "full_name": "Test User",
-            "bio": "Full-stack developer",
-            "company": "Test Company",
-            "location": "Test City"
-        },
-        "repository_info": {
-            "name": "test-repo",
-            "description": "A test repository",
-            "language": "JavaScript",
-            "owner": {"login": "testuser"}
-        },
-        "repository_languages": [
-            {"language": "JavaScript", "percentage": 80.0},
-            {"language": "TypeScript", "percentage": 20.0}
-        ],
-        "repository_skills": {
-            "technical_skills": ["JavaScript", "TypeScript", "React"],
-            "frameworks": ["React"]
-        }
+        "user_data": {"github_username": "testuser", "full_name": "Test User", "bio": "Full-stack developer", "company": "Test Company", "location": "Test City"},
+        "repository_info": {"name": "test-repo", "description": "A test repository", "language": "JavaScript", "owner": {"login": "testuser"}},
+        "repository_languages": [{"language": "JavaScript", "percentage": 80.0}, {"language": "TypeScript", "percentage": 20.0}],
+        "repository_skills": {"technical_skills": ["JavaScript", "TypeScript", "React"], "frameworks": ["React"]},
     }
 
     print("🔄 TESTING FORCE REFRESH FUNCTIONALITY")
@@ -48,12 +32,7 @@ def test_force_refresh_functionality():
     print("\n📝 TEST 1: Generating prompt with force_refresh=False")
     try:
         prompt_normal = prompt_service.build_prompt(
-            github_data=github_data,
-            recommendation_type="professional",
-            tone="professional",
-            length="medium",
-            analysis_context_type="repo_only",
-            repository_url="https://github.com/testuser/test-repo"
+            github_data=github_data, recommendation_type="professional", tone="professional", length="medium", analysis_context_type="repo_only", repository_url="https://github.com/testuser/test-repo"
         )
         print("✅ Normal prompt generation: SUCCESS")
         print(f"   Prompt length: {len(prompt_normal)} characters")
@@ -65,12 +44,7 @@ def test_force_refresh_functionality():
     print("\n📝 TEST 2: Generating prompt with same parameters")
     try:
         prompt_force = prompt_service.build_prompt(
-            github_data=github_data,
-            recommendation_type="professional",
-            tone="professional",
-            length="medium",
-            analysis_context_type="repo_only",
-            repository_url="https://github.com/testuser/test-repo"
+            github_data=github_data, recommendation_type="professional", tone="professional", length="medium", analysis_context_type="repo_only", repository_url="https://github.com/testuser/test-repo"
         )
         print("✅ Second prompt generation: SUCCESS")
         print(f"   Prompt length: {len(prompt_force)} characters")
@@ -93,6 +67,7 @@ def test_force_refresh_functionality():
     print("\n📝 Note: The force_refresh parameter bypasses caching at the AI service level,")
     print("   allowing fresh recommendation generation even when cached results exist.")
     print("   This test confirms the prompt building layer is ready for the caching bypass.")
+
 
 if __name__ == "__main__":
     test_force_refresh_functionality()

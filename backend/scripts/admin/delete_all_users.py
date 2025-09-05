@@ -7,24 +7,21 @@ This script safely handles user deletion with proper cascade operations.
 import asyncio
 import logging
 import sys
-from typing import Dict, Any
+from typing import Any, Dict
 
-from sqlalchemy import text, select, func
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Add the backend directory to the Python path
-sys.path.insert(0, '/home/day/ProgrammingProjects/github_repo_linkedin_recommendation_writer_app/backend')
+sys.path.insert(0, "/home/day/ProgrammingProjects/github_repo_linkedin_recommendation_writer_app/backend")
 
 from app.core.database import AsyncSessionLocal, test_database_connection
-from app.models.user import User
-from app.models.recommendation import Recommendation
 from app.models.github_profile import GitHubProfile
+from app.models.recommendation import Recommendation
+from app.models.user import User
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -46,43 +43,26 @@ class UserDeletionManager:
         """Get current database statistics before deletion."""
         try:
             # Count users
-            user_count_result = await self.db_session.execute(
-                select(func.count(User.id))
-            )
+            user_count_result = await self.db_session.execute(select(func.count(User.id)))
             user_count = user_count_result.scalar()
 
             # Count recommendations
-            recommendation_count_result = await self.db_session.execute(
-                select(func.count(Recommendation.id))
-            )
+            recommendation_count_result = await self.db_session.execute(select(func.count(Recommendation.id)))
             recommendation_count = recommendation_count_result.scalar()
 
             # Count GitHub profiles
-            github_profile_count_result = await self.db_session.execute(
-                select(func.count(GitHubProfile.id))
-            )
+            github_profile_count_result = await self.db_session.execute(select(func.count(GitHubProfile.id)))
             github_profile_count = github_profile_count_result.scalar()
 
             # Get user details
-            users_result = await self.db_session.execute(
-                select(User.id, User.username, User.email, User.created_at)
-                .order_by(User.created_at)
-            )
+            users_result = await self.db_session.execute(select(User.id, User.username, User.email, User.created_at).order_by(User.created_at))
             users = users_result.fetchall()
 
             return {
                 "user_count": user_count,
                 "recommendation_count": recommendation_count,
                 "github_profile_count": github_profile_count,
-                "users": [
-                    {
-                        "id": user.id,
-                        "username": user.username,
-                        "email": user.email,
-                        "created_at": user.created_at.isoformat() if user.created_at else None
-                    }
-                    for user in users
-                ]
+                "users": [{"id": user.id, "username": user.username, "email": user.email, "created_at": user.created_at.isoformat() if user.created_at else None} for user in users],
             }
 
         except Exception as e:
@@ -96,29 +76,21 @@ class UserDeletionManager:
 
             # Get counts before deletion
             stats_before = await self.get_database_stats()
-            logger.info(f"Before deletion: {stats_before['user_count']} users, "
-                       f"{stats_before['recommendation_count']} recommendations, "
-                       f"{stats_before['github_profile_count']} GitHub profiles")
+            logger.info(f"Before deletion: {stats_before['user_count']} users, " f"{stats_before['recommendation_count']} recommendations, " f"{stats_before['github_profile_count']} GitHub profiles")
 
             # Delete in proper order to handle foreign key constraints
             # 1. Delete recommendations (they reference users)
-            deleted_recommendations = await self.db_session.execute(
-                text("DELETE FROM recommendations")
-            )
+            deleted_recommendations = await self.db_session.execute(text("DELETE FROM recommendations"))
             recommendations_deleted = deleted_recommendations.rowcount
             logger.info(f"Deleted {recommendations_deleted} recommendations")
 
             # 2. Delete GitHub profiles (they reference users)
-            deleted_profiles = await self.db_session.execute(
-                text("DELETE FROM github_profiles")
-            )
+            deleted_profiles = await self.db_session.execute(text("DELETE FROM github_profiles"))
             profiles_deleted = deleted_profiles.rowcount
             logger.info(f"Deleted {profiles_deleted} GitHub profiles")
 
             # 3. Delete users
-            deleted_users = await self.db_session.execute(
-                text("DELETE FROM users")
-            )
+            deleted_users = await self.db_session.execute(text("DELETE FROM users"))
             users_deleted = deleted_users.rowcount
             logger.info(f"Deleted {users_deleted} users")
 
@@ -133,25 +105,15 @@ class UserDeletionManager:
                 "success": True,
                 "stats_before": stats_before,
                 "stats_after": stats_after,
-                "deleted": {
-                    "users": users_deleted,
-                    "recommendations": recommendations_deleted,
-                    "github_profiles": profiles_deleted
-                },
-                "message": f"Successfully deleted {users_deleted} users, "
-                          f"{recommendations_deleted} recommendations, and "
-                          f"{profiles_deleted} GitHub profiles"
+                "deleted": {"users": users_deleted, "recommendations": recommendations_deleted, "github_profiles": profiles_deleted},
+                "message": f"Successfully deleted {users_deleted} users, " f"{recommendations_deleted} recommendations, and " f"{profiles_deleted} GitHub profiles",
             }
 
         except Exception as e:
             # Rollback on error
             await self.db_session.rollback()
             logger.error(f"Failed to delete users: {e}")
-            return {
-                "success": False,
-                "error": str(e),
-                "message": "User deletion failed and was rolled back"
-            }
+            return {"success": False, "error": str(e), "message": "User deletion failed and was rolled back"}
 
     async def verify_deletion(self) -> Dict[str, Any]:
         """Verify that all users have been deleted."""
@@ -162,30 +124,18 @@ class UserDeletionManager:
                 return {
                     "verified": True,
                     "message": "✅ Verification successful: All users have been deleted",
-                    "remaining_counts": {
-                        "users": stats.get("user_count", 0),
-                        "recommendations": stats.get("recommendation_count", 0),
-                        "github_profiles": stats.get("github_profile_count", 0)
-                    }
+                    "remaining_counts": {"users": stats.get("user_count", 0), "recommendations": stats.get("recommendation_count", 0), "github_profiles": stats.get("github_profile_count", 0)},
                 }
             else:
                 return {
                     "verified": False,
                     "message": f"❌ Verification failed: {stats.get('user_count', 0)} users still remain",
-                    "remaining_counts": {
-                        "users": stats.get("user_count", 0),
-                        "recommendations": stats.get("recommendation_count", 0),
-                        "github_profiles": stats.get("github_profile_count", 0)
-                    }
+                    "remaining_counts": {"users": stats.get("user_count", 0), "recommendations": stats.get("recommendation_count", 0), "github_profiles": stats.get("github_profile_count", 0)},
                 }
 
         except Exception as e:
             logger.error(f"Failed to verify deletion: {e}")
-            return {
-                "verified": False,
-                "error": str(e),
-                "message": "Verification failed due to error"
-            }
+            return {"verified": False, "error": str(e), "message": "Verification failed due to error"}
 
 
 async def main():
@@ -217,16 +167,15 @@ async def main():
         print(f"   📝 Recommendations: {stats['recommendation_count']}")
         print(f"   🔗 GitHub Profiles: {stats['github_profile_count']}")
 
-        if stats['user_count'] == 0:
+        if stats["user_count"] == 0:
             print("\nℹ️  No users found in the database. Nothing to delete.")
             return
 
         # Show user details
         print("\n👤 Current Users:")
-        for user in stats['users'][:10]:  # Show first 10 users
-            print(f"   ID: {user['id']}, Username: {user['username'] or 'N/A'}, "
-                  f"Email: {user['email'] or 'N/A'}")
-        if len(stats['users']) > 10:
+        for user in stats["users"][:10]:  # Show first 10 users
+            print(f"   ID: {user['id']}, Username: {user['username'] or 'N/A'}, " f"Email: {user['email'] or 'N/A'}")
+        if len(stats["users"]) > 10:
             print(f"   ... and {len(stats['users']) - 10} more users")
 
         # Confirm deletion

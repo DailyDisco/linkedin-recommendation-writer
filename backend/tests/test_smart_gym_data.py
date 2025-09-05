@@ -3,13 +3,14 @@
 Test script to validate repo_only prompt generation and ensure no general profile data leakage.
 """
 
-import sys
 import os
+import sys
 
 # Add the backend directory to the Python path
-sys.path.append(os.path.join(os.path.dirname(__file__), 'backend'))
+sys.path.append(os.path.join(os.path.dirname(__file__), "backend"))
 
 from app.services.ai.prompt_service import PromptService
+
 
 def test_smart_gym_repo_only():
     """Test repo_only prompt generation with smart-gym repository data."""
@@ -27,7 +28,6 @@ def test_smart_gym_repo_only():
             # FILTERED OUT: bio, company, location, followers, public_repos, organizations, starred_technologies
         },
         # FILTERED OUT: "repositories", "languages", "skills", "commit_analysis", "commits", "starred_technologies", "organizations"
-
         # ONLY repository-specific data should be included:
         "repository_info": {
             "name": "smart-gym",
@@ -37,33 +37,21 @@ def test_smart_gym_repo_only():
             "stars": 50,
             "forks": 10,
             "url": "https://github.com/rajakrishna/smart-gym",
-            "owner": {"login": "rajakrishna", "avatar_url": "", "html_url": ""}
+            "owner": {"login": "rajakrishna", "avatar_url": "", "html_url": ""},
         },
         "repository_languages": [
             {"language": "TypeScript", "percentage": 98.7},
             {"language": "CSS", "percentage": 1.2},
             {"language": "JavaScript", "percentage": 0.1},
         ],
-        "repository_skills": {
-            "technical_skills": ["TypeScript", "JavaScript", "CSS", "HTML", "Frontend Development"],
-            "frameworks": ["React", "Next.js", "TailwindCSS"],
-            "tools": ["Git", "Vercel"]
-        },
-        "repository_commits": [], # Only contributor's commits to this repo
-        "repository_commit_analysis": {
-            "total_commits": 15,
-            "patterns": {"most_active_month": "October"}
-        },
-        "contributor_info": {
-            "username": "diego",
-            "full_name": "Diego",
-            "contributions": 0,  # No commits in this test
-            "email": "diego@example.com"
-        },
+        "repository_skills": {"technical_skills": ["TypeScript", "JavaScript", "CSS", "HTML", "Frontend Development"], "frameworks": ["React", "Next.js", "TailwindCSS"], "tools": ["Git", "Vercel"]},
+        "repository_commits": [],  # Only contributor's commits to this repo
+        "repository_commit_analysis": {"total_commits": 15, "patterns": {"most_active_month": "October"}},
+        "contributor_info": {"username": "diego", "full_name": "Diego", "contributions": 0, "email": "diego@example.com"},  # No commits in this test
         "analyzed_at": "2024-09-01T00:00:00Z",
         "analysis_context_type": "repo_only",
         "repository_url": "https://github.com/rajakrishna/smart-gym",
-        "ai_focus_instruction": "Focus ONLY on diego's contributions to rajakrishna/smart-gym repository. Do not mention or reference any other repositories, projects, or general profile information."
+        "ai_focus_instruction": "Focus ONLY on diego's contributions to rajakrishna/smart-gym repository. Do not mention or reference any other repositories, projects, or general profile information.",
     }
 
     # Generate the prompt
@@ -73,7 +61,7 @@ def test_smart_gym_repo_only():
         tone="professional",
         length="medium",
         analysis_context_type="repo_only",
-        repository_url="https://github.com/rajakrishna/smart-gym"
+        repository_url="https://github.com/rajakrishna/smart-gym",
     )
 
     print("\n🧪 TESTING SMART-GYM REPO_ONLY PROMPT")
@@ -111,7 +99,7 @@ def test_smart_gym_repo_only():
         "excludes_general_starred_tech": not any(tech in repo_only_prompt.lower() for tech in ["python", "data-science", "machine-learning", "api-design"]),
         # Allow "web-development" since it's related to the repository's "web technologies" description
         "contains_repo_name": "smart-gym" in repo_only_prompt,
-        "contains_correct_owner": "diego" in repo_only_prompt, # Now refers to the contributor
+        "contains_correct_owner": "diego" in repo_only_prompt,  # Now refers to the contributor
         "excludes_company": "Tech Corp" not in repo_only_prompt,
         "excludes_location": "San Francisco" not in repo_only_prompt,
         "excludes_organizations": "OpenSourceOrg" not in repo_only_prompt,
@@ -124,11 +112,11 @@ def test_smart_gym_repo_only():
         print(f"{status}: {check}")
 
     overall_passed = all(validation_results.values())
-    print("\n📊 SMART-GYM TEST SUMMARY: {}/{} tests passed ({:.1f}%) ".format(
-        sum(1 for p in validation_results.values() if p),
-        len(validation_results),
-        (sum(1 for p in validation_results.values() if p) / len(validation_results)) * 100
-    ))
+    print(
+        "\n📊 SMART-GYM TEST SUMMARY: {}/{} tests passed ({:.1f}%) ".format(
+            sum(1 for p in validation_results.values() if p), len(validation_results), (sum(1 for p in validation_results.values() if p) / len(validation_results)) * 100
+        )
+    )
 
     if overall_passed:
         print("🎉 SMART-GYM REPO_ONLY ISOLATION: SUCCESS!")
@@ -136,6 +124,7 @@ def test_smart_gym_repo_only():
     else:
         print("❌ SMART-GYM REPO_ONLY ISOLATION: FAILED!")
         return False
+
 
 if __name__ == "__main__":
     test_smart_gym_repo_only()

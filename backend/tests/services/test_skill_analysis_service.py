@@ -1,11 +1,12 @@
 """Tests for SkillAnalysisService."""
 
-import pytest
 from datetime import datetime
 from unittest.mock import Mock, patch
 
-from app.services.skill_analysis_service import SkillAnalysisService
+import pytest
+
 from app.schemas.recommendation import SkillGapAnalysisRequest, SkillGapAnalysisResponse, SkillMatch
+from app.services.skill_analysis_service import SkillAnalysisService
 
 
 class TestSkillAnalysisService:
@@ -25,27 +26,13 @@ class TestSkillAnalysisService:
                 "frameworks": ["Django", "React", "FastAPI"],
                 "tools": ["Git", "Docker", "PostgreSQL"],
                 "domains": ["Web Development", "Data Science"],
-                "dependencies_found": ["pandas", "numpy", "requests"]
+                "dependencies_found": ["pandas", "numpy", "requests"],
             },
-            "starred_technologies": {
-                "languages": {"JavaScript": 5, "TypeScript": 3},
-                "topics": ["machine-learning", "web-development", "api-design"]
-            },
+            "starred_technologies": {"languages": {"JavaScript": 5, "TypeScript": 3}, "topics": ["machine-learning", "web-development", "api-design"]},
             "commit_analysis": {
-                "excellence_areas": {
-                    "primary_strength": "backend_development",
-                    "patterns": {
-                        "api_development": {"percentage": 25},
-                        "database_design": {"percentage": 20}
-                    }
-                },
-                "tools_and_features": {
-                    "tools_by_category": {
-                        "frameworks": ["Django", "FastAPI"],
-                        "databases": ["PostgreSQL", "Redis"]
-                    }
-                }
-            }
+                "excellence_areas": {"primary_strength": "backend_development", "patterns": {"api_development": {"percentage": 25}, "database_design": {"percentage": 20}}},
+                "tools_and_features": {"tools_by_category": {"frameworks": ["Django", "FastAPI"], "databases": ["PostgreSQL", "Redis"]}},
+            },
         }
 
     def test_init(self, skill_service):
@@ -115,8 +102,7 @@ class TestSkillAnalysisService:
         assert isinstance(match, SkillMatch)
         assert match.skill == "backend_development"
         # Should match the primary strength from commit analysis
-        assert any("backend_development" in evidence.lower() or "backend development" in evidence.lower()
-                  for evidence in match.evidence)
+        assert any("backend_development" in evidence.lower() or "backend development" in evidence.lower() for evidence in match.evidence)
 
     def test_get_related_technologies_javascript(self, skill_service):
         """Test getting related technologies for JavaScript."""
@@ -186,12 +172,7 @@ class TestSkillAnalysisService:
 
     def test_analyze_skill_gaps_full_flow(self, skill_service, sample_github_data):
         """Test full skill gap analysis flow."""
-        request = SkillGapAnalysisRequest(
-            github_username="testuser",
-            target_role="frontend_developer",
-            industry="technology",
-            experience_level="mid"
-        )
+        request = SkillGapAnalysisRequest(github_username="testuser", target_role="frontend_developer", industry="technology", experience_level="mid")
 
         response = skill_service.analyze_skill_gaps(request, sample_github_data)
 
@@ -211,32 +192,12 @@ class TestSkillAnalysisService:
     def test_analyze_skill_gaps_with_missing_data(self, skill_service):
         """Test skill gap analysis with minimal GitHub data."""
         minimal_github_data = {
-            "skills": {
-                "technical_skills": [],
-                "frameworks": [],
-                "tools": [],
-                "domains": [],
-                "dependencies_found": []
-            },
-            "starred_technologies": {
-                "languages": {},
-                "topics": []
-            },
-            "commit_analysis": {
-                "excellence_areas": {
-                    "primary_strength": "",
-                    "patterns": {}
-                },
-                "tools_and_features": {
-                    "tools_by_category": {}
-                }
-            }
+            "skills": {"technical_skills": [], "frameworks": [], "tools": [], "domains": [], "dependencies_found": []},
+            "starred_technologies": {"languages": {}, "topics": []},
+            "commit_analysis": {"excellence_areas": {"primary_strength": "", "patterns": {}}, "tools_and_features": {"tools_by_category": {}}},
         }
 
-        request = SkillGapAnalysisRequest(
-            github_username="testuser",
-            target_role="backend_developer"
-        )
+        request = SkillGapAnalysisRequest(github_username="testuser", target_role="backend_developer")
 
         response = skill_service.analyze_skill_gaps(request, minimal_github_data)
 
@@ -244,13 +205,16 @@ class TestSkillAnalysisService:
         assert response.overall_match_score >= 0
         assert len(response.skill_analysis) > 0
 
-    @pytest.mark.parametrize("role,experience_level", [
-        ("frontend_developer", "junior"),
-        ("backend_developer", "mid"),
-        ("fullstack_developer", "senior"),
-        ("data_scientist", "mid"),
-        ("devops_engineer", "senior"),
-    ])
+    @pytest.mark.parametrize(
+        "role,experience_level",
+        [
+            ("frontend_developer", "junior"),
+            ("backend_developer", "mid"),
+            ("fullstack_developer", "senior"),
+            ("data_scientist", "mid"),
+            ("devops_engineer", "senior"),
+        ],
+    )
     def test_get_role_skill_requirements_all_roles(self, skill_service, role, experience_level):
         """Test getting skill requirements for all supported roles."""
         requirements = skill_service.get_role_skill_requirements(role, experience_level)
@@ -274,10 +238,7 @@ class TestSkillAnalysisService:
     def test_generate_skill_recommendations_limits(self, skill_service):
         """Test that skill recommendations are properly limited."""
         # Create many missing skills
-        skill_matches = [
-            SkillMatch(skill=f"Skill{i}", match_level="missing", match_score=0, evidence=[])
-            for i in range(10)
-        ]
+        skill_matches = [SkillMatch(skill=f"Skill{i}", match_level="missing", match_score=0, evidence=[]) for i in range(10)]
 
         recommendations = skill_service.generate_skill_recommendations(skill_matches, "developer")
 

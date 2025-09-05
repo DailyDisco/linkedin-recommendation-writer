@@ -3,14 +3,15 @@
 Test script to verify parameter mapping between frontend and backend.
 """
 
-import sys
 import os
+import sys
 
 # Add backend to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'backend'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "backend"))
 
-from app.services.recommendation.recommendation_service import RecommendationService
 from app.services.ai.prompt_service import PromptService
+from app.services.recommendation.recommendation_service import RecommendationService
+
 
 def test_parameter_mapping():
     """Test that parameters are correctly mapped from frontend to backend."""
@@ -20,12 +21,12 @@ def test_parameter_mapping():
 
     # Simulate frontend request data
     frontend_request = {
-        'github_username': 'testuser',
-        'analysis_context_type': 'repo_only',
-        'repository_url': 'https://github.com/testuser/test-repo',
-        'recommendation_type': 'professional',
-        'tone': 'professional',
-        'length': 'medium'
+        "github_username": "testuser",
+        "analysis_context_type": "repo_only",
+        "repository_url": "https://github.com/testuser/test-repo",
+        "recommendation_type": "professional",
+        "tone": "professional",
+        "length": "medium",
     }
 
     print("📤 Frontend sends:")
@@ -39,8 +40,8 @@ def test_parameter_mapping():
     print(f"   • repository_url: {frontend_request['repository_url']}")
 
     # Test the condition that determines repo_only mode
-    analysis_context_type = frontend_request.get('analysis_context_type', 'profile')
-    repository_url = frontend_request.get('repository_url')
+    analysis_context_type = frontend_request.get("analysis_context_type", "profile")
+    repository_url = frontend_request.get("repository_url")
 
     condition_result = analysis_context_type == "repo_only" and repository_url is not None
 
@@ -63,6 +64,7 @@ def test_parameter_mapping():
     print("🎉 PARAMETER MAPPING TEST COMPLETED")
 
     return condition_result
+
 
 if __name__ == "__main__":
     success = test_parameter_mapping()

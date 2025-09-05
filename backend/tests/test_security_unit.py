@@ -6,8 +6,8 @@ from fastapi.responses import JSONResponse
 
 from app.core.security_config import security_utils
 from app.core.security_middleware import (
-    InputSanitizationMiddleware,
     EnhancedSecurityHeadersMiddleware,
+    InputSanitizationMiddleware,
     PIIFilteringMiddleware,
     RequestSizeLimitMiddleware,
 )
@@ -89,8 +89,8 @@ class TestPIIFilteringMiddleware:
                 self.method = "GET"
                 self.url = "http://test.com/api/test?email=user@example.com"
                 self.query_params = "email=user@example.com"
-                self.client = type('obj', (object,), {'host': '127.0.0.1'})()
-                self.state = type('obj', (object,), {'request_id': 'test-id'})()
+                self.client = type("obj", (object,), {"host": "127.0.0.1"})()
+                self.state = type("obj", (object,), {"request_id": "test-id"})()
 
         request = MockRequest()
 
