@@ -10,8 +10,8 @@ import logging
 import os
 
 from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.health import router as health_router
 from app.api.v1 import api_router
@@ -45,6 +45,7 @@ if os.path.exists(static_dir):
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
     logger.info("📁 Static files mounted at /static")
 
+
 # Root route to serve the frontend
 @app.get("/")
 async def root():
@@ -56,12 +57,8 @@ async def root():
         return FileResponse(index_path)
     else:
         logger.warning("⚠️ Frontend index.html not found, returning API info")
-        return {
-            "message": "LinkedIn Recommendation Writer API",
-            "docs": "/docs" if settings.ENVIRONMENT != "production" else None,
-            "health": "/health",
-            "api": "/api/v1"
-        }
+        return {"message": "LinkedIn Recommendation Writer API", "docs": "/docs" if settings.ENVIRONMENT != "production" else None, "health": "/health", "api": "/api/v1"}
+
 
 # Include health check routes
 app.include_router(health_router, tags=["health"])
