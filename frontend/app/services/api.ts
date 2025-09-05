@@ -8,6 +8,7 @@ import type {
   RecommendationOption,
   RegenerateRequest,
   SkillGapAnalysisResponse,
+  RecommendationOptionsResponse,
 } from '../types';
 import type { RecommendationFormData } from '../hooks/useRecommendationState';
 import type { AxiosRequestConfig } from 'axios';
@@ -813,20 +814,6 @@ export interface RecommendationResponse {
   word_count: number;
   created_at: string;
   github_username: string;
-}
-
-// Merged and updated RecommendationOptionsResponse
-export interface RecommendationOptionsResponse {
-  options: Array<{
-    id: number;
-    name: string;
-    content: string;
-    title: string;
-    word_count: number;
-    focus: string;
-    explanation: string;
-  }>;
-  generation_parameters: Record<string, unknown>;
 }
 
 export default api;
