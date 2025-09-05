@@ -96,7 +96,7 @@ function showErrorToast(type: GlobalErrorType): void {
 function createErrorContext(
   type: GlobalErrorType,
   error: Error | Event | string,
-  additionalData?: any
+  additionalData?: Record<string, unknown>
 ): ErrorContext {
   const now = new Date().toISOString();
 

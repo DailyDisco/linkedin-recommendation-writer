@@ -129,13 +129,13 @@ describe('ErrorBoundary', () => {
 
   it('should render error fallback when error occurs', () => {
     // Suppress console.error for this test
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const consoleGroupSpy = vi
       .spyOn(console, 'group')
-      .mockImplementation(() => { });
+      .mockImplementation(() => {});
     const consoleGroupEndSpy = vi
       .spyOn(console, 'groupEnd')
-      .mockImplementation(() => { });
+      .mockImplementation(() => {});
 
     render(
       React.createElement(
@@ -156,13 +156,13 @@ describe('ErrorBoundary', () => {
   });
 
   it('should show network-specific error message', () => {
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const consoleGroupSpy = vi
       .spyOn(console, 'group')
-      .mockImplementation(() => { });
+      .mockImplementation(() => {});
     const consoleGroupEndSpy = vi
       .spyOn(console, 'groupEnd')
-      .mockImplementation(() => { });
+      .mockImplementation(() => {});
 
     render(
       React.createElement(
@@ -185,13 +185,13 @@ describe('ErrorBoundary', () => {
   });
 
   it('should show error ID when error occurs', () => {
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const consoleGroupSpy = vi
       .spyOn(console, 'group')
-      .mockImplementation(() => { });
+      .mockImplementation(() => {});
     const consoleGroupEndSpy = vi
       .spyOn(console, 'groupEnd')
-      .mockImplementation(() => { });
+      .mockImplementation(() => {});
 
     render(
       React.createElement(
@@ -212,13 +212,13 @@ describe('ErrorBoundary', () => {
   });
 
   it('should show recovery suggestions', () => {
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const consoleGroupSpy = vi
       .spyOn(console, 'group')
-      .mockImplementation(() => { });
+      .mockImplementation(() => {});
     const consoleGroupEndSpy = vi
       .spyOn(console, 'groupEnd')
-      .mockImplementation(() => { });
+      .mockImplementation(() => {});
 
     render(
       React.createElement(
@@ -238,13 +238,13 @@ describe('ErrorBoundary', () => {
   });
 
   it('should reset error when Try Again is clicked', () => {
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const consoleGroupSpy = vi
       .spyOn(console, 'group')
-      .mockImplementation(() => { });
+      .mockImplementation(() => {});
     const consoleGroupEndSpy = vi
       .spyOn(console, 'groupEnd')
-      .mockImplementation(() => { });
+      .mockImplementation(() => {});
 
     const { rerender } = render(
       React.createElement(
@@ -281,13 +281,13 @@ describe('ErrorBoundary', () => {
   });
 
   it('should show Go Home button', () => {
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const consoleGroupSpy = vi
       .spyOn(console, 'group')
-      .mockImplementation(() => { });
+      .mockImplementation(() => {});
     const consoleGroupEndSpy = vi
       .spyOn(console, 'groupEnd')
-      .mockImplementation(() => { });
+      .mockImplementation(() => {});
 
     render(
       React.createElement(
@@ -306,13 +306,13 @@ describe('ErrorBoundary', () => {
   });
 
   it('should show Report Issue button when enabled', () => {
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const consoleGroupSpy = vi
       .spyOn(console, 'group')
-      .mockImplementation(() => { });
+      .mockImplementation(() => {});
     const consoleGroupEndSpy = vi
       .spyOn(console, 'groupEnd')
-      .mockImplementation(() => { });
+      .mockImplementation(() => {});
 
     render(
       React.createElement(
@@ -332,14 +332,14 @@ describe('ErrorBoundary', () => {
   });
 
   it('should copy error details to clipboard when Report Issue is clicked', async () => {
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const consoleGroupSpy = vi
       .spyOn(console, 'group')
-      .mockImplementation(() => { });
+      .mockImplementation(() => {});
     const consoleGroupEndSpy = vi
       .spyOn(console, 'groupEnd')
-      .mockImplementation(() => { });
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => { });
+      .mockImplementation(() => {});
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
 
     render(
       React.createElement(
@@ -365,13 +365,13 @@ describe('ErrorBoundary', () => {
   });
 
   it('should call onError callback when provided', () => {
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const consoleGroupSpy = vi
       .spyOn(console, 'group')
-      .mockImplementation(() => { });
+      .mockImplementation(() => {});
     const consoleGroupEndSpy = vi
       .spyOn(console, 'groupEnd')
-      .mockImplementation(() => { });
+      .mockImplementation(() => {});
 
     const onErrorMock = vi.fn();
 
@@ -396,13 +396,13 @@ describe('ErrorBoundary', () => {
   });
 
   it('should show error context when provided', () => {
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const consoleGroupSpy = vi
       .spyOn(console, 'group')
-      .mockImplementation(() => { });
+      .mockImplementation(() => {});
     const consoleGroupEndSpy = vi
       .spyOn(console, 'groupEnd')
-      .mockImplementation(() => { });
+      .mockImplementation(() => {});
 
     render(
       React.createElement(
@@ -423,13 +423,13 @@ describe('ErrorBoundary', () => {
   });
 
   it('should use custom fallback when provided', () => {
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const consoleGroupSpy = vi
       .spyOn(console, 'group')
-      .mockImplementation(() => { });
+      .mockImplementation(() => {});
     const consoleGroupEndSpy = vi
       .spyOn(console, 'groupEnd')
-      .mockImplementation(() => { });
+      .mockImplementation(() => {});
 
     const CustomFallback = ({ resetError }: { resetError: () => void }) =>
       React.createElement(

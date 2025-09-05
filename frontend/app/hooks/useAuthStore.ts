@@ -26,7 +26,7 @@ export interface AuthState {
 export interface AuthActions {
   login: (token: string) => Promise<void>;
   logout: () => void;
-  fetchUserDetails: () => Promise<void>;
+  fetchUserDetails: (forceRefresh?: boolean) => Promise<void>;
   setUserDetails: (userDetails: AuthState['userDetails']) => void;
   setLoadingUserDetails: (loading: boolean) => void;
   setUserDetailsError: (error: string | null) => void;
@@ -236,6 +236,9 @@ export const useAuthStore = create<AuthStore>()(
           accessToken: state.accessToken,
           lastFetchTime: state.lastFetchTime,
         }),
+        onRehydrateStorage: () => _state => {
+          // Store rehydration complete
+        },
       }
     ),
     { name: 'auth-store' }

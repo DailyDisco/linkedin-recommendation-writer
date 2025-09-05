@@ -26,7 +26,6 @@ import {
   Settings,
   RefreshCw,
 } from 'lucide-react';
-import { apiClient } from '@/services/api';
 import { PleaseSignInOrRegister } from '../components/PleaseSignInOrRegister';
 import { Link } from 'react-router';
 import { trackEngagement } from '../utils/analytics';

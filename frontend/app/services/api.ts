@@ -68,11 +68,11 @@ api.interceptors.response.use(
       console.log('🔐 API Interceptor: 401 error detected');
       console.log(
         '🔐 API Interceptor: Request URL:',
-        (error as any).config?.url || 'unknown'
+        (error as HttpError).config?.url || 'unknown'
       );
       console.log(
         '🔐 API Interceptor: Request method:',
-        (error as any).config?.method || 'unknown'
+        (error as HttpError).config?.method || 'unknown'
       );
       console.log('🔐 API Interceptor: Error response:', error.response);
       console.log('🔐 API Interceptor: Timestamp:', new Date().toISOString());
@@ -686,16 +686,11 @@ export const handleApiError = (
     onRetry?: () => void;
   } = {}
 ) => {
-  const {
-    showToast = true,
-    showRecoverySuggestions = false,
-    context = '',
-    onRetry,
-  } = options;
+  const { showToast = true, context = '', onRetry } = options;
 
   let errorType: ApiErrorType;
   let status = -1;
-  let errorData: any = null;
+  let errorData: unknown = null;
 
   if ((error as HttpError).response) {
     // Server responded with error status
@@ -722,7 +717,7 @@ export const handleApiError = (
   console.error('Error ID:', errorId);
   console.error('Type:', errorType);
   console.error('Status:', status);
-  console.error('Message:', (error as any)?.message || 'Unknown error');
+  console.error('Message:', (error as HttpError)?.message || 'Unknown error');
   console.error('Data:', errorData);
   console.error('Timestamp:', new Date().toISOString());
   console.groupEnd();

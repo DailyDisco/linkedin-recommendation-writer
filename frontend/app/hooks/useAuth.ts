@@ -39,9 +39,6 @@ export const useAuth = (): AuthContextType => {
   // Get actions (these don't need to be reactive)
   const store = useAuthStore();
 
-  // Debug: Authentication state working correctly
-  // console.log('🔐 useAuth hook - isLoggedIn:', isLoggedIn);
-
   return {
     isLoggedIn,
     userDetails,
@@ -52,7 +49,7 @@ export const useAuth = (): AuthContextType => {
     isAuthenticating,
     login: store.login,
     logout: store.logout,
-    fetchUserDetails: (forceRefresh = false) =>
-      store.fetchUserDetails(forceRefresh),
+    fetchUserDetails: (forceRefresh?: boolean) =>
+      store.fetchUserDetails(forceRefresh ?? false),
   };
 };
