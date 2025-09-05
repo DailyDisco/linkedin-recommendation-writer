@@ -11,6 +11,12 @@ import './styles/index.css';
 import { AppLayout } from './layouts/AppLayout';
 import { RootProvider } from './providers/RootProvider';
 import { RootHtmlDocument } from './layouts/RootHtmlDocument';
+import { initializeGlobalErrorHandling } from './utils/globalErrorHandler';
+
+// Initialize global error handling
+if (typeof window !== 'undefined') {
+  initializeGlobalErrorHandling();
+}
 
 export default function Root() {
   return (

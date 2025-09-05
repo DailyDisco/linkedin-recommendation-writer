@@ -10,6 +10,11 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
 from app.core.config import settings
+from app.core.exceptions import (
+    BaseApplicationError,
+    NotFoundError,
+    ValidationError,
+)
 from app.core.security_config import security_utils
 
 logger = logging.getLogger(__name__)
@@ -114,41 +119,63 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
 
 
 class ErrorHandlingMiddleware(BaseHTTPMiddleware):
-    """Centralized error handling middleware."""
+    """Centralized error handling middleware with support for custom exceptions."""
 
     async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
         try:
             return await call_next(request)
+        except BaseApplicationError as e:
+            # Handle custom application exceptions
+            return await self._handle_application_error(e, request)
         except ValueError as e:
-            logger.warning(f"Validation error: {e}")
+            # Handle standard Python ValueError
+            logger.warning(f"Validation error: {security_utils.filter_pii_for_logging(str(e))}")
             return JSONResponse(
                 status_code=400,
-                content={"detail": str(e), "type": "validation_error"},
+                content={
+                    "error": "VALIDATION_ERROR",
+                    "message": "The provided data is invalid. Please check your input and try again.",
+                    "type": "validation_error",
+                    "request_id": getattr(request.state, "request_id", "unknown"),
+                },
             )
         except ConnectionError as e:
-            logger.error(f"Connection error: {e}")
+            # Handle connection errors
+            logger.error(f"Connection error: {security_utils.filter_pii_for_logging(str(e))}")
             return JSONResponse(
                 status_code=503,
                 content={
-                    "detail": "Service temporarily unavailable",
+                    "error": "EXTERNAL_SERVICE_ERROR",
+                    "message": "Service temporarily unavailable. Please try again later.",
                     "type": "connection_error",
+                    "request_id": getattr(request.state, "request_id", "unknown"),
                 },
             )
         except TimeoutError as e:
-            logger.error(f"Timeout error: {e}")
+            # Handle timeout errors
+            logger.error(f"Timeout error: {security_utils.filter_pii_for_logging(str(e))}")
             return JSONResponse(
                 status_code=504,
-                content={"detail": "Request timeout", "type": "timeout_error"},
+                content={
+                    "error": "EXTERNAL_SERVICE_ERROR",
+                    "message": "Request timeout. The server is taking longer than expected to respond.",
+                    "type": "timeout_error",
+                    "request_id": getattr(request.state, "request_id", "unknown"),
+                },
             )
         except Exception as e:
+            # Handle any other unhandled exceptions
             request_id = getattr(request.state, "request_id", "unknown")
-            logger.error(f"Unhandled error in request {request_id}: {e}", exc_info=True)
+            safe_error = security_utils.filter_pii_for_logging(str(e))
+            logger.error(f"Unhandled error in request {request_id}: {safe_error}", exc_info=True)
 
             if settings.API_DEBUG:
                 return JSONResponse(
                     status_code=500,
                     content={
-                        "detail": str(e),
+                        "error": "INTERNAL_ERROR",
+                        "message": "An internal server error occurred.",
+                        "detail": safe_error,
                         "type": "internal_error",
                         "request_id": request_id,
                     },
@@ -157,8 +184,64 @@ class ErrorHandlingMiddleware(BaseHTTPMiddleware):
                 return JSONResponse(
                     status_code=500,
                     content={
-                        "detail": "Internal server error",
+                        "error": "INTERNAL_ERROR",
+                        "message": "Internal server error. Please try again later.",
                         "type": "internal_error",
                         "request_id": request_id,
                     },
                 )
+
+    async def _handle_application_error(self, error: BaseApplicationError, request: Request) -> JSONResponse:
+        """Handle custom application exceptions with proper error mapping."""
+        request_id = getattr(request.state, "request_id", "unknown")
+
+        # Determine HTTP status code based on error type
+        status_code = self._get_status_code_for_error(error)
+
+        # Log the error with appropriate level
+        safe_message = error.get_safe_message()
+        if isinstance(error, (ValidationError, NotFoundError)):
+            logger.warning(f"Application error in request {request_id}: {safe_message}")
+        else:
+            logger.error(f"Application error in request {request_id}: {safe_message}", exc_info=True)
+
+        # Prepare response content
+        response_content = {
+            "error": error.error_code,
+            "message": error.get_user_friendly_message(),
+            "type": error.__class__.__name__.lower(),
+            "request_id": request_id,
+        }
+
+        # Include additional details for certain error types in debug mode
+        if settings.API_DEBUG and hasattr(error, "details") and error.details:
+            # Sanitize details before including
+            safe_details = {}
+            for key, value in error.details.items():
+                if isinstance(value, str):
+                    safe_details[key] = security_utils.filter_pii_for_logging(value)
+                else:
+                    safe_details[key] = value
+            response_content["details"] = safe_details
+
+        return JSONResponse(
+            status_code=status_code,
+            content=response_content,
+        )
+
+    def _get_status_code_for_error(self, error: BaseApplicationError) -> int:
+        """Map error types to appropriate HTTP status codes."""
+        error_code_mapping = {
+            "VALIDATION_ERROR": 400,
+            "NOT_FOUND": 404,
+            "RATE_LIMIT_ERROR": 429,
+            "AUTHENTICATION_ERROR": 401,
+            "AUTHORIZATION_ERROR": 403,
+            "EXTERNAL_SERVICE_ERROR": 502,
+            "DATABASE_ERROR": 500,
+            "CACHE_ERROR": 500,
+            "CONFIGURATION_ERROR": 500,
+            "INPUT_SANITIZATION_ERROR": 400,
+        }
+
+        return error_code_mapping.get(error.error_code, 500)
