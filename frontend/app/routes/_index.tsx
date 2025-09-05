@@ -15,12 +15,6 @@ import {
 export default function HomePage() {
   const advancedFeaturesRef = useRef<HTMLElement>(null);
 
-  const handleScrollToAdvanced = () => {
-    advancedFeaturesRef.current?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start',
-    });
-  };
   // Optimized hover variants (removed fade-in)
   const hoverScale = { scale: 1.02 };
   const tapScale = { scale: 0.98 };
@@ -66,20 +60,6 @@ export default function HomePage() {
               <span>Generate Recommendation</span>
               <ArrowRight className='w-4 h-4' />
             </Link>
-          </motion.div>
-          <motion.div
-            whileHover={hoverScale}
-            whileTap={tapScale}
-            transition={quickTransition}
-            style={{ willChange: 'transform' }}
-          >
-            <button
-              onClick={handleScrollToAdvanced}
-              className='inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-1-ring disabled:pointer-events-none disabled:opacity-50 border border-purple-300 bg-purple-50 text-purple-700 shadow-sm hover:bg-purple-100 active:bg-purple-200 h-10 px-8 space-x-2'
-            >
-              <Settings className='w-5 h-5' />
-              <span>Advanced Features</span>
-            </button>
           </motion.div>
           <motion.div
             whileHover={hoverScale}
@@ -413,17 +393,6 @@ export default function HomePage() {
               and improved confidence scoring
             </p>
           </div>
-        </div>
-
-        <div className='text-center pt-4'>
-          <button
-            onClick={handleScrollToAdvanced}
-            className='inline-flex items-center space-x-2 bg-purple-600 text-white px-6 py-3 rounded-md font-medium hover:bg-purple-700 transition-colors'
-          >
-            <Settings className='w-5 h-5' />
-            <span>Explore Advanced Features</span>
-            <ArrowRight className='w-4 h-4' />
-          </button>
         </div>
       </section>
 
