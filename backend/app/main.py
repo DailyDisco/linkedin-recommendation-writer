@@ -42,8 +42,9 @@ setup_middleware(app)
 # Mount static files
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 if os.path.exists(static_dir):
+    app.mount("/assets", StaticFiles(directory=os.path.join(static_dir, "assets")), name="assets")
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
-    logger.info("📁 Static files mounted at /static")
+    logger.info("📁 Static files mounted at /assets and /static")
 
 
 # Root route to serve the frontend
