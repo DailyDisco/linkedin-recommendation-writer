@@ -7,7 +7,6 @@ import type {
   RecommendationRequest,
   RecommendationOption,
   RegenerateRequest,
-  SkillGapAnalysisResponse,
   RecommendationOptionsResponse,
 } from '../types';
 import type { RecommendationFormData } from '../hooks/useRecommendationState';
@@ -69,11 +68,11 @@ api.interceptors.response.use(
       console.log('🔐 API Interceptor: 401 error detected');
       console.log(
         '🔐 API Interceptor: Request URL:',
-        (error as HttpError).config?.url
+        (error as any).config?.url || 'unknown'
       );
       console.log(
         '🔐 API Interceptor: Request method:',
-        (error as HttpError).config?.method
+        (error as any).config?.method || 'unknown'
       );
       console.log('🔐 API Interceptor: Error response:', error.response);
       console.log('🔐 API Interceptor: Timestamp:', new Date().toISOString());
@@ -412,19 +411,6 @@ export const apiClient = {
     return response.data;
   },
 
-  async analyzeSkillGaps(data: {
-    github_username: string;
-    target_role: string;
-    industry?: string;
-    experience_level?: string;
-  }): Promise<SkillGapAnalysisResponse> {
-    const response = await api.post(
-      '/recommendations/analyze-skill-gaps',
-      data
-    );
-    return response.data;
-  },
-
   // Prompt Assistant
   async getPromptSuggestions(data: {
     github_username: string;
@@ -736,7 +722,7 @@ export const handleApiError = (
   console.error('Error ID:', errorId);
   console.error('Type:', errorType);
   console.error('Status:', status);
-  console.error('Message:', error?.message || 'Unknown error');
+  console.error('Message:', (error as any)?.message || 'Unknown error');
   console.error('Data:', errorData);
   console.error('Timestamp:', new Date().toISOString());
   console.groupEnd();
@@ -802,6 +788,10 @@ export interface HttpError {
   request?: AxiosRequestConfig;
   message?: string;
   code?: string;
+  config?: {
+    url?: string;
+    method?: string;
+  };
 }
 
 export interface RecommendationResponse {

@@ -31,8 +31,6 @@ from app.schemas.recommendation import (
     RecommendationResponse,
     RecommendationVersionHistoryResponse,
     RevertToVersionRequest,
-    SkillGapAnalysisRequest,
-    SkillGapAnalysisResponse,
     StreamProgressResponse,
     VersionComparisonResponse,
 )
@@ -248,41 +246,6 @@ async def refine_recommendation_with_keywords(
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         logger.error(f"💥 CRITICAL ERROR in keyword refinement: {e}")
-        logger.error("=" * 80)
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-
-@router.post("/analyze-skill-gaps", response_model=SkillGapAnalysisResponse)
-async def analyze_skill_gaps(
-    request: SkillGapAnalysisRequest,
-    recommendation_service: RecommendationService = Depends(get_recommendation_service),
-):
-    """Analyze skill gaps for a target role."""
-    try:
-        logger.info("📊 SKILL GAP ANALYSIS API REQUEST")
-        logger.info("=" * 80)
-        logger.info(f"👤 GitHub Username: {request.github_username}")
-        logger.info(f"🎯 Target Role: {request.target_role}")
-        logger.info(f"🏢 Industry: {request.industry}")
-        logger.info(f"📈 Experience Level: {request.experience_level}")
-
-        skill_analysis = await recommendation_service.analyze_skill_gaps(request)
-
-        logger.info("✅ SKILL GAP ANALYSIS COMPLETED SUCCESSFULLY")
-        logger.info("📊 Final Results:")
-        logger.info(f"   • Overall Match Score: {skill_analysis.overall_match_score}%")
-        logger.info(f"   • Strengths Identified: {len(skill_analysis.strengths)}")
-        logger.info(f"   • Gaps Identified: {len(skill_analysis.gaps)}")
-        logger.info(f"   • Recommendations: {len(skill_analysis.recommendations)}")
-        logger.info("=" * 80)
-
-        return skill_analysis
-
-    except ValueError as e:
-        logger.error(f"❌ Validation Error: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"💥 CRITICAL ERROR in skill gap analysis: {e}")
         logger.error("=" * 80)
         raise HTTPException(status_code=500, detail="Internal server error")
 

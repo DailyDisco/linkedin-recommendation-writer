@@ -140,6 +140,10 @@ export interface HttpError {
   };
   code?: string;
   message?: string;
+  config?: {
+    url?: string;
+    method?: string;
+  };
 }
 
 // Repository information types
@@ -307,11 +311,4 @@ export interface FilterState {
     start: Date;
     end: Date;
   };
-}
-
-export interface SkillAnalysisData {
-  github_username: string;
-  target_role: string;
-  industry?: string;
-  experience_level?: string;
 }

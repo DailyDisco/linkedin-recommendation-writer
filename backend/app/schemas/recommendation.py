@@ -237,38 +237,6 @@ class RevertToVersionRequest(BaseModel):
     revert_reason: Optional[str] = Field(None, description="Reason for reverting to this version")
 
 
-class SkillGapAnalysisRequest(BaseModel):
-    """Schema for skill gap analysis requests."""
-
-    github_username: str = Field(..., description="GitHub username to analyze")
-    target_role: str = Field(..., description="Target job role or position")
-    industry: Optional[str] = Field("technology", description="Industry context")
-    experience_level: Optional[str] = Field("mid", description="Experience level: junior, mid, senior")
-
-
-class SkillMatch(BaseModel):
-    """Schema for individual skill match analysis."""
-
-    skill: str
-    match_level: str = Field(..., description="strong, moderate, weak, missing")
-    evidence: List[str] = Field(default_factory=list, description="Evidence from GitHub profile")
-
-
-class SkillGapAnalysisResponse(BaseModel):
-    """Schema for skill gap analysis responses."""
-
-    github_username: str
-    target_role: str
-    overall_match_score: int = Field(..., description="Overall match percentage (0-100)")
-    skill_analysis: List[SkillMatch] = Field(default_factory=list, description="Detailed skill-by-skill analysis")
-    strengths: List[str] = Field(default_factory=list, description="Key strengths identified")
-    gaps: List[str] = Field(default_factory=list, description="Skills that need development")
-    recommendations: List[str] = Field(default_factory=list, description="Specific recommendations for improvement")
-    learning_resources: List[str] = Field(default_factory=list, description="Suggested learning resources")
-    analysis_summary: str = Field(..., description="Overall summary of the analysis")
-    generated_at: datetime
-
-
 class RecommendationOptionsResponse(BaseModel):
     """Response schema for multiple recommendation options."""
 

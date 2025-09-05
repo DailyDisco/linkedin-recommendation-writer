@@ -17,12 +17,9 @@ from app.schemas.recommendation import (
     RecommendationVersionDetail,
     RecommendationVersionHistoryResponse,
     RecommendationVersionInfo,
-    SkillGapAnalysisRequest,
-    SkillGapAnalysisResponse,
     VersionComparisonResponse,
 )
 from app.services.ai.ai_service_new import AIService
-from app.services.analysis.skill_analysis_service import SkillAnalysisService
 from app.services.github.github_commit_service import GitHubCommitService
 from app.services.github.github_repository_service import GitHubRepositoryService
 from app.services.github.github_user_service import GitHubUserService
@@ -55,7 +52,6 @@ class RecommendationService:
         self.github_service = GitHubUserService(GitHubCommitService())
         self.repository_service = GitHubRepositoryService(GitHubCommitService())
         self.ai_service = AIService()
-        self.skill_analysis_service = SkillAnalysisService()
         self.recommendation_engine_service = RecommendationEngineService(self.ai_service)
 
     async def create_recommendation(
@@ -1178,56 +1174,6 @@ class RecommendationService:
 
         logger.info(f"🔄 Successfully reverted recommendation {recommendation_id} to version {target_version.version_number}")
         return response
-
-    async def analyze_skill_gaps(self, request: SkillGapAnalysisRequest) -> SkillGapAnalysisResponse:
-        """Analyze skill gaps for a target role."""
-        import time
-
-        start_time = time.time()
-
-        try:
-            logger.info("📊 SKILL GAP ANALYSIS STARTED")
-            logger.info("=" * 60)
-            logger.info(f"👤 GitHub Username: {request.github_username}")
-            logger.info(f"🎯 Target Role: {request.target_role}")
-            logger.info(f"🏢 Industry: {request.industry}")
-            logger.info(f"📈 Experience Level: {request.experience_level}")
-
-            # Get GitHub profile data
-            logger.info("🔍 STEP 1: FETCHING GITHUB PROFILE")
-            logger.info("-" * 50)
-
-            github_data = await self.github_service.analyze_github_profile(username=request.github_username, force_refresh=False)
-
-            if not github_data:
-                logger.error(f"❌ Failed to analyze GitHub profile for {request.github_username}")
-                raise ValueError(f"Could not analyze GitHub profile for {request.github_username}")
-
-            logger.info("✅ GitHub profile analysis successful")
-
-            # Use SkillAnalysisService for the rest of the analysis
-            return self.skill_analysis_service.analyze_skill_gaps(request, github_data)
-
-        except Exception as e:
-            logger.error(f"💥 ERROR in skill gap analysis for {request.github_username}: {e}")
-            logger.error(f"⏱️  Failed after {time.time() - start_time:.2f} seconds")
-            raise
-
-    def _create_gap_analysis_summary(self, match_score: int, strengths_count: int, gaps_count: int, target_role: str) -> str:
-        """Create a summary of the skill gap analysis."""
-        if match_score >= 80:
-            summary = f"Excellent match for {target_role} role! You have strong foundational skills with {strengths_count} key strengths."
-        elif match_score >= 60:
-            summary = f"Good match for {target_role} role. You have {strengths_count} strengths but {gaps_count} areas for improvement."
-        elif match_score >= 40:
-            summary = f"Moderate match for {target_role} role. Consider developing {gaps_count} key skills to strengthen your profile."
-        else:
-            summary = f"Significant gaps for {target_role} role. Focus on building {gaps_count} core skills to become competitive."
-
-        if gaps_count > 0:
-            summary += " Prioritize learning the missing skills to improve your overall match score."
-
-        return summary
 
     def _analyze_contributor_focus(self, contributor_commits: List[Dict[str, Any]], languages: List[str]) -> str:
         """Analyze a contributor's focus area based on their commits and languages."""

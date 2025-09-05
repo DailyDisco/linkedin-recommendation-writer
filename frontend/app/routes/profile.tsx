@@ -27,7 +27,6 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { apiClient } from '@/services/api';
-import type { SkillAnalysisData } from '../types/index';
 import { PleaseSignInOrRegister } from '../components/PleaseSignInOrRegister';
 import { Link } from 'react-router';
 import { trackEngagement } from '../utils/analytics';
@@ -79,17 +78,6 @@ export default function UserProfilePage() {
   if (!isLoggedIn) {
     return <PleaseSignInOrRegister />;
   }
-
-  const handleSkillAnalysis = async (data: SkillAnalysisData) => {
-    try {
-      const response = await apiClient.analyzeSkillGaps(data);
-      console.log('Skill gap analysis successful:', response);
-      return response;
-    } catch (error) {
-      console.error('Skill gap analysis failed:', error);
-      throw error;
-    }
-  };
 
   const recommendationProgress =
     userDailyLimit && userRecommendationCount
@@ -403,7 +391,7 @@ export default function UserProfilePage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <AdvancedFeatures onAnalyzeSkills={handleSkillAnalysis} />
+          <AdvancedFeatures />
         </CardContent>
       </Card>
     </div>

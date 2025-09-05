@@ -364,14 +364,16 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className='space-y-3'>
+          <div className='text-center'>
             <div className='w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center'>
               <Target className='w-6 h-6 text-orange-600' />
             </div>
-            <h3 className='font-semibold text-gray-900'>Skill Gap Analysis</h3>
+            <h3 className='font-semibold text-gray-900'>
+              Smart Recommendations
+            </h3>
             <p className='text-sm text-gray-600'>
-              Analyze GitHub profiles against job requirements to identify
-              strengths and skill gaps
+              Generate intelligent, personalized LinkedIn recommendations
+              tailored to your unique profile and goals
             </p>
           </div>
 

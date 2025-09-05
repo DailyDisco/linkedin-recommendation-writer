@@ -40,6 +40,10 @@ export interface HttpError {
   request?: unknown;
   message?: string;
   code?: string;
+  config?: {
+    url?: string;
+    method?: string;
+  };
 }
 
 export interface GitHubUserData {
@@ -168,21 +172,8 @@ export interface RegenerateRequest {
   exclude_keywords?: string[];
 }
 
-export interface SkillMatch {
-  skill: string;
-  match_level: string;
-  evidence: string[];
-}
-
-export interface SkillGapAnalysisResponse {
-  github_username: string;
-  target_role: string;
-  overall_match_score: number;
-  skill_analysis: SkillMatch[];
-  strengths: string[];
-  gaps: string[];
-  recommendations: string[];
-  learning_resources: string[];
-  analysis_summary: string;
-  generated_at: string;
+export interface RecommendationOptionsResponse {
+  options: RecommendationOption[];
+  generation_parameters?: Record<string, unknown>;
+  generation_prompt?: string;
 }

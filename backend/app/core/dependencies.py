@@ -14,7 +14,6 @@ from app.core.redis_client import get_redis
 from app.models.user import User
 from app.services.ai.ai_service_new import AIService
 from app.services.analysis.profile_analysis_service import ProfileAnalysisService
-from app.services.analysis.skill_analysis_service import SkillAnalysisService
 from app.services.github.github_commit_service import GitHubCommitService
 from app.services.github.github_repository_service import GitHubRepositoryService
 from app.services.github.github_user_service import GitHubUserService
@@ -117,11 +116,6 @@ class ServiceContainer:
         return cls._get_service("github_repository", GitHubRepositoryService, GitHubCommitService())
 
     @classmethod
-    def get_skill_analysis_service(cls) -> SkillAnalysisService:
-        """Get or create skill analysis service instance."""
-        return cls._get_service("skill_analysis", SkillAnalysisService)
-
-    @classmethod
     def get_profile_analysis_service(cls) -> ProfileAnalysisService:
         """Get or create profile analysis service instance."""
         return cls._get_service("profile_analysis", ProfileAnalysisService)
@@ -161,11 +155,6 @@ def get_recommendation_engine_service() -> RecommendationEngineService:
 def get_repository_service() -> GitHubRepositoryService:
     """Dependency injector for GitHubRepositoryService."""
     return ServiceContainer.get_repository_service()
-
-
-def get_skill_analysis_service() -> SkillAnalysisService:
-    """Dependency provider for skill analysis service."""
-    return ServiceContainer.get_skill_analysis_service()
 
 
 def get_profile_analysis_service() -> ProfileAnalysisService:
