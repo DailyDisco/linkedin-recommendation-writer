@@ -237,7 +237,7 @@ describe('Global Error Handler', () => {
         preventDefault: vi.fn(),
       };
 
-      handleUncaughtException(mockEvent as any);
+      handleUncaughtException(mockEvent as ErrorEvent);
 
       expect(mockToast).toHaveBeenCalled();
       expect(mockEvent.preventDefault).toHaveBeenCalled();
@@ -249,7 +249,7 @@ describe('Global Error Handler', () => {
         preventDefault: vi.fn(),
       };
 
-      handleUnhandledRejection(mockEvent as any);
+      handleUnhandledRejection(mockEvent as PromiseRejectionEvent);
 
       expect(mockToast).toHaveBeenCalled();
       expect(mockEvent.preventDefault).toHaveBeenCalled();
@@ -264,7 +264,7 @@ describe('Global Error Handler', () => {
         target: mockTarget,
       };
 
-      handleResourceError(mockEvent as any);
+      handleResourceError(mockEvent as ErrorEvent);
 
       expect(mockToast).toHaveBeenCalled();
     });
