@@ -18,15 +18,15 @@ class User(Base):
     username = Column(String, unique=True, index=True, nullable=True)
     full_name = Column(String, nullable=True)
     hashed_password = Column(String, nullable=False)
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    is_active = Column(Boolean, default=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Recommendation limits
     recommendation_count = Column(Integer, default=0)  # Number of recommendations created today
     last_recommendation_date = Column(DateTime, nullable=True)  # Last date a recommendation was created
     daily_limit = Column(Integer, default=5)  # Daily recommendation limit (5 for registered users)
-    role = Column(String, default="free")  # User role: admin, premium, or free
+    role = Column(String, default="free", index=True)  # User role: admin, premium, or free
 
     # Relationships
     github_profiles = relationship("GitHubProfile", back_populates="user")

@@ -40,8 +40,8 @@ class GitHubProfile(Base):
     skills_analysis = Column(JSON, nullable=True)  # Extracted skills
 
     # Metadata
-    last_analyzed = Column(DateTime, default=datetime.utcnow)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    last_analyzed = Column(DateTime, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships

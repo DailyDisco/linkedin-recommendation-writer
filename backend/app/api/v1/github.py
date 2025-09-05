@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from app.core.dependencies import get_github_service, get_repository_service, validate_github_username
@@ -28,7 +29,7 @@ def _handle_api_error(error: Exception, operation: str, status_code: int = 500) 
 
 
 async def _process_github_analysis_background(task_id: str, username: str, force_refresh: bool = False, max_repositories: int = 10) -> None:
-    """Background task to process GitHub analysis."""
+    """Background task to process GitHub analysis with progress updates."""
     try:
         logger.info(f"🔄 Starting background analysis for {username} (task: {task_id})")
 
@@ -39,7 +40,9 @@ async def _process_github_analysis_background(task_id: str, username: str, force
         github_service = GitHubUserService(commit_service)
 
         # Update task status to processing
-        await set_cache(f"task_status:{task_id}", {"status": "processing", "username": username, "started_at": datetime.utcnow().isoformat(), "message": "Analyzing GitHub profile..."}, ttl=3600)
+        await set_cache(
+            f"task_status:{task_id}", {"status": "processing", "username": username, "started_at": datetime.utcnow().isoformat(), "message": "Initializing GitHub analysis...", "progress": 5}, ttl=3600
+        )
 
         # Perform the analysis
         analysis = await github_service.analyze_github_profile(username=username, force_refresh=force_refresh, max_repositories=max_repositories)
@@ -48,21 +51,25 @@ async def _process_github_analysis_background(task_id: str, username: str, force
             # Store successful result
             await set_cache(f"task_result:{task_id}", analysis, ttl=3600)
             await set_cache(
-                f"task_status:{task_id}", {"status": "completed", "username": username, "completed_at": datetime.utcnow().isoformat(), "message": "Analysis completed successfully"}, ttl=3600
+                f"task_status:{task_id}",
+                {"status": "completed", "username": username, "completed_at": datetime.utcnow().isoformat(), "message": "Analysis completed successfully", "progress": 100},
+                ttl=3600,
             )
             logger.info(f"✅ Background analysis completed for {username}")
         else:
             # Store error result
             await set_cache(
                 f"task_status:{task_id}",
-                {"status": "failed", "username": username, "completed_at": datetime.utcnow().isoformat(), "message": "Analysis failed - user not found or analysis error"},
+                {"status": "failed", "username": username, "completed_at": datetime.utcnow().isoformat(), "message": "Analysis failed - user not found or analysis error", "progress": 0},
                 ttl=3600,
             )
             logger.error(f"❌ Background analysis failed for {username}")
 
     except Exception as e:
         logger.error(f"💥 Background analysis error for {username}: {e}")
-        await set_cache(f"task_status:{task_id}", {"status": "failed", "username": username, "completed_at": datetime.utcnow().isoformat(), "message": f"Analysis failed: {str(e)}"}, ttl=3600)
+        await set_cache(
+            f"task_status:{task_id}", {"status": "failed", "username": username, "completed_at": datetime.utcnow().isoformat(), "message": f"Analysis failed: {str(e)}", "progress": 0}, ttl=3600
+        )
 
 
 class GitHubServiceHealthResponse(BaseModel):
@@ -335,3 +342,97 @@ async def get_repository_contributors_by_path(
         force_refresh=force_refresh,
     )
     return await get_repository_contributors(request, github_repository_service)
+
+
+@router.get("/analyze/stream/{task_id}")
+async def stream_github_analysis_progress(task_id: str):
+    """Stream GitHub analysis progress updates via Server-Sent Events."""
+
+    async def generate_progress_stream():
+        """Generate SSE stream for GitHub analysis progress."""
+        try:
+            logger.info(f"🎯 SSE stream started for GitHub analysis task: {task_id}")
+
+            while True:
+                # Check task status
+                status_data = await get_cache(f"task_status:{task_id}")
+
+                if not status_data:
+                    # Task not found or expired
+                    yield 'data: {"status": "not_found", "message": "Task not found or expired"}\n\n'
+                    break
+
+                status = status_data.get("status", "unknown")
+                message = status_data.get("message", "")
+                progress = status_data.get("progress", 0)
+
+                # Create progress update
+                progress_data = {"task_id": task_id, "status": status, "stage": message, "progress": progress, "timestamp": datetime.utcnow().isoformat()}
+
+                # If completed, include result
+                if status == "completed":
+                    result_data = await get_cache(f"task_result:{task_id}")
+                    if result_data:
+                        progress_data["result"] = result_data
+
+                # Send progress update
+                yield f"data: {progress_data}\n\n"
+
+                # If completed or failed, end the stream
+                if status in ["completed", "failed"]:
+                    logger.info(f"🎯 SSE stream ended for task {task_id}: {status}")
+                    break
+
+                # Wait before next check
+                import asyncio
+
+                await asyncio.sleep(1)
+
+        except Exception as e:
+            logger.error(f"Error in GitHub analysis SSE stream for task {task_id}: {e}")
+            yield f'data: {{"status": "error", "message": "Stream error: {str(e)}"}}\n\n'
+
+    return StreamingResponse(
+        generate_progress_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Cache-Control",
+        },
+    )
+
+
+@router.post("/analyze/stream")
+async def start_github_analysis_stream(
+    request: GitHubAnalysisRequest,
+    background_tasks: BackgroundTasks,
+    github_user_service: GitHubUserService = Depends(get_github_service),
+):
+    """Start GitHub analysis with streaming progress updates."""
+    try:
+        logger.info("🚀 Starting streaming GitHub analysis...")
+        logger.info(f"   • Username: {request.username}")
+        logger.info(f"   • Force refresh: {request.force_refresh}")
+
+        # Generate unique task ID
+        import uuid
+
+        task_id = str(uuid.uuid4())
+
+        logger.info(f"   • Task ID: {task_id}")
+
+        # Set initial status
+        await set_cache(
+            f"task_status:{task_id}", {"status": "queued", "username": request.username, "started_at": datetime.utcnow().isoformat(), "message": "Analysis queued...", "progress": 0}, ttl=3600
+        )
+
+        # Start background analysis
+        background_tasks.add_task(_process_github_analysis_background, task_id, request.username, request.force_refresh)
+
+        return {"task_id": task_id, "status": "started", "message": "GitHub analysis started. Use the task_id to stream progress updates.", "stream_url": f"/api/v1/github/analyze/stream/{task_id}"}
+
+    except Exception as e:
+        logger.error(f"Error starting GitHub analysis: {e}")
+        raise HTTPException(status_code=500, detail="Failed to start analysis")

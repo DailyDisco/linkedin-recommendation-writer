@@ -1,4 +1,5 @@
-import { memo } from 'react';
+import { memo, useState, useEffect, useCallback, useRef } from 'react';
+import { Loader2 } from 'lucide-react';
 import type { ContributorInfo } from '../../types';
 
 interface ContributorCardProps {
@@ -86,3 +87,123 @@ export const ContributorCard = memo(
 );
 
 ContributorCard.displayName = 'ContributorCard';
+
+interface LazyContributorListProps {
+  contributors: ContributorInfo[];
+  onWriteRecommendation: (contributor: ContributorInfo) => void;
+  mode: 'user' | 'repository';
+  initialLoadSize?: number;
+  loadMoreSize?: number;
+}
+
+export const LazyContributorList = memo(
+  ({
+    contributors,
+    onWriteRecommendation,
+    mode,
+    initialLoadSize = 20,
+    loadMoreSize = 10,
+  }: LazyContributorListProps) => {
+    const [displayedCount, setDisplayedCount] = useState(initialLoadSize);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const observerRef = useRef<IntersectionObserver | null>(null);
+    const loadingRef = useRef<HTMLDivElement>(null);
+
+    // Reset displayed count when contributors change
+    useEffect(() => {
+      setDisplayedCount(initialLoadSize);
+    }, [contributors, initialLoadSize]);
+
+    const loadMore = useCallback(() => {
+      if (displayedCount >= contributors.length || isLoadingMore) return;
+
+      setIsLoadingMore(true);
+
+      // Simulate loading delay for better UX
+      setTimeout(() => {
+        setDisplayedCount(prev =>
+          Math.min(prev + loadMoreSize, contributors.length)
+        );
+        setIsLoadingMore(false);
+      }, 300);
+    }, [contributors.length, displayedCount, isLoadingMore, loadMoreSize]);
+
+    // Set up intersection observer for infinite scroll
+    useEffect(() => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
+
+      observerRef.current = new IntersectionObserver(
+        entries => {
+          const target = entries[0];
+          if (
+            target.isIntersecting &&
+            displayedCount < contributors.length &&
+            !isLoadingMore
+          ) {
+            loadMore();
+          }
+        },
+        {
+          threshold: 0.1,
+          rootMargin: '100px',
+        }
+      );
+
+      if (loadingRef.current) {
+        observerRef.current.observe(loadingRef.current);
+      }
+
+      return () => {
+        if (observerRef.current) {
+          observerRef.current.disconnect();
+        }
+      };
+    }, [loadMore, displayedCount, contributors.length, isLoadingMore]);
+
+    const displayedContributors = contributors.slice(0, displayedCount);
+    const hasMore = displayedCount < contributors.length;
+
+    return (
+      <div className='space-y-4 max-h-96 overflow-y-auto'>
+        {displayedContributors.map(contributor => (
+          <ContributorCard
+            key={contributor.username}
+            contributor={contributor}
+            onWriteRecommendation={onWriteRecommendation}
+            mode={mode}
+          />
+        ))}
+
+        {hasMore && (
+          <div
+            ref={loadingRef}
+            className='flex items-center justify-center py-4 text-gray-500'
+          >
+            {isLoadingMore ? (
+              <>
+                <Loader2 className='w-4 h-4 mr-2 animate-spin' />
+                <span className='text-sm'>Loading more contributors...</span>
+              </>
+            ) : (
+              <span className='text-sm'>
+                Showing {displayedCount} of {contributors.length} contributors
+              </span>
+            )}
+          </div>
+        )}
+
+        {!hasMore && contributors.length > initialLoadSize && (
+          <div className='text-center py-4 text-gray-500'>
+            <span className='text-sm'>
+              Showing all {contributors.length} contributors
+            </span>
+          </div>
+        )}
+      </div>
+    );
+  }
+);
+
+LazyContributorList.displayName = 'LazyContributorList';

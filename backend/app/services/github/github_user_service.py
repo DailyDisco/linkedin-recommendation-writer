@@ -83,7 +83,7 @@ class GitHubUserService:
             logger.info("-" * 40)
             user_start = time.time()
 
-            user_data = await self._get_user_data(username)
+            user_data = await self._get_user_data(username, force_refresh)
             if not user_data:
                 logger.error(f"❌ Failed to fetch user data for {username}")
                 logger.error("💡 This could mean:")
@@ -105,7 +105,7 @@ class GitHubUserService:
             logger.info("-" * 40)
             repos_start = time.time()
 
-            repositories = await self._get_repositories(username, max_repositories)
+            repositories = await self._get_repositories(username, max_repositories, force_refresh)
 
             repos_end = time.time()
             logger.info(f"⏱️  Repositories fetched in {repos_end - repos_start:.2f} seconds")
@@ -199,8 +199,17 @@ class GitHubUserService:
             logger.error(f"⏱️  Failed after {time.time() - analysis_start:.2f} seconds")
             return None
 
-    async def _get_user_data(self, username: str) -> Optional[Dict[str, Any]]:
-        """Get basic user data from GitHub."""
+    async def _get_user_data(self, username: str, force_refresh: bool = False) -> Optional[Dict[str, Any]]:
+        """Get basic user data from GitHub with Redis caching."""
+        cache_key = f"github:user_data:{username}"
+
+        # Check cache first (unless force refresh)
+        if not force_refresh:
+            cached_data = await get_cache(cache_key)
+            if cached_data:
+                logger.info(f"💨 CACHE HIT for user data: {username}")
+                return cached_data
+
         try:
             logger.info(f"🔍 Looking up GitHub user: {username}")
 
@@ -250,6 +259,35 @@ class GitHubUserService:
                 "organizations": organizations,
                 "starred_technologies": starred_tech_analysis,
             }
+
+            # Cache the result for future use
+            user_data_result = {
+                "github_username": user.login,
+                "github_id": user.id,
+                "full_name": user.name,
+                "bio": user.bio,
+                "company": user.company,
+                "location": user.location,
+                "email": user.email,
+                "blog": user.blog,
+                "avatar_url": user.avatar_url,
+                "public_repos": user.public_repos,
+                "followers": user.followers,
+                "following": user.following,
+                "public_gists": user.public_gists,
+                "created_at": user.created_at.isoformat() if user.created_at else None,
+                "updated_at": user.updated_at.isoformat() if user.updated_at else None,
+                # Enhanced data
+                "starred_repositories": starred_repositories,
+                "organizations": organizations,
+                "starred_technologies": starred_tech_analysis,
+            }
+
+            # Store in cache
+            await set_cache(cache_key, user_data_result, ttl=self.COMMIT_ANALYSIS_CACHE_TTL)
+            logger.info(f"💾 Cached user data for: {username}")
+
+            return user_data_result
 
         except GithubException as e:
             logger.error(f"❌ GitHub API error for user {username}:")
@@ -412,8 +450,17 @@ class GitHubUserService:
             "topic_diversity": topic_diversity,
         }
 
-    async def _get_repositories(self, username: str, max_count: int) -> List[Dict[str, Any]]:
-        """Get user's repositories with details."""
+    async def _get_repositories(self, username: str, max_count: int, force_refresh: bool = False) -> List[Dict[str, Any]]:
+        """Get user's repositories with details and Redis caching."""
+        cache_key = f"github:repos:{username}:{max_count}"
+
+        # Check cache first (unless force refresh)
+        if not force_refresh:
+            cached_data = await get_cache(cache_key)
+            if cached_data:
+                logger.info(f"💨 CACHE HIT for repositories: {username}")
+                return cached_data
+
         try:
             if not self.github_client:
                 return []
@@ -448,6 +495,10 @@ class GitHubUserService:
 
                 repositories.append(repo_data)
                 count += 1
+
+            # Cache the result
+            await set_cache(cache_key, repositories, ttl=self.COMMIT_ANALYSIS_CACHE_TTL)
+            logger.info(f"💾 Cached repositories for: {username} ({len(repositories)} repos)")
 
             return repositories
 

@@ -59,14 +59,12 @@ async def _validate_environment() -> None:
     if settings.GITHUB_TOKEN:
         logger.info("✅ GITHUB_TOKEN is configured")
     else:
-        logger.error("❌ GITHUB_TOKEN is not configured!")
-        raise ValueError("GITHUB_TOKEN environment variable is required")
+        logger.warning("⚠️ GITHUB_TOKEN is not configured - GitHub functionality will be limited")
 
     if settings.GEMINI_API_KEY:
         logger.info("✅ GEMINI_API_KEY is configured")
     else:
-        logger.error("❌ GEMINI_API_KEY is not configured!")
-        raise ValueError("GEMINI_API_KEY environment variable is required")
+        logger.warning("⚠️ GEMINI_API_KEY is not configured - AI recommendations will not work")
 
 
 async def _initialize_database() -> None:

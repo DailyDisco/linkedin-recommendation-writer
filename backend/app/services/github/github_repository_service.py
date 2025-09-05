@@ -218,7 +218,7 @@ class GitHubRepositoryService:
             logger.info("-" * 40)
             repo_start = time.time()
 
-            repo_info = await self._get_repository_info(owner, repo_name)
+            repo_info = await self._get_repository_info(owner, repo_name, force_refresh)
             if not repo_info:
                 logger.error(f"❌ Failed to fetch repository info for {repository_full_name}")
                 logger.error("   • This is likely due to GitHub API authentication issues")
@@ -239,7 +239,7 @@ class GitHubRepositoryService:
             logger.info("-" * 40)
             lang_start = time.time()
 
-            repo_languages = await self._get_repository_languages(owner, repo_name)
+            repo_languages = await self._get_repository_languages(owner, repo_name, force_refresh)
 
             lang_end = time.time()
             logger.info(f"⏱️  Language analysis completed in {lang_end - lang_start:.2f} seconds")
@@ -364,8 +364,17 @@ class GitHubRepositoryService:
             logger.error(f"💥 ERROR analyzing repository {repository_full_name}: {e}")
             return None
 
-    async def _get_repository_info(self, owner: str, repo_name: str) -> Optional[Dict[str, Any]]:
-        """Get basic repository information."""
+    async def _get_repository_info(self, owner: str, repo_name: str, force_refresh: bool = False) -> Optional[Dict[str, Any]]:
+        """Get basic repository information with Redis caching."""
+        cache_key = f"github:repo_info:{owner}/{repo_name}"
+
+        # Check cache first (unless force refresh)
+        if not force_refresh:
+            cached_data = await get_cache(cache_key)
+            if cached_data:
+                logger.info(f"💨 CACHE HIT for repository info: {owner}/{repo_name}")
+                return cached_data
+
         try:
             if not self.github_client:
                 logger.error("🚨 GitHub client not initialized - cannot fetch repository info")
@@ -406,12 +415,62 @@ class GitHubRepositoryService:
                     "html_url": repo.owner.html_url,
                 },
             }
+
+            # Cache the result
+            repo_info_result = {
+                "name": repo.name,
+                "full_name": repo.full_name,
+                "description": repo.description,
+                "language": repo.language,
+                "languages_url": repo.languages_url,
+                "html_url": repo.html_url,
+                "clone_url": repo.clone_url,
+                "git_url": repo.git_url,
+                "ssh_url": repo.ssh_url,
+                "size": repo.size,
+                "stars": repo.stargazers_count,
+                "forks": repo.forks_count,
+                "watchers": repo.watchers_count,
+                "open_issues": repo.open_issues_count,
+                "has_issues": repo.has_issues,
+                "has_projects": repo.has_projects,
+                "has_wiki": repo.has_wiki,
+                "has_pages": repo.has_pages,
+                "archived": repo.archived,
+                "disabled": getattr(repo, "disabled", False),
+                "created_at": repo.created_at.isoformat() if repo.created_at else None,
+                "updated_at": repo.updated_at.isoformat() if repo.updated_at else None,
+                "pushed_at": repo.pushed_at.isoformat() if repo.pushed_at else None,
+                "topics": repo.get_topics(),
+                "visibility": getattr(repo, "visibility", "public"),  # For newer PyGitHub versions
+                "owner": {
+                    "login": repo.owner.login,
+                    "avatar_url": repo.owner.avatar_url,
+                    "html_url": repo.owner.html_url,
+                },
+            }
+
+            # Store in cache
+            await set_cache(cache_key, repo_info_result, ttl=self.COMMIT_ANALYSIS_CACHE_TTL)
+            logger.info(f"💾 Cached repository info for: {owner}/{repo_name}")
+
+            return repo_info_result
+
         except Exception as e:
             logger.error(f"Error fetching repository info for {owner}/{repo_name}: {e}")
             return None
 
-    async def _get_repository_languages(self, owner: str, repo_name: str) -> List[LanguageStats]:
-        """Get programming languages used in the repository."""
+    async def _get_repository_languages(self, owner: str, repo_name: str, force_refresh: bool = False) -> List[LanguageStats]:
+        """Get programming languages used in the repository with Redis caching."""
+        cache_key = f"github:repo_languages:{owner}/{repo_name}"
+
+        # Check cache first (unless force refresh)
+        if not force_refresh:
+            cached_data = await get_cache(cache_key)
+            if cached_data:
+                logger.info(f"💨 CACHE HIT for repository languages: {owner}/{repo_name}")
+                return cached_data
+
         try:
             if not self.github_client:
                 return []
@@ -435,6 +494,10 @@ class GitHubRepositoryService:
 
             # Sort by percentage
             language_stats.sort(key=lambda x: x.percentage, reverse=True)
+
+            # Cache the result
+            await set_cache(cache_key, language_stats, ttl=self.COMMIT_ANALYSIS_CACHE_TTL)
+            logger.info(f"💾 Cached languages for: {owner}/{repo_name} ({len(language_stats)} languages)")
 
             return language_stats
         except Exception as e:

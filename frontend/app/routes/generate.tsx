@@ -15,7 +15,7 @@ import RecommendationModal from '../components/RecommendationModal';
 import RegistrationModal from '../components/RegistrationModal';
 import { ContributorSkeleton } from '../components/ui/loading-skeleton';
 import ErrorBoundary from '../components/ui/error-boundary';
-import { ContributorCard } from '../components/ui/memo-components';
+import { LazyContributorList } from '../components/ui/memo-components';
 import { testRepositoryUrlParsing } from '../utils/debug-url-parser';
 import { useAuth } from '../hooks/useAuth'; // Import useAuth hook
 import { useRecommendationCount } from '../hooks/useRecommendationCount'; // Import anonymous count hook
@@ -719,16 +719,13 @@ export default function GeneratorPage() {
                     </div>
                   )}
 
-                  <div className='space-y-4 max-h-96 overflow-y-auto'>
-                    {parsedContributors.map(contributor => (
-                      <ContributorCard
-                        key={contributor.username}
-                        contributor={contributor}
-                        onWriteRecommendation={handleWriteRecommendation}
-                        mode={mode}
-                      />
-                    ))}
-                  </div>
+                  <LazyContributorList
+                    contributors={parsedContributors}
+                    onWriteRecommendation={handleWriteRecommendation}
+                    mode={mode}
+                    initialLoadSize={15}
+                    loadMoreSize={10}
+                  />
                 </div>
               ) : (
                 <div className='bg-gray-50 rounded-lg p-6 min-h-[300px] flex items-center justify-center text-gray-500'>

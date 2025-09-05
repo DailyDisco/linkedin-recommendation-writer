@@ -23,10 +23,10 @@ class Recommendation(Base):
 
     # Generation parameters
     # professional, technical, leadership, etc.
-    recommendation_type = Column(String, default="professional")
+    recommendation_type = Column(String, default="professional", index=True)
     # professional, friendly, formal, casual
-    tone = Column(String, default="professional")
-    length = Column(String, default="medium")  # short, medium, long
+    tone = Column(String, default="professional", index=True)
+    length = Column(String, default="medium", index=True)  # short, medium, long
 
     # AI generation metadata
     ai_model = Column(String, nullable=False)  # gemini-2.5-flash-lite, etc.
@@ -43,7 +43,7 @@ class Recommendation(Base):
     generated_options = Column(JSON, nullable=True)  # Store all generated options for reference
 
     # Metadata
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
@@ -64,8 +64,8 @@ class RecommendationVersion(Base):
     recommendation_id = Column(Integer, ForeignKey("recommendations.id"), nullable=False)
 
     # Version information
-    version_number = Column(Integer, nullable=False)  # 1, 2, 3, etc.
-    change_type = Column(String, nullable=False)  # 'created', 'refined', 'keyword_refinement', 'manual_edit'
+    version_number = Column(Integer, nullable=False, index=True)  # 1, 2, 3, etc.
+    change_type = Column(String, nullable=False, index=True)  # 'created', 'refined', 'keyword_refinement', 'manual_edit'
     change_description = Column(Text, nullable=True)  # Description of what changed
 
     # Keyword refinement specific metadata
@@ -83,7 +83,7 @@ class RecommendationVersion(Base):
     word_count = Column(Integer, default=0)
 
     # Metadata
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
     created_by = Column(String, nullable=True)  # 'system', 'user', etc.
 
     # Relationships
