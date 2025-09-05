@@ -1,5 +1,4 @@
 import React from 'react';
-import { AdvancedFeatures } from '@/components/AdvancedFeatures';
 import { useAuth } from '../hooks/useAuth';
 import {
   Card,
@@ -133,9 +132,9 @@ export default function UserProfilePage() {
                   <AvatarFallback className='bg-gray-600 text-white font-medium'>
                     {userDetails
                       ? getAvatarInitials(
-                          userDetails.username,
-                          userDetails.email
-                        )
+                        userDetails.username,
+                        userDetails.email
+                      )
                       : 'U'}
                   </AvatarFallback>
                 </Avatar>
@@ -376,23 +375,6 @@ export default function UserProfilePage() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Advanced Features Section */}
-      <Card className='shadow-sm hover:shadow-md transition-shadow duration-300'>
-        <CardHeader>
-          <CardTitle className='flex items-center gap-2'>
-            <Sparkles className='w-5 h-5 text-indigo-600' />
-            🤖 Advanced AI Tools
-          </CardTitle>
-          <CardDescription>
-            Unlock powerful capabilities to supercharge your professional
-            presence with cutting-edge AI technology
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <AdvancedFeatures />
-        </CardContent>
-      </Card>
     </div>
   );
 }
