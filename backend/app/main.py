@@ -7,8 +7,11 @@ LinkedIn recommendations.
 """
 
 import logging
+import os
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 from app.api.health import router as health_router
 from app.api.v1 import api_router
@@ -35,6 +38,30 @@ app = FastAPI(
 
 # Setup middleware
 setup_middleware(app)
+
+# Mount static files
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+if os.path.exists(static_dir):
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+    logger.info("📁 Static files mounted at /static")
+
+# Root route to serve the frontend
+@app.get("/")
+async def root():
+    """Serve the main frontend application."""
+    index_path = os.path.join(static_dir, "index.html") if os.path.exists(static_dir) else None
+
+    if index_path and os.path.exists(index_path):
+        logger.info("🎨 Serving frontend index.html")
+        return FileResponse(index_path)
+    else:
+        logger.warning("⚠️ Frontend index.html not found, returning API info")
+        return {
+            "message": "LinkedIn Recommendation Writer API",
+            "docs": "/docs" if settings.ENVIRONMENT != "production" else None,
+            "health": "/health",
+            "api": "/api/v1"
+        }
 
 # Include health check routes
 app.include_router(health_router, tags=["health"])
