@@ -6,13 +6,17 @@ import uuid
 from typing import Any, Awaitable, Callable, Dict
 
 from fastapi import Request, Response
+from starlette import status
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
 from app.core.config import settings
 from app.core.exceptions import (
+    AuthenticationError,
+    AuthorizationError,
     BaseApplicationError,
     NotFoundError,
+    RateLimitError,
     ValidationError,
 )
 from app.core.security_config import security_utils
@@ -231,17 +235,13 @@ class ErrorHandlingMiddleware(BaseHTTPMiddleware):
 
     def _get_status_code_for_error(self, error: BaseApplicationError) -> int:
         """Map error types to appropriate HTTP status codes."""
-        error_code_mapping = {
-            "VALIDATION_ERROR": 400,
-            "NOT_FOUND": 404,
-            "RATE_LIMIT_ERROR": 429,
-            "AUTHENTICATION_ERROR": 401,
-            "AUTHORIZATION_ERROR": 403,
-            "EXTERNAL_SERVICE_ERROR": 502,
-            "DATABASE_ERROR": 500,
-            "CACHE_ERROR": 500,
-            "CONFIGURATION_ERROR": 500,
-            "INPUT_SANITIZATION_ERROR": 400,
-        }
-
-        return error_code_mapping.get(error.error_code, 500)
+        if isinstance(error, AuthenticationError):
+            return status.HTTP_401_UNAUTHORIZED
+        elif isinstance(error, AuthorizationError):
+            return status.HTTP_403_FORBIDDEN
+        elif isinstance(error, RateLimitError):
+            return status.HTTP_429_TOO_MANY_REQUESTS
+        elif isinstance(error, NotFoundError):
+            return status.HTTP_404_NOT_FOUND
+        else:
+            return status.HTTP_500_INTERNAL_SERVER_ERROR

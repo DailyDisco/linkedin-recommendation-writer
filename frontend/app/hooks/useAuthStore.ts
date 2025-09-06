@@ -14,6 +14,10 @@ export interface AuthState {
     recommendation_count: number;
     last_recommendation_date: string | null;
     daily_limit: number;
+    bio?: string; // Add bio field
+    email_notifications_enabled?: boolean; // New field
+    default_tone?: string; // New field
+    language?: string; // New field
   } | null;
   userRecommendationCount: number | null; // Keep for backward compatibility
   userDailyLimit: number | null; // Keep for backward compatibility

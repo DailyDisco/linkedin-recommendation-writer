@@ -226,6 +226,9 @@ class APICSRFProtectionMiddleware(BaseHTTPMiddleware):
             or "/api/v1/auth/register" in request.url.path
             or "/api/v1/auth/login" in request.url.path
             or "/api/v1/auth/token" in request.url.path
+            or "/api/v1/auth/change-password" in request.url.path
+            or "/api/v1/users/me" in request.url.path
+            or request.url.path.startswith("/api/v1/users/")
         ):
             return await call_next(request)
 

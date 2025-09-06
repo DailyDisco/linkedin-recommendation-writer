@@ -18,6 +18,7 @@
 # Note: This must come AFTER the .env.*.local pattern to take precedence
 !.env.example
 todo.md
+backend_go
 
 # ==============================================
 # Python (Backend)

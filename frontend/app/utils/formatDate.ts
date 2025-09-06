@@ -1,7 +1,8 @@
-export function formatDate(date: string) {
-  return new Date(date).toLocaleDateString('en-US', {
+export function formatDate(dateString: string | null) {
+  if (!dateString) return 'Never';
+  return new Date(dateString).toLocaleDateString('en-US', {
     year: 'numeric',
-    month: 'long',
+    month: 'short',
     day: 'numeric',
   });
 }

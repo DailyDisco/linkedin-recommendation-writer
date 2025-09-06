@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
@@ -27,6 +27,10 @@ class User(Base):
     last_recommendation_date = Column(DateTime, nullable=True)  # Last date a recommendation was created
     daily_limit = Column(Integer, default=5)  # Daily recommendation limit (5 for registered users)
     role = Column(String, default="free", index=True)  # User role: admin, premium, or free
+    bio = Column(Text, nullable=True)  # Add bio field
+    email_notifications_enabled = Column(Boolean, default=True)  # New field for email notifications
+    default_tone = Column(String, default="professional")  # New field for default recommendation tone
+    language = Column(String, default="en")  # New field for user language preference (e.g., "en", "es")
 
     # Relationships
     github_profiles = relationship("GitHubProfile", back_populates="user")

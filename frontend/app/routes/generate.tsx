@@ -219,15 +219,15 @@ export default function GeneratorPage() {
           topics: result.repository.topics || [],
           owner: result.repository.owner
             ? {
-                login: result.repository.owner.login,
-                avatar_url: result.repository.owner.avatar_url || '',
-                html_url: result.repository.owner.html_url || '',
-              }
+              login: result.repository.owner.login,
+              avatar_url: result.repository.owner.avatar_url || '',
+              html_url: result.repository.owner.html_url || '',
+            }
             : {
-                login: result.repository.full_name.split('/')[0],
-                avatar_url: '',
-                html_url: '',
-              }, // Default owner if not present
+              login: result.repository.full_name.split('/')[0],
+              avatar_url: '',
+              html_url: '',
+            }, // Default owner if not present
         };
         setRepositoryInfo(repoInfo);
 
@@ -237,7 +237,7 @@ export default function GeneratorPage() {
           languagesCount: result.repository.language ? 1 : 0,
           hasRecentActivity: result.repository.updated_at
             ? new Date(result.repository.updated_at) >
-              new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+            new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
             : false,
         });
 
@@ -250,11 +250,14 @@ export default function GeneratorPage() {
         const result = await githubApi.analyzeProfile(username);
 
         // Check if background processing is in progress
-        if (
-          (result.user_data as any)?.processing &&
-          (result.user_data as any)?.task_id
-        ) {
-          const taskId = (result.user_data as any).task_id;
+        const userData = result.user_data as GitHubUserData & {
+          processing?: boolean;
+          task_id?: string;
+          full_name?: string;
+          github_username?: string;
+        };
+        if (userData?.processing && userData?.task_id) {
+          const taskId = userData.task_id;
 
           console.log(
             '🎯 FRONTEND: Background processing detected, polling for task:',
@@ -279,12 +282,9 @@ export default function GeneratorPage() {
 
             // Update progress message using the actual username
             const displayName =
-              (
-                (result.user_data as any).full_name ||
-                (result.user_data as any).name
-              )?.split(' ')[0] ||
-              (result.user_data as any).github_username ||
-              (result.user_data as any).login ||
+              (userData.full_name || userData.name)?.split(' ')[0] ||
+              userData.github_username ||
+              userData.login ||
               formData.input_value;
             setBackgroundProcessingMessage(
               `Analyzing ${displayName}'s GitHub profile and creating multiple options... (${attempts + 1}/${maxAttempts})`
@@ -340,7 +340,7 @@ export default function GeneratorPage() {
               languagesCount: 0, // We don't have language data for user profiles
               hasRecentActivity: userData.updated_at
                 ? new Date(userData.updated_at) >
-                  new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+                new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
                 : false,
             });
 
@@ -395,7 +395,7 @@ export default function GeneratorPage() {
             languagesCount: 0, // We don't have language data for user profiles
             hasRecentActivity: userData.updated_at
               ? new Date(userData.updated_at) >
-                new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+              new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
               : false,
           });
 
@@ -575,11 +575,10 @@ export default function GeneratorPage() {
                   <button
                     type='button'
                     onClick={() => setMode('repository')}
-                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                      mode === 'repository'
+                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${mode === 'repository'
                         ? 'bg-blue-600 text-white'
                         : 'text-gray-600 hover:text-gray-900'
-                    }`}
+                      }`}
                   >
                     <Users className='w-4 h-4' />
                     <span>Repository Mode</span>
@@ -587,11 +586,10 @@ export default function GeneratorPage() {
                   <button
                     type='button'
                     onClick={() => setMode('user')}
-                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                      mode === 'user'
+                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${mode === 'user'
                         ? 'bg-blue-600 text-white'
                         : 'text-gray-600 hover:text-gray-900'
-                    }`}
+                      }`}
                   >
                     <User className='w-4 h-4' />
                     <span>Single User</span>

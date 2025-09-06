@@ -29,6 +29,20 @@ class UserLogin(BaseModel):
     password: str
 
 
+class UserUpdate(UserBase):
+    """User update schema."""
+
+    # Fields that can be updated
+    full_name: Optional[str] = None
+    username: Optional[str] = None
+    bio: Optional[str] = None
+    email_notifications_enabled: Optional[bool] = None
+    default_tone: Optional[str] = None
+    language: Optional[str] = None
+
+    model_config = ConfigDict(extra="forbid")  # Forbid extra fields to prevent unexpected updates
+
+
 class UserResponse(UserBase):
     """User response schema."""
 
@@ -40,6 +54,10 @@ class UserResponse(UserBase):
     last_recommendation_date: Optional[datetime] = None
     daily_limit: int
     role: str
+    bio: Optional[str] = None
+    email_notifications_enabled: Optional[bool] = None
+    default_tone: Optional[str] = None
+    language: Optional[str] = None
 
 
 class Token(BaseModel):

@@ -20,6 +20,15 @@ def setup_middleware(app: FastAPI) -> None:
     Note: Middleware is executed in reverse order of addition.
     Last added middleware is executed first.
     """
+    # CORS middleware (must be added first to execute last)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origins,
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["*"],
+    )
+
     # Add custom middleware (order matters - last added is executed first)
     # Security middlewares (executed in reverse order)
     app.add_middleware(ErrorHandlingMiddleware)
@@ -38,12 +47,3 @@ def setup_middleware(app: FastAPI) -> None:
             RateLimitingMiddleware,
             requests_per_minute=settings.RATE_LIMIT_REQUESTS_PER_MINUTE,
         )
-
-    # CORS middleware
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.cors_origins,
-        allow_credentials=True,
-        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allow_headers=["*"],
-    )

@@ -201,3 +201,25 @@ class ConfigurationError(BaseApplicationError):
             details,
         )
         self.setting = setting
+
+
+class AuthenticationError(BaseApplicationError):
+    """Raised when user authentication fails."""
+
+    def __init__(
+        self,
+        message: str,
+        details: Optional[Dict[str, Any]] = None,
+    ):
+        super().__init__(message=message, error_code="AUTHENTICATION_ERROR", details=details, user_message="Authentication failed. Please check your credentials and try again.")
+
+
+class AuthorizationError(BaseApplicationError):
+    """Raised when user authorization fails."""
+
+    def __init__(
+        self,
+        message: str,
+        details: Optional[Dict[str, Any]] = None,
+    ):
+        super().__init__(message=message, error_code="AUTHORIZATION_ERROR", details=details, user_message="You don't have permission to perform this action.")

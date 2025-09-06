@@ -437,6 +437,29 @@ export const apiClient = {
     return response.data;
   },
 
+  async updateUserProfile(
+    userId: number,
+    data: {
+      full_name?: string;
+      username?: string;
+      bio?: string;
+      email_notifications_enabled?: boolean;
+      default_tone?: string;
+      language?: string;
+    }
+  ) {
+    const response = await api.put('/users/me', data);
+    return response.data;
+  },
+
+  async changePassword(data: {
+    current_password: string;
+    new_password: string;
+  }) {
+    const response = await api.put('/auth/change-password', data);
+    return response.data;
+  },
+
   async chatWithAssistant(data: {
     github_username: string;
     conversation_history: Array<{ role: string; content: string }>;

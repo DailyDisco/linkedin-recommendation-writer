@@ -738,6 +738,7 @@ async def regenerate_recommendation_stream(
     )
 
 
+@router.get("", response_model=RecommendationListResponse)
 @router.get("/", response_model=RecommendationListResponse)
 async def list_recommendations(
     github_username: Optional[str] = Query(None, description="Filter by GitHub username"),
