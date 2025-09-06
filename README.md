@@ -1,6 +1,15 @@
+<div align="center">
+
 # LinkedIn Recommendation Writer
 
+_(Your Logo Here)_
+
+</div>
+
 [![Live Demo](https://img.shields.io/badge/Live_Demo-View_App-brightgreen?style=flat&logo=vercel)](https://linkedin-recommendation-writer-production.up.railway.app/)
+[![CI/CD Pipeline](https://github.com/day0009/linkedin-recommendation-writer-app/actions/workflows/ci.yml/badge.svg)](https://github.com/day0009/linkedin-recommendation-writer-app/actions/workflows/ci.yml)
+[![Python CI](https://github.com/day0009/linkedin-recommendation-writer-app/actions/workflows/python-ci.yml/badge.svg)](https://github.com/day0009/linkedin-recommendation-writer-app/actions/workflows/python-ci.yml)
+[![React CI](https://github.com/day0009/linkedin-recommendation-writer-app/actions/workflows/react-ci.yml/badge.svg)](https://github.com/day0009/linkedin-recommendation-writer-app/actions/workflows/react-ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=flat&logo=docker&logoColor=white)](https://docker.com)
 
@@ -10,6 +19,7 @@ Generate professional LinkedIn recommendations using GitHub data and AI.
 
 - [🌐 Live Demo](#-live-demo)
 - [✨ Features](#-features)
+- [🏗️ Project Architecture](#️-project-architecture)
 - [💻 Technology Stack](#-technology-stack)
 - [🚀 Deployment](#-deployment)
 - [🛠️ Installation & Local Development](#️-installation--local-development)
@@ -34,35 +44,62 @@ _(Add your application screenshots or GIFs here to showcase key features.)_
 - 💾 **History Tracking**: Save and manage all generated recommendations
 - 🚀 **Fast Results**: Intelligent caching for quick responses
 
+## 🏗️ Project Architecture
+
+The project is organized into a monorepo structure with distinct frontend and backend directories, promoting a clean separation of concerns.
+
+```
+linkedin-recommendation-writer-app/
+├── .github/          # GitHub Actions workflows for CI/CD
+├── backend/          # FastAPI application
+│   ├── app/          # Core application code
+│   │   ├── api/      # API endpoints (routers)
+│   │   ├── core/     # Configuration and core settings
+│   │   ├── models/   # SQLAlchemy database models
+│   │   └── services/ # Business logic and services
+│   ├── alembic/      # Database migrations
+│   └── tests/        # Backend tests
+├── frontend/         # React (Vite) application
+│   ├── app/          # Source code for the frontend
+│   │   ├── components/ # Reusable UI components
+│   │   ├── routes/     # Page components and layouts
+│   │   ├── services/   # API communication layer
+│   │   └── hooks/      # Custom React hooks
+│   └── tests/        # Frontend tests
+├── deployment/       # Deployment scripts and guides
+├── docker/           # Docker configurations
+└── scripts/          # Helper scripts for development
+```
+
 ## 💻 Technology Stack
 
 This project leverages a modern full-stack architecture with the following key technologies:
 
 **Frontend:**
 
-- **React 19**: A JavaScript library for building user interfaces.
-- **React Router 7**: Full-stack web framework with file-based routing.
-- **Tailwind CSS 4**: A utility-first CSS framework for styling.
+- **React 19.1.1**: A JavaScript library for building user interfaces.
+- **React Router 7.7.1**: Full-stack web framework with file-based routing.
+- **Tailwind CSS 4.1.12**: A utility-first CSS framework for styling.
 - **ShadCN UI**: A collection of reusable components built with Radix UI and Tailwind CSS.
-- **Vite 7**: Fast build tool and development server.
-- **TypeScript**: Type-safe JavaScript development.
-- **Vitest**: Modern testing framework for unit and integration tests.
+- **Vite 7.1.3**: Fast build tool and development server.
+- **TypeScript 5.9.2**: Type-safe JavaScript development.
+- **Vitest 3.2.4**: Modern testing framework for unit and integration tests.
 
 **Backend:**
 
-- **FastAPI 0.116**: A modern, fast web framework for building APIs with Python.
+- **FastAPI 0.116.1**: A modern, fast web framework for building APIs with Python.
 - **Python 3.11+**: Modern Python with type hints and async support.
-- **Pydantic 2.11**: Data validation and settings management using Python type hints.
-- **SQLAlchemy 2.0**: Async-capable SQL toolkit and Object-Relational Mapper (ORM).
+- **Pydantic 2.11.7**: Data validation and settings management using Python type hints.
+- **SQLAlchemy 2.0.43**: Async-capable SQL toolkit and Object-Relational Mapper (ORM).
 - **PostgreSQL**: A powerful, open-source object-relational database system.
-- **Redis 6.4**: In-memory data store for caching and session management.
-- **Alembic**: Database migration tool for SQLAlchemy.
-- **Celery**: Distributed task queue for background processing.
+- **Redis 6.4.0**: In-memory data store for caching and session management.
+- **Alembic 1.16.5**: Database migration tool for SQLAlchemy.
+- **Celery 5.5.3**: Distributed task queue for background processing.
 
 **AI/Machine Learning:**
 
-- **Google Gemini 2.5 Flash**: Advanced AI model for natural language processing and recommendation generation.
-- **PyGithub**: Python library for GitHub API integration and repository analysis.
+- **Google Gemini 1.32.0**: Advanced AI model for natural language processing and recommendation generation.
+- **PyGithub 2.7.0**: Python library for GitHub API integration and repository analysis.
 - **Structured Analysis**: Advanced GitHub profile and repository analysis with skill extraction.
 
 **Deployment & Containerization:**
