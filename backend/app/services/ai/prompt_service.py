@@ -459,7 +459,7 @@ class PromptService:
             "- **PARAGRAPH STRUCTURE**: Create 3-4 distinct paragraphs telling a cohesive story",
             "- **STORYTELLING FLOW**: Opening impression → Specific examples → Character qualities → Strong endorsement",
             "- **NATURAL LANGUAGE**: Use 'I've seen...', 'They consistently...', 'What impresses me...' style phrasing",
-            "- **AVOID**: Technical metrics, commit counts, PR numbers, or any robotic language",
+            "- **AVOID**: Robotic phrases (e.g., 'demonstrates expertise'), buzzwords (e.g., 'passionate', 'team player'), and generic statements (e.g., 'worked on various projects'). Focus on specific evidence instead.",
             "- **FOCUS**: Personal qualities, work impact, and genuine professional admiration",
         ]
 

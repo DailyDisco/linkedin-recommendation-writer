@@ -522,20 +522,7 @@ class AIRecommendationService:
             display_name = self.prompt_service._extract_display_name(github_data["user_data"])
 
         # Generate 2 different options with varying approaches
-        option_configs = [
-            {
-                "name": "Option 1",
-                "focus": "technical_expertise",
-                "temperature_modifier": 0.1,
-                "custom_instruction": "Focus on technical skills and problem-solving abilities.",
-            },
-            {
-                "name": "Option 2",
-                "focus": "collaboration",
-                "temperature_modifier": 0.2,
-                "custom_instruction": "Emphasize teamwork and collaborative abilities.",
-            },
-        ]
+        option_configs = self._get_dynamic_option_configs(github_data)
 
         for i, config in enumerate(option_configs, 1):
             logger.info(f"📝 GENERATING {config['name']}: {config['focus']}")
@@ -595,6 +582,50 @@ class AIRecommendationService:
         logger.info("=" * 60)
 
         return options
+
+    def _get_dynamic_option_configs(self, github_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Generate dynamic recommendation options based on inferred personality traits."""
+        trait_to_instruction = {
+            "detail_oriented": "Focus on their methodical and detail-oriented approach, highlighting precision and thoroughness.",
+            "strategic_thinker": "Emphasize their ability to see the big picture and design scalable solutions.",
+            "problem_solver": "Highlight their skill in debugging and solving complex technical challenges.",
+            "collaborator": "Focus on their teamwork, communication, and ability to work effectively with others.",
+            "reliable": "Showcase their consistency, dependability, and the quality of their contributions.",
+            "innovative": "Highlight their creativity and use of new technologies to solve problems.",
+            "technical_expertise": "Focus on technical skills and problem-solving abilities.",
+        }
+
+        inferred_traits = self.story_generator.infer_personality_traits(github_data.get("commit_analysis", {}), github_data.get("pr_data"))
+
+        unique_traits = []
+        for trait_info in inferred_traits:
+            if trait_info["trait"] not in unique_traits:
+                unique_traits.append(trait_info["trait"])
+
+        focuses = unique_traits[:2]
+
+        # Fallback logic
+        if not focuses:
+            focuses = ["technical_expertise", "collaboration"]
+        elif len(focuses) == 1:
+            if focuses[0] == "collaboration":
+                focuses.insert(0, "technical_expertise")
+            else:
+                focuses.append("collaboration")
+
+        option_configs = []
+        for i, focus in enumerate(focuses, 1):
+            instruction = trait_to_instruction.get(focus, f"Emphasize their {focus.replace('_', ' ')}.")
+            option_configs.append(
+                {
+                    "name": f"Option {i}",
+                    "focus": focus,
+                    "temperature_modifier": 0.1 * i,
+                    "custom_instruction": instruction,
+                }
+            )
+
+        return option_configs
 
     def _generate_option_explanation(self, option_content: str, option_name: str, focus: str, github_data: Dict[str, Any], display_name: Optional[str] = None) -> str:
         """Generate a concise explanation for why to choose this recommendation option."""
