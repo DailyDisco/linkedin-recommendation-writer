@@ -1433,7 +1433,14 @@ class RecommendationService:
 
                 # Get repository data
                 logger.info(f"🔍 DEBUG: Calling repository_service.analyze_repository for {owner}/{repo}")
-                repository_data = await self.repository_service.analyze_repository(f"{owner}/{repo}", force_refresh=False, analysis_context_type=analysis_context_type, repository_url=repository_url)
+                # CRITICAL: Pass target_username for repo_only context to ensure commit filtering
+                repository_data = await self.repository_service.analyze_repository(
+                    f"{owner}/{repo}",
+                    force_refresh=False,
+                    analysis_context_type=analysis_context_type,
+                    repository_url=repository_url,
+                    target_username=github_username if analysis_context_type == "repo_only" else None,
+                )
                 logger.info(f"🔍 DEBUG: Repository data returned keys: {list(repository_data.keys()) if repository_data else 'None'}")
                 if repository_data:
                     logger.info("🔍 DEBUG: Repository data structure sample:")

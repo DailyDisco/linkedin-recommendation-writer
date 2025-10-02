@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/bash
 set -euo pipefail
 
 # Colors for output
@@ -44,43 +44,50 @@ if [ -n "$HAS_BACKEND" ]; then
     exit 1
   fi
 
-  # Run backend import sorting
-  if ! (cd backend && python -m isort --check-only --diff app/); then
-    echo -e "${YELLOW}⚠️  Python import sorting check failed${NC}"
-    echo -e "${BLUE}🔧 Running isort to fix imports...${NC}"
-    if (cd backend && python -m isort app/); then
-      echo -e "${GREEN}✅ Python import sorting completed successfully${NC}"
-      echo -e "${YELLOW}📝 Staged files have been updated with sorted imports${NC}"
+  # Check if Python tools are available
+  if ! python3 -m isort --version >/dev/null 2>&1; then
+    echo -e "${YELLOW}⚠️  Python tools (isort, black, flake8) not found in system Python${NC}"
+    echo -e "${CYAN}💡 Backend is likely containerized. Skipping Python checks.${NC}"
+    echo -e "${CYAN}   To enable checks, install tools: pip install isort black flake8${NC}"
+  else
+    # Run backend import sorting
+    if ! (cd backend && python3 -m isort --check-only --diff app/); then
+      echo -e "${YELLOW}⚠️  Python import sorting check failed${NC}"
+      echo -e "${BLUE}🔧 Running isort to fix imports...${NC}"
+      if (cd backend && python3 -m isort app/); then
+        echo -e "${GREEN}✅ Python import sorting completed successfully${NC}"
+        echo -e "${YELLOW}📝 Staged files have been updated with sorted imports${NC}"
+      else
+        echo -e "${RED}❌ Python import sorting failed${NC}"
+        failed=1
+      fi
     else
-      echo -e "${RED}❌ Python import sorting failed${NC}"
-      failed=1
+      echo -e "${GREEN}✅ Python import sorting check completed successfully${NC}"
     fi
-  else
-    echo -e "${GREEN}✅ Python import sorting check completed successfully${NC}"
-  fi
 
-  # Run backend formatting check
-  if ! (cd backend && python -m black --check --diff app/); then
-    echo -e "${YELLOW}⚠️  Python formatting check failed${NC}"
-    echo -e "${BLUE}🔧 Running black to fix formatting...${NC}"
-    if (cd backend && python -m black app/); then
-      echo -e "${GREEN}✅ Python formatting fix completed successfully${NC}"
-      echo -e "${YELLOW}📝 Staged files have been updated with formatted Python code${NC}"
+    # Run backend formatting check
+    if ! (cd backend && python3 -m black --check --diff app/); then
+      echo -e "${YELLOW}⚠️  Python formatting check failed${NC}"
+      echo -e "${BLUE}🔧 Running black to fix formatting...${NC}"
+      if (cd backend && python3 -m black app/); then
+        echo -e "${GREEN}✅ Python formatting fix completed successfully${NC}"
+        echo -e "${YELLOW}📝 Staged files have been updated with formatted Python code${NC}"
+      else
+        echo -e "${RED}❌ Python formatting fix failed${NC}"
+        failed=1
+      fi
     else
-      echo -e "${RED}❌ Python formatting fix failed${NC}"
-      failed=1
+      echo -e "${GREEN}✅ Python formatting check completed successfully${NC}"
     fi
-  else
-    echo -e "${GREEN}✅ Python formatting check completed successfully${NC}"
-  fi
 
-  # Run backend linting check
-  if ! python -m flake8 --max-line-length=250 --extend-ignore=E203,W503 backend/app/; then
-    echo -e "${RED}❌ Python linting check failed${NC}"
-    echo -e "${YELLOW}💡 Fix the linting issues above${NC}"
-    failed=1
-  else
-    echo -e "${GREEN}✅ Python linting check completed successfully${NC}"
+    # Run backend linting check
+    if ! python3 -m flake8 --max-line-length=250 --extend-ignore=E203,W503 backend/app/; then
+      echo -e "${RED}❌ Python linting check failed${NC}"
+      echo -e "${YELLOW}💡 Fix the linting issues above${NC}"
+      failed=1
+    else
+      echo -e "${GREEN}✅ Python linting check completed successfully${NC}"
+    fi
   fi
 fi
 

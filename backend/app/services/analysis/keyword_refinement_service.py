@@ -122,7 +122,15 @@ class KeywordRefinementService:
                     # Group sentences into paragraphs
                     paragraphs = []
                     current_paragraph = []
-                    sentences_per_paragraph = max(2, len(sentences) // 3)  # Aim for 3 paragraphs
+                    # Determine target paragraphs based on length if available
+                    target_paragraphs = 2  # Default medium
+                    if generation_params:
+                        target_length = generation_params.get("length", "medium")
+                        if target_length == "short":
+                            target_paragraphs = 1
+                        elif target_length == "long":
+                            target_paragraphs = 3
+                    sentences_per_paragraph = max(2, len(sentences) // target_paragraphs)
 
                     for i, sentence in enumerate(sentences):
                         current_paragraph.append(sentence + ".")

@@ -171,19 +171,24 @@ class GitHubRepositoryService:
         return parts[-1] if len(parts) > 1 else ""
 
     async def analyze_repository(
-        self, repository_full_name: str, force_refresh: bool = False, analysis_context_type: str = "profile", repository_url: Optional[str] = None
+        self, repository_full_name: str, force_refresh: bool = False, analysis_context_type: str = "profile", repository_url: Optional[str] = None, target_username: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
-        """Analyze a specific GitHub repository and return comprehensive data."""
+        """Analyze a specific GitHub repository and return comprehensive data.
+
+        Args:
+            target_username: For repo_only context, only analyze commits from this specific user
+        """
         import time
 
         logger.info("📁 REPOSITORY ANALYSIS STARTED")
         logger.info("=" * 60)
         logger.info(f"🏗️  Target repository: {repository_full_name}")
         logger.info(f"🔄 Force refresh: {force_refresh}")
+        logger.info(f"👤 Target user (repo_only): {target_username if analysis_context_type == 'repo_only' else 'N/A'}")
 
         analysis_start = time.time()
 
-        # Create context-aware cache key
+        # Create context-aware cache key - include target_username for repo_only to prevent cross-contamination
         context_suffix = ""
         if analysis_context_type != "profile":
             context_suffix = f":{analysis_context_type}"
@@ -191,6 +196,9 @@ class GitHubRepositoryService:
                 # Use the provided repository URL for consistency
                 repo_path = repository_url.replace("https://github.com/", "").split("?")[0]
                 context_suffix += f":{repo_path}"
+            # CRITICAL: Include target_username in cache key for repo_only to prevent data contamination
+            if analysis_context_type == "repo_only" and target_username:
+                context_suffix += f":user_{target_username}"
 
         cache_key = f"repository:{repository_full_name}{context_suffix}"
 
@@ -239,18 +247,30 @@ class GitHubRepositoryService:
             logger.info("-" * 40)
             lang_start = time.time()
 
-            repo_languages = await self._get_repository_languages(owner, repo_name, force_refresh)
+            # CRITICAL: For repo_only context, only analyze languages from user's commits, not all repository languages
+            if analysis_context_type == "repo_only" and target_username:
+                logger.info(f"🔒 REPO_ONLY: Extracting languages ONLY from {target_username}'s commits")
+                # We'll extract languages from the user's commits later, after we get them
+                repo_languages = []  # Start with empty - will be filled from user's commits
+            else:
+                repo_languages = await self._get_repository_languages(owner, repo_name, force_refresh)
 
             lang_end = time.time()
             logger.info(f"⏱️  Language analysis completed in {lang_end - lang_start:.2f} seconds")
             logger.info(f"✅ Found {len(repo_languages) if repo_languages else 0} programming languages in repository")
 
             # Get repository commits (limited for performance)
+            # CRITICAL: For repo_only context, only get commits from target user
             logger.info("📝 STEP 3: ANALYZING REPOSITORY COMMITS")
             logger.info("-" * 40)
             commits_start = time.time()
 
-            repo_commits = await self._get_repository_commits(owner, repo_name, limit=50)
+            if analysis_context_type == "repo_only" and target_username:
+                logger.info(f"🔒 REPO_ONLY: Fetching commits ONLY from user: {target_username}")
+                repo_commits = await self._get_repository_commits_by_user(owner, repo_name, target_username, limit=50)
+            else:
+                logger.info("📝 Fetching all repository commits...")
+                repo_commits = await self._get_repository_commits(owner, repo_name, limit=50)
 
             commits_end = time.time()
             logger.info(f"⏱️  Commit analysis completed in {commits_end - commits_start:.2f} seconds")
@@ -266,6 +286,12 @@ class GitHubRepositoryService:
             logger.info("🔧 STEP 4: EXTRACTING REPOSITORY SKILLS")
             logger.info("-" * 40)
             skills_start = time.time()
+
+            # CRITICAL: For repo_only context, extract languages from user's commit files
+            if analysis_context_type == "repo_only" and target_username and not repo_languages:
+                logger.info(f"🔒 REPO_ONLY: Extracting languages from {target_username}'s commit files")
+                repo_languages = self._extract_languages_from_user_commits(repo_commits, target_username)
+                logger.info(f"✅ Found {len(repo_languages)} languages from user's commits: {[lang.language for lang in repo_languages]}")
 
             try:
                 repo_skills = await self._extract_repository_skills(repo_info, repo_languages, repo_commits)
@@ -329,8 +355,19 @@ class GitHubRepositoryService:
                     "commit_analysis": commit_patterns,
                     "analyzed_at": datetime.utcnow().isoformat(),
                     "analysis_time_seconds": round(total_time, 2),
-                    "analysis_context_type": "repository",
+                    "analysis_context_type": analysis_context_type,
                 }
+
+                # CRITICAL: Validate repo_only data isolation
+                if analysis_context_type == "repo_only" and target_username:
+                    validation_result = self._validate_repo_only_isolation(result, target_username)
+                    if not validation_result["is_valid"]:
+                        logger.error("🚨 CRITICAL: Repo-only data contamination detected!")
+                        for issue in validation_result["issues"]:
+                            logger.error(f"   • {issue}")
+                        raise ValueError(f"Repo-only data contamination: {validation_result['issues']}")
+                    logger.info("✅ REPO_ONLY: Data isolation validation PASSED")
+
                 logger.info("✅ Final result constructed successfully")
             except Exception as result_error:
                 logger.error(f"💥 Error constructing final result: {result_error}")
@@ -560,6 +597,213 @@ class GitHubRepositoryService:
         except Exception as e:
             logger.error(f"Error fetching commits for {owner}/{repo_name}: {e}")
             return []
+
+    async def _get_repository_commits_by_user(self, owner: str, repo_name: str, target_username: str, limit: int = 50) -> List[Dict[str, Any]]:
+        """Get commits from the repository filtered by a specific user (for repo_only context)."""
+        try:
+            if not self.github_client:
+                return []
+
+            repo = self.github_client.get_repo(f"{owner}/{repo_name}")
+
+            # Get commits filtered by author
+            commits = repo.get_commits(author=target_username)
+
+            commit_data = []
+            count = 0
+            for commit in commits:  # type: Any
+                if count >= limit:
+                    break
+
+                # Double-check that this commit is by the target user
+                commit_author = commit.author.login if commit.author else None
+                commit_committer = commit.committer.login if commit.committer else None
+
+                if commit_author == target_username or commit_committer == target_username:
+                    commit_data.append(
+                        {
+                            "sha": commit.sha,
+                            "message": commit.commit.message,
+                            "author": {
+                                "name": (commit.commit.author.name if commit.commit.author else None),
+                                "email": (commit.commit.author.email if commit.commit.author else None),
+                                "date": (commit.commit.author.date.isoformat() if commit.commit.author else None),
+                                "login": commit_author,  # Add GitHub username for verification
+                            },
+                            "committer": {
+                                "name": (commit.commit.committer.name if commit.commit.committer else None),
+                                "email": (commit.commit.committer.email if commit.commit.committer else None),
+                                "date": (commit.commit.committer.date.isoformat() if commit.commit.committer else None),
+                                "login": commit_committer,  # Add GitHub username for verification
+                            },
+                            "stats": (
+                                {
+                                    "additions": (commit.stats.additions if commit.stats and hasattr(commit.stats, "additions") and commit.stats.additions is not None else 0),
+                                    "deletions": (commit.stats.deletions if commit.stats and hasattr(commit.stats, "deletions") and commit.stats.deletions is not None else 0),
+                                    "total": (commit.stats.total if commit.stats and hasattr(commit.stats, "total") and commit.stats.total is not None else 0),
+                                }
+                                if commit.stats
+                                else None
+                            ),
+                            "files": (
+                                [
+                                    {
+                                        "filename": f.filename,
+                                        "additions": f.additions,
+                                        "deletions": f.deletions,
+                                        "changes": f.changes,
+                                        "status": f.status,
+                                    }
+                                    for f in commit.files
+                                ]
+                                if commit.files
+                                else []
+                            ),
+                            "html_url": commit.html_url,
+                        }
+                    )
+                    count += 1
+
+            logger.info(f"🔒 REPO_ONLY: Found {len(commit_data)} commits by user {target_username} in {owner}/{repo_name}")
+            return commit_data
+
+        except Exception as e:
+            logger.error(f"Error fetching commits by user {target_username} from repository {owner}/{repo_name}: {e}")
+            return []
+
+    def _extract_languages_from_user_commits(self, commits: List[Dict[str, Any]], target_username: str) -> List[LanguageStats]:
+        """Extract languages from file extensions in user's commits (for repo_only context)."""
+        try:
+            # Map file extensions to languages
+            extension_to_language = {
+                ".py": "Python",
+                ".js": "JavaScript",
+                ".jsx": "JavaScript",
+                ".ts": "TypeScript",
+                ".tsx": "TypeScript",
+                ".java": "Java",
+                ".cpp": "C++",
+                ".cxx": "C++",
+                ".cc": "C++",
+                ".c": "C",
+                ".h": "C",
+                ".hpp": "C++",
+                ".cs": "C#",
+                ".php": "PHP",
+                ".rb": "Ruby",
+                ".go": "Go",
+                ".rs": "Rust",
+                ".swift": "Swift",
+                ".kt": "Kotlin",
+                ".scala": "Scala",
+                ".sh": "Shell",
+                ".bash": "Shell",
+                ".sql": "SQL",
+                ".html": "HTML",
+                ".css": "CSS",
+                ".scss": "SCSS",
+                ".sass": "Sass",
+                ".less": "Less",
+                ".vue": "Vue",
+                ".r": "R",
+                ".R": "R",
+                ".m": "Objective-C",
+                ".mm": "Objective-C++",
+                ".dart": "Dart",
+                ".lua": "Lua",
+                ".pl": "Perl",
+                ".pm": "Perl",
+                ".ex": "Elixir",
+                ".exs": "Elixir",
+                ".clj": "Clojure",
+                ".elm": "Elm",
+                ".hs": "Haskell",
+                ".ml": "OCaml",
+                ".fs": "F#",
+                ".jl": "Julia",
+                ".nim": "Nim",
+                ".cr": "Crystal",
+                ".zig": "Zig",
+            }
+
+            language_counts = {}
+
+            # Count files by language for user's commits only
+            for commit in commits:
+                commit_author = commit.get("author", {}).get("login")
+                commit_committer = commit.get("committer", {}).get("login")
+
+                # Only process commits by the target user
+                if commit_author == target_username or commit_committer == target_username:
+                    files = commit.get("files", [])
+                    for file in files:
+                        filename = file.get("filename", "")
+                        if "." in filename:
+                            # Get file extension
+                            extension = "." + filename.split(".")[-1].lower()
+                            if extension in extension_to_language:
+                                language = extension_to_language[extension]
+                                # Count additions + deletions as measure of language usage
+                                changes = file.get("additions", 0) + file.get("deletions", 0)
+                                language_counts[language] = language_counts.get(language, 0) + changes
+
+            # Convert to LanguageStats format
+            from app.models.github_models import LanguageStats
+
+            language_stats = []
+            total_changes = sum(language_counts.values())
+
+            if total_changes > 0:
+                for language, changes in sorted(language_counts.items(), key=lambda x: x[1], reverse=True):
+                    percentage = (changes / total_changes) * 100
+                    language_stats.append(LanguageStats(language=language, bytes=changes, percentage=percentage))  # Use changes as proxy for bytes
+
+            logger.info(f"🔒 REPO_ONLY: Extracted {len(language_stats)} languages from {target_username}'s commits")
+            return language_stats
+
+        except Exception as e:
+            logger.error(f"Error extracting languages from user commits: {e}")
+            return []
+
+    def _validate_repo_only_isolation(self, result: Dict[str, Any], target_username: str) -> Dict[str, Any]:
+        """Validate that repo_only result contains ONLY data from the target user."""
+        validation = {"is_valid": True, "issues": [], "warnings": []}
+
+        # Check commits - all should be from target user
+        commits = result.get("commits", [])
+        if commits:
+            non_user_commits = 0
+            for commit in commits:
+                commit_author = commit.get("author", {}).get("login")
+                commit_committer = commit.get("committer", {}).get("login")
+
+                if commit_author != target_username and commit_committer != target_username:
+                    non_user_commits += 1
+
+            if non_user_commits > 0:
+                validation["is_valid"] = False
+                validation["issues"].append(f"Found {non_user_commits} commits not by target user {target_username}")
+            else:
+                logger.info(f"✅ All {len(commits)} commits are from target user {target_username}")
+
+        # Check languages - should only be from user's commits
+        languages = result.get("languages", [])
+        if languages:
+            logger.info(f"✅ Languages extracted from user's commits: {[lang.language for lang in languages[:5]]}")
+
+        # Check analysis context type
+        if result.get("analysis_context_type") != "repo_only":
+            validation["is_valid"] = False
+            validation["issues"].append("analysis_context_type is not 'repo_only'")
+
+        # Verify no general profile data leaked in
+        forbidden_fields = ["starred_repositories", "organizations", "bio", "company", "location"]
+        for field in forbidden_fields:
+            if field in result:
+                validation["is_valid"] = False
+                validation["issues"].append(f"Forbidden profile field '{field}' found in repo_only result")
+
+        return validation
 
     async def _extract_repository_skills(
         self,

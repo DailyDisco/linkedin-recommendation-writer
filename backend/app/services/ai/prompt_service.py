@@ -53,8 +53,18 @@ class PromptService:
                     extracted_name = self._extract_name_from_username(repo_owner)
                     person_reference = extracted_name if extracted_name else repo_owner
 
-        # Build human narrative sections using story generator
+        # Build human narrative sections using enhanced story generator
         narrative_sections = self.story_generator.build_human_prompt_sections(github_data, analysis_context_type, display_name=person_reference)
+
+        # Generate specific stories for more authentic recommendations
+        specific_stories = self.story_generator.generate_specific_stories(github_data)
+
+        # Determine relationship context for appropriate voice
+        relationship_context = self.story_generator.determine_relationship_context(github_data)
+
+        # Store relationship context for use in generation parameters
+        if not hasattr(self, "_current_relationship_context"):
+            self._current_relationship_context = relationship_context
 
         # Base prompt structure with storytelling approach
         prompt_parts = [
@@ -200,12 +210,20 @@ class PromptService:
                         if patterns.get("most_active_month"):
                             prompt_parts.append(f"- Most active development period: {patterns['most_active_month']}")
 
-                # Add human story elements from contributor summary
+                # Add human story elements from contributor summary and specific stories
                 contributor_summary = github_data.get("contributor_commit_summary", {})
                 if contributor_summary and contributor_summary.get("total_commits", 0) > 0:
                     logger.info("🔍 PROMPT SERVICE: Adding human story elements from contributor summary")
                     prompt_parts.append("")
                     prompt_parts.append("PERSONAL OBSERVATIONS ABOUT THEIR WORK:")
+
+                    # Add specific stories from enhanced generator
+                    if specific_stories:
+                        prompt_parts.append("")
+                        prompt_parts.append("SPECIFIC INCIDENTS AND EXAMPLES:")
+                        for story in specific_stories[:3]:  # Top 3 stories
+                            prompt_parts.append(f"- {story}")
+                        logger.info(f"✅ Added {len(specific_stories[:3])} specific stories to prompt")
 
                     # Convert technical data to human stories
                     stories = self.story_generator.convert_technical_to_story(github_data, context_type)
@@ -259,6 +277,17 @@ class PromptService:
                 prompt_parts.append("- NEVER mention commit numbers, PR counts, or technical IDs")
                 prompt_parts.append("- Transform technical achievements into workplace stories")
                 prompt_parts.append("- Focus on outcomes and impact, not process metrics")
+
+                # Add relationship-specific voice guidance
+                relationship_contexts = self.story_generator.relationship_contexts
+                if relationship_context in relationship_contexts:
+                    context_info = relationship_contexts[relationship_context]
+                    prompt_parts.append("")
+                    prompt_parts.append(f"RELATIONSHIP VOICE ({relationship_context.upper()}):")
+                    for pattern in context_info.get("voice_patterns", []):
+                        prompt_parts.append(f"- Use phrases like: '{pattern}'")
+                    prompt_parts.append(f"- Write from {', '.join(context_info.get('perspectives', []))} perspective")
+                    logger.info(f"✅ Added {relationship_context} relationship context to prompt")
 
                 # LOG THE COMPLETE PROMPT FOR DEBUGGING
                 final_prompt = "\n".join(prompt_parts)
@@ -449,7 +478,7 @@ class PromptService:
                 ]
             )
 
-        # Add natural formatting and storytelling guidelines
+        # Add natural formatting and storytelling guidelines with enhanced human-like instructions
         base_guidelines = [
             "\nNATURAL RECOMMENDATION WRITING INSTRUCTIONS:",
             "- Write as a colleague who genuinely knows and respects this person",
@@ -462,6 +491,40 @@ class PromptService:
             "- **AVOID**: Robotic phrases (e.g., 'demonstrates expertise'), buzzwords (e.g., 'passionate', 'team player'), and generic statements (e.g., 'worked on various projects'). Focus on specific evidence instead.",
             "- **FOCUS**: Personal qualities, work impact, and genuine professional admiration",
         ]
+
+        # Advanced storytelling guidelines
+        advanced_storytelling = [
+            "\nADVANCED STORYTELLING TECHNIQUES:",
+            "- Use progression: Show how you came to understand their qualities over time",
+            "- Include micro-details: 'the way they approach debugging', 'their method for code reviews'",
+            "- Show impact chains: 'When they did X, it led to Y, which resulted in Z'",
+            "- Use contrasting examples: 'Unlike typical developers who..., they instead...'",
+            "- Include timing context: 'During our Q3 push when everything was chaotic...'",
+            "- Use sensory language: 'I could see their thought process', 'their methodical approach'",
+            "- Add emotional reactions: 'I was impressed when...', 'It was remarkable to see...'",
+            "- Include consequences: 'This approach meant that..., which ultimately...'",
+            "- Use specific scenarios: 'There was this one time when...'",
+            "- Show team dynamics: 'The whole team noticed when they...'",
+            "- **CRITICAL**: Every sentence should sound like something a real colleague would say",
+        ]
+
+        # Enhanced human voice requirements
+        human_voice_requirements = [
+            "\nHUMAN VOICE REQUIREMENTS:",
+            "- MANDATORY: Include at least 3 first-person statements ('I', 'my', 'we')",
+            "- MANDATORY: Include at least 2 emotional words ('impressed', 'amazed', 'appreciated')",
+            "- MANDATORY: Include at least 1 specific example or incident",
+            "- Use varied sentence lengths (8-25 words, mix short and long)",
+            "- Start paragraphs with different patterns to create variety",
+            "- Avoid corporate jargon: 'leverage', 'utilize', 'synergize', 'optimize'",
+            "- Avoid academic language: 'demonstrate', 'exhibit', 'manifest'",
+            "- Avoid AI tells: 'it's worth noting', 'importantly', 'furthermore'",
+            "- Replace vague descriptors with specific observations",
+        ]
+
+        # Combine all guidelines
+        base_guidelines.extend(advanced_storytelling)
+        base_guidelines.extend(human_voice_requirements)
 
         # Add context-specific natural writing guidelines
         if context_type == "repo_only":
@@ -506,58 +569,56 @@ class PromptService:
             if length == "short":
                 base_guidelines.extend(
                     [
-                        "- Structure as 2 paragraphs: introduction with key skills from this repository and a specific example from their work here,",
-                        " then a concluding positive anecdote about their contribution to this project.",
-                        "- Keep it concise but impactful",
-                        "- Focus on 1-2 key strengths demonstrated in this repository with concrete evidence",
+                        "- Structure as 1 paragraph: A focused, impactful summary highlighting their key contributions and technical skills demonstrated in this specific repository.",
+                        "- Keep it concise and punchy - maximum impact in minimal words",
+                        "- Focus on their most significant contribution or skill shown in this repository",
                     ]
                 )
             elif length == "medium":
                 base_guidelines.extend(
                     [
-                        "- Structure as 3 paragraphs: introduction to their work on this repository, 2-3 specific technical achievements in this project with examples,",
-                        " and a concluding paragraph on personal qualities/collaboration shown in this repository with an anecdote.",
-                        "- Provide 2-3 specific examples or achievements from this repository only",
-                        "- Balance technical expertise with personal qualities demonstrated in this project",
+                        "- Structure as 2 paragraphs: First paragraph introduces their work and key technical achievements in this repository,",
+                        " second paragraph covers their collaboration style and personal qualities demonstrated through this project.",
+                        "- Provide 1-2 specific examples or achievements from this repository only",
+                        "- Balance technical expertise with personal qualities shown in this project",
                     ]
                 )
             else:  # long
                 base_guidelines.extend(
                     [
-                        "- Structure as 4-5 paragraphs: introduction to their role in this repository, detailed technical background with 2-3 achievements in this project,",
-                        " specific contributions/problem-solving in this repository, collaboration skills with an anecdote from this project,",
-                        " and a strong conclusion about their impact on this repository.",
-                        "- Include 3-4 detailed examples from this repository only",
-                        "- Show their contributions and growth within this project",
+                        "- Structure as 3 paragraphs: First paragraph introduces their role and context in this repository,",
+                        " second paragraph details specific technical contributions and achievements in this project,",
+                        " third paragraph covers collaboration, problem-solving, and overall impact on this repository.",
+                        "- Include 2-3 detailed examples from this repository only",
+                        "- Show their comprehensive contributions within this project",
                     ]
                 )
         else:
             if length == "short":
                 base_guidelines.extend(
                     [
-                        "- Structure as 2 paragraphs: introduction with key skills and a specific example,",
-                        " then a concluding positive anecdote.",
-                        "- Keep it concise but impactful",
-                        "- Focus on 1-2 key strengths with concrete evidence",
+                        "- Structure as 1 paragraph: A focused, impactful summary highlighting their key technical skills and most impressive professional qualities.",
+                        "- Keep it concise and punchy - maximum impact in minimal words",
+                        "- Focus on their strongest technical abilities and standout professional traits",
                     ]
                 )
             elif length == "medium":
                 base_guidelines.extend(
                     [
-                        "- Structure as 3 paragraphs: introduction, 2-3 specific technical achievements with examples,",
-                        " and a concluding paragraph on personal qualities/collaboration with an anecdote.",
-                        "- Provide 2-3 specific examples or achievements",
+                        "- Structure as 2 paragraphs: First paragraph introduces their technical expertise and key achievements,",
+                        " second paragraph covers their collaboration style, personal qualities, and professional impact.",
+                        "- Provide 1-2 specific examples or achievements",
                         "- Balance technical expertise with personal qualities",
                     ]
                 )
             else:  # long
                 base_guidelines.extend(
                     [
-                        "- Structure as 4-5 paragraphs: introduction, detailed technical background with 2-3 achievements,",
-                        " specific project contributions/problem-solving, collaboration skills with an anecdote,",
-                        " and a strong conclusion.",
-                        "- Include 3-4 detailed examples",
-                        "- Show development journey and growth",
+                        "- Structure as 3 paragraphs: First paragraph introduces their background and primary technical expertise,",
+                        " second paragraph details specific achievements and technical contributions across projects,",
+                        " third paragraph covers their collaboration style, leadership qualities, and overall professional impact.",
+                        "- Include 2-3 detailed examples",
+                        "- Show their comprehensive professional capabilities and growth",
                     ]
                 )
 
@@ -600,11 +661,11 @@ class PromptService:
     def _get_length_guideline(self, length: str) -> str:
         """Get word count guideline for different lengths."""
         length_map = {
-            "short": "100-150",
-            "medium": "150-200",
-            "long": "200-300",
+            "short": "80-120",  # 1 paragraph: concise and focused
+            "medium": "120-180",  # 2 paragraphs: balanced detail
+            "long": "180-250",  # 3 paragraphs: comprehensive coverage
         }
-        return length_map.get(length, "150-200")
+        return length_map.get(length, "120-180")
 
     def _extract_commit_examples(self, commit_analysis: Dict[str, Any]) -> List[str]:
         """Extract specific, concrete examples from commit analysis for evidence-based writing."""

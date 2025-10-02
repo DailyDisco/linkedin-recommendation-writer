@@ -40,6 +40,8 @@ class AIRecommendationService:
                 top_p=0.9,
                 top_k=40,
             )
+        self.rate_limit_requests_per_minute = 15
+        self.request_timestamps = []
 
     async def generate_recommendation_stream(
         self,
@@ -713,7 +715,25 @@ class AIRecommendationService:
             top_p=0.9,
             top_k=40,
         )
-        response = self.client.models.generate_content(model=settings.GEMINI_MODEL, contents=prompt, config=config)
+        try:
+            response = self.client.models.generate_content(model=settings.GEMINI_MODEL, contents=prompt, config=config)
+        except Exception as e:
+            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                # Extract retry delay from error
+                import re
+
+                match = re.search(r"retryDelay.*?(\d+)s", str(e))
+                retry_seconds = int(match.group(1)) if match else 60
+
+                raise Exception(
+                    {
+                        "type": "rate_limit_exceeded",
+                        "message": f"API rate limit reached. Please wait {retry_seconds} seconds.",
+                        "retry_after": retry_seconds,
+                        "suggestions": ["Wait and try again", "Consider upgrading to Gemini Pro for higher limits", "Use fewer options to reduce API calls"],
+                    }
+                )
+            raise e
 
         # Get the raw content
         raw_content = response.candidates[0].content.parts[0].text
@@ -920,8 +940,8 @@ class AIRecommendationService:
 
     def _get_target_paragraphs(self, length_guideline: str) -> int:
         """Get the target number of paragraphs based on length guideline."""
-        targets = {"short": 2, "medium": 3, "long": 4}
-        return targets.get(length_guideline, 3)
+        targets = {"short": 1, "medium": 2, "long": 3}
+        return targets.get(length_guideline, 2)
 
     def _apply_tone_formatting(self, content: str, tone: str) -> str:
         """Apply tone-specific formatting to the content."""
@@ -1099,13 +1119,15 @@ class AIRecommendationService:
         word_count = len(content.split())
 
         # Check paragraph count
-        expected_paragraphs = 3  # Default
+        expected_paragraphs = 2  # Default (medium)
         if generation_params:
             length = generation_params.get("length", "medium")
             if length == "short":
+                expected_paragraphs = 1
+            elif length == "medium":
                 expected_paragraphs = 2
             elif length == "long":
-                expected_paragraphs = 4
+                expected_paragraphs = 3
 
         if len(paragraphs) != expected_paragraphs:
             validation_results["issues"].append(f"Expected {expected_paragraphs} paragraphs, got {len(paragraphs)}")
@@ -1114,14 +1136,14 @@ class AIRecommendationService:
         # Check word count
         if generation_params:
             length = generation_params.get("length", "medium")
-            if length == "short" and word_count > 180:
-                validation_results["issues"].append("Content too long for short format")
+            if length == "short" and (word_count < 80 or word_count > 120):
+                validation_results["issues"].append("Word count outside short range (80-120)")
                 validation_results["structure_score"] = int(validation_results["structure_score"]) - 15  # Explicitly cast to int
-            elif length == "medium" and (word_count < 120 or word_count > 220):
-                validation_results["issues"].append("Word count outside medium range (120-220)")
+            elif length == "medium" and (word_count < 120 or word_count > 180):
+                validation_results["issues"].append("Word count outside medium range (120-180)")
                 validation_results["structure_score"] = int(validation_results["structure_score"]) - 10  # Explicitly cast to int
-            elif length == "long" and word_count < 180:
-                validation_results["issues"].append("Content too short for long format")
+            elif length == "long" and (word_count < 180 or word_count > 250):
+                validation_results["issues"].append("Word count outside long range (180-250)")
                 validation_results["structure_score"] = int(validation_results["structure_score"]) - 15  # Explicitly cast to int
 
         # Check for incomplete sentences (using regex to split more robustly)
@@ -1226,7 +1248,25 @@ class AIRecommendationService:
             top_p=0.9,
             top_k=40,
         )
-        response = self.client.models.generate_content(model=settings.GEMINI_MODEL, contents=prompt, config=config)
+        try:
+            response = self.client.models.generate_content(model=settings.GEMINI_MODEL, contents=prompt, config=config)
+        except Exception as e:
+            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                # Extract retry delay from error
+                import re
+
+                match = re.search(r"retryDelay.*?(\d+)s", str(e))
+                retry_seconds = int(match.group(1)) if match else 60
+
+                raise Exception(
+                    {
+                        "type": "rate_limit_exceeded",
+                        "message": f"API rate limit reached. Please wait {retry_seconds} seconds.",
+                        "retry_after": retry_seconds,
+                        "suggestions": ["Wait and try again", "Consider upgrading to Gemini Pro for higher limits", "Use fewer options to reduce API calls"],
+                    }
+                )
+            raise e
 
         # Get the raw content
         raw_content = response.candidates[0].content.parts[0].text
@@ -1250,3 +1290,20 @@ class AIRecommendationService:
                 logger.info(f"💡 Suggestions: {validation['suggestions']}")
 
         return formatted_content
+
+    def can_make_requests(self, num_requests: int) -> bool:
+        """Check if we can make multiple requests without hitting rate limits."""
+        import time
+
+        now = time.time()
+        # Remove timestamps older than 1 minute
+        self.request_timestamps = [ts for ts in self.request_timestamps if now - ts < 60]
+        return len(self.request_timestamps) + num_requests <= self.rate_limit_requests_per_minute
+
+    def record_requests(self, num_requests: int):
+        """Record multiple requests."""
+        import time
+
+        now = time.time()
+        for _ in range(num_requests):
+            self.request_timestamps.append(now)
