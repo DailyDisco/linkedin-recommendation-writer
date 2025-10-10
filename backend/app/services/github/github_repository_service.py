@@ -1,3 +1,4 @@
+import logging
 import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional, cast
@@ -5,12 +6,13 @@ from typing import Any, Dict, List, Optional, cast
 from github import Github
 from github.GithubException import GithubException
 from github.Repository import Repository as GithubRepository
-from loguru import logger
 
 from app.core.config import settings
 from app.core.redis_client import get_cache, set_cache
 from app.schemas.github import LanguageStats
 from app.services.github.github_commit_service import GitHubCommitService
+
+logger = logging.getLogger(__name__)
 
 
 class GitHubRepositoryService:

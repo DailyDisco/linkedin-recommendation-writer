@@ -1,15 +1,17 @@
 import json
+import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from github import Github
 from github.GithubException import GithubException
-from loguru import logger
 
 from app.core.config import settings
 from app.core.redis_client import get_cache, set_cache
 from app.services.analysis.profile_analysis_service import ProfileAnalysisService
 from app.services.github.github_commit_service import GitHubCommitService
+
+logger = logging.getLogger(__name__)
 
 
 class GitHubUserService:

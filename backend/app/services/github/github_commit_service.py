@@ -1,13 +1,15 @@
 import asyncio
+import logging
 import re
 from collections import Counter
 from datetime import datetime
 from typing import Any, Dict, List, Optional, TypedDict
 
 from github import Github
-from loguru import logger
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class ConventionalStats(TypedDict):
