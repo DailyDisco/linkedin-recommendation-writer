@@ -1,7 +1,6 @@
 """Health check and diagnostic endpoints."""
 
 import logging
-from datetime import datetime
 from typing import Any, Dict, Union
 
 from fastapi import APIRouter
@@ -10,7 +9,6 @@ from fastapi.responses import JSONResponse
 from app.core.config import settings
 from app.core.database import check_database_health, test_database_connection
 from app.core.redis_client import check_redis_health
-from app.services.infrastructure import DatabaseAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -127,37 +125,3 @@ async def database_connection_test():
     except Exception as e:
         logger.error(f"❌ Database test endpoint failed: {e}")
         return JSONResponse(status_code=500, content={"status": "error", "message": "Database test endpoint failed", "error": str(e)})
-
-
-@router.get("/db-analysis", response_model=None)
-async def database_analysis():
-    """Comprehensive database analysis and assessment."""
-    logger.info("📊 Database analysis requested")
-
-    try:
-        analysis = await DatabaseAnalyzer.analyze_current_state()
-        recommendations = await DatabaseAnalyzer.generate_recommendations(analysis)
-
-        analysis["recommendations"] = recommendations
-
-        return JSONResponse(status_code=200, content={"status": "success", "message": "Database analysis completed", "analysis": analysis, "timestamp": datetime.now().isoformat()})
-    except Exception as e:
-        logger.error(f"❌ Database analysis failed: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": "Database analysis failed", "error": str(e), "timestamp": datetime.now().isoformat()})
-
-
-@router.post("/db-performance-test", response_model=None)
-async def database_performance_test(duration: int = 30):
-    """Run database performance test."""
-    logger.info(f"⚡ Database performance test requested (duration: {duration}s)")
-
-    if duration < 1 or duration > 300:
-        return JSONResponse(status_code=400, content={"status": "error", "message": "Duration must be between 1 and 300 seconds"})
-
-    try:
-        results = await DatabaseAnalyzer.run_performance_test(duration)
-
-        return JSONResponse(status_code=200, content={"status": "success", "message": f"Performance test completed ({duration}s)", "results": results})
-    except Exception as e:
-        logger.error(f"❌ Database performance test failed: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": "Database performance test failed", "error": str(e)})

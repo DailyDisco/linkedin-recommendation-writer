@@ -12,6 +12,7 @@ setuptools>=78.1.1  # Updated for path traversal fix
 
 # Database
 asyncpg==0.30.0  # PostgreSQL driver for asyncio
+psycopg2-binary==2.9.10  # PostgreSQL driver for synchronous operations (used by Alembic migrations)
 sqlalchemy[asyncio]==2.0.43  # SQL toolkit and Object-Relational Mapper (ORM) with async support
 alembic==1.16.5  # Database migration tool for SQLAlchemy
 
@@ -20,7 +21,6 @@ redis==6.4.0  # Python client for Redis key-value store
 
 # HTTP requests
 httpx==0.28.1  # Synchronous and asynchronous HTTP client library for API requests
-aiohttp==3.12.15  # Asynchronous HTTP client/server framework for web requests
 anyio==4.10.0  # Cross-platform async I/O library providing unified async/await interface for asyncio and trio
 
 # AI/ML
@@ -61,11 +61,7 @@ pandas==2.3.2  # Data analysis and manipulation library
 numpy==2.3.2  # Fundamental package for scientific computing with Python
 
 # Logging
-structlog==25.4.0  # Structured logging library
 loguru==0.7.3  # Opinionated logging library
-
-# Background tasks
-celery==5.5.3  # Distributed task queue
 
 # Monitoring and metrics (optional - removed for simplification)
 # prometheus-client==0.22.1  # Python client for Prometheus metrics

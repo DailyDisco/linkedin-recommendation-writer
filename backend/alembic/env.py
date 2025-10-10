@@ -12,6 +12,17 @@ config = context.config
 # Import application settings to use the actual DATABASE_URL
 from app.core.config import settings
 
+
+def get_sync_url(async_url: str) -> str:
+    """Convert async database URL to sync URL for migrations.
+    
+    Alembic migrations need to run with a synchronous driver (psycopg2)
+    because they execute in a thread pool context via run_in_executor.
+    The asyncpg driver cannot work in this context due to greenlet requirements.
+    """
+    return async_url.replace("postgresql+asyncpg://", "postgresql://")
+
+
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
 # Disabled: The application already has logging configured, and this causes
@@ -49,8 +60,9 @@ def run_migrations_offline() -> None:
 
     """
     # Override the sqlalchemy.url from alembic.ini with the actual DATABASE_URL
-    # from environment variables to ensure we use the correct connection string
-    config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+    # from environment variables, converting async URL to sync URL for migrations
+    sync_url = get_sync_url(settings.DATABASE_URL)
+    config.set_main_option("sqlalchemy.url", sync_url)
     
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
@@ -78,8 +90,9 @@ async def run_async_migrations():
     """
     
     # Override the sqlalchemy.url from alembic.ini with the actual DATABASE_URL
-    # from environment variables to ensure we use the correct connection string
-    config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+    # from environment variables, converting async URL to sync URL for migrations
+    sync_url = get_sync_url(settings.DATABASE_URL)
+    config.set_main_option("sqlalchemy.url", sync_url)
 
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
