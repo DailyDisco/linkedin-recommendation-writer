@@ -28,6 +28,7 @@ class RecommendationRequest(BaseModel):
         pattern="^(short|medium|long)$",
     )
     custom_prompt: Optional[str] = Field(None, description="Custom prompt additions for personalization", max_length=1000)
+    shared_work_context: Optional[str] = Field(None, description="What the recommender worked on with this person (specific projects, features, etc.)", max_length=500)
     include_specific_skills: Optional[List[str]] = Field(None, description="Specific skills to highlight", max_items=20)
     target_role: Optional[str] = Field(None, description="Target role or industry for the recommendation", max_length=200)
     include_keywords: Optional[List[str]] = Field(None, description="Keywords/phrases that must be included", max_items=10)
@@ -51,7 +52,7 @@ class RecommendationRequest(BaseModel):
             raise ValueError("Invalid repository URL or not a GitHub URL")
         return v
 
-    @field_validator("custom_prompt", "target_role")
+    @field_validator("custom_prompt", "target_role", "shared_work_context")
     @classmethod
     def sanitize_text_fields(cls, v: Optional[str]) -> Optional[str]:
         """Sanitize text fields to remove dangerous content."""
@@ -254,6 +255,7 @@ class DynamicRefinementRequest(BaseModel):
     recommendation_type: Optional[str] = Field("professional", description="Type of recommendation")
     tone: Optional[str] = Field("professional", description="Tone of the recommendation")
     length: Optional[str] = Field("medium", description="Length of the recommendation")
+    shared_work_context: Optional[str] = Field(None, description="What the recommender worked on with this person", max_length=500)
     analysis_context_type: Optional[str] = Field("profile", description="Type of analysis performed")
     repository_url: Optional[str] = Field(None, description="Repository URL if repo-specific analysis")
     dynamic_tone: Optional[str] = Field(None, description="Dynamic tone override")

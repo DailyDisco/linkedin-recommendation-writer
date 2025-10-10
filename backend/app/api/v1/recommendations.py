@@ -113,6 +113,7 @@ async def generate_recommendation(
             tone=request.tone,
             length=request.length,
             custom_prompt=request.custom_prompt,
+            shared_work_context=request.shared_work_context,
             target_role=request.target_role,
             specific_skills=request.include_specific_skills,
             include_keywords=request.include_keywords,
@@ -427,6 +428,7 @@ async def regenerate_recommendation(
         recommendation_type = request.get("recommendation_type", "professional")
         tone = request.get("tone", "professional")
         length = request.get("length", "medium")
+        shared_work_context = request.get("shared_work_context")  # Optional shared work context
         analysis_context_type = request.get("analysis_context_type", "profile")
         repository_url = request.get("repository_url")
         display_name = request.get("display_name")  # Optional display name parameter
@@ -453,6 +455,7 @@ async def regenerate_recommendation(
             recommendation_type=recommendation_type,
             tone=tone,
             length=length,
+            shared_work_context=shared_work_context,
             analysis_context_type=analysis_context_type,
             repository_url=repository_url,
             display_name=display_name,

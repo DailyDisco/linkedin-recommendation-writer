@@ -22,6 +22,7 @@ class PromptService:
         tone: str = "professional",
         length: str = "medium",
         custom_prompt: Optional[str] = None,
+        shared_work_context: Optional[str] = None,
         target_role: Optional[str] = None,
         specific_skills: Optional[list] = None,
         exclude_keywords: Optional[list] = None,
@@ -32,6 +33,9 @@ class PromptService:
         display_name: Optional[str] = None,  # New parameter
     ) -> str:
         """Build the AI generation prompt."""
+
+        # Sanitize github_data to remove repository names before building prompt
+        github_data = self._sanitize_github_data_for_prompt(github_data)
 
         user_data = github_data.get("user_data", {})
         languages = github_data.get("languages", [])
@@ -76,8 +80,46 @@ class PromptService:
             f"Write the recommendation as if you know {person_reference} personally and have worked with them directly.",
         ]
 
+        # Add shared work context if provided
+        if shared_work_context:
+            prompt_parts.extend([
+                "",
+                "CRITICAL CONTEXT - Our Working Relationship:",
+                f"The recommender and {person_reference} worked together on: {shared_work_context}",
+                f"Ground the entire recommendation in this specific shared experience.",
+                f"Describe concrete examples and situations from this work, not generic statements.",
+                f"Reference specific challenges, achievements, or contributions from this shared context.",
+            ])
+
+        # Add repository name filtering instruction
+        prompt_parts.extend([
+            "",
+            "CRITICAL RULES - Repository Names:",
+            "NEVER mention specific repository names in the recommendation.",
+            "Instead use descriptive phrases: 'a critical backend service', 'an innovative web application', 'a key infrastructure project'",
+            "Refer to work contextually and descriptively, not by repository name.",
+            "Focus on what was accomplished and the skills demonstrated, not where the code lives.",
+        ])
+
+        # Add human-like output instructions
+        prompt_parts.extend([
+            "",
+            "WRITING STYLE - Sound Human, Not AI:",
+            "- Use varied sentence structures (mix short punchy sentences with longer detailed ones)",
+            "- Include specific observations and concrete examples, not generic praise",
+            "- Use natural transitions and avoid formulaic patterns",
+            "- Write from first-person perspective ('I worked with', 'I observed', 'What impressed me')",
+            "- Show, don't just tell (use examples and stories, not just adjectives)",
+            "- Avoid AI patterns like: 'In conclusion', 'Furthermore', 'Moreover', 'It is worth noting', 'Indeed'",
+            "- Use conversational phrases: 'What impressed me most', 'I particularly remember when', 'One thing that stands out'",
+            "- Focus on impact and outcomes, not just tasks completed",
+            "- Be specific about situations and results rather than using vague superlatives",
+            "- Vary your vocabulary and avoid repeating the same descriptive words",
+            "- Make it feel personal and genuine, like you're actually recommending someone you respect",
+        ])
+
         if target_role:
-            prompt_parts.append(f"Highlight why they'd be great for a {target_role} position.")
+            prompt_parts.append(f"\nHighlight why they'd be great for a {target_role} position.")
 
         # Add GitHub context based on standardized analysis type
         # Use parameter if provided, otherwise fall back to data
@@ -1311,3 +1353,137 @@ Just give me the updated recommendation text, nothing else.
                 return clean_username.capitalize()
 
         return ""
+
+    def _sanitize_github_data_for_prompt(self, github_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Remove or replace repository names from github_data to prevent them appearing in recommendations."""
+        import re
+        import copy
+
+        # Create a deep copy to avoid modifying the original data
+        sanitized_data = copy.deepcopy(github_data)
+
+        # Collect all repository names to sanitize
+        repo_names_to_remove = set()
+
+        # Extract repo names from repositories list
+        if "repositories" in sanitized_data:
+            for repo in sanitized_data.get("repositories", []):
+                if isinstance(repo, dict):
+                    if repo.get("name"):
+                        repo_names_to_remove.add(repo["name"])
+                    if repo.get("full_name"):
+                        # Extract repo name from "owner/repo" format
+                        full_name_parts = repo["full_name"].split("/")
+                        if len(full_name_parts) == 2:
+                            repo_names_to_remove.add(full_name_parts[1])
+
+        # Extract from repository_info
+        if "repository_info" in sanitized_data:
+            repo_info = sanitized_data.get("repository_info", {})
+            if repo_info.get("name"):
+                repo_names_to_remove.add(repo_info["name"])
+            if repo_info.get("full_name"):
+                full_name_parts = repo_info["full_name"].split("/")
+                if len(full_name_parts) == 2:
+                    repo_names_to_remove.add(full_name_parts[1])
+
+        # Extract from starred repositories
+        if "starred_repositories" in sanitized_data.get("user_data", {}):
+            for repo in sanitized_data["user_data"].get("starred_repositories", []):
+                if isinstance(repo, dict) and repo.get("name"):
+                    repo_names_to_remove.add(repo["name"])
+
+        logger.info(f"🔍 Sanitizing {len(repo_names_to_remove)} repository names from github_data")
+
+        # Sanitize commits
+        if "commit_analysis" in sanitized_data:
+            commit_analysis = sanitized_data["commit_analysis"]
+            if "top_repositories" in commit_analysis:
+                for repo_entry in commit_analysis["top_repositories"]:
+                    if isinstance(repo_entry, dict):
+                        repo_entry["repository"] = "the project"
+
+        # Sanitize PR data if present
+        if "pull_requests" in sanitized_data:
+            from app.services.github.github_commit_service import GitHubCommitService
+            commit_service = GitHubCommitService()
+            sanitized_data["pull_requests"] = commit_service._sanitize_pr_data_for_prompt(
+                sanitized_data["pull_requests"],
+                list(repo_names_to_remove)
+            )
+
+        # Sanitize repository_info (keep structure but remove specific names)
+        if "repository_info" in sanitized_data:
+            repo_info = sanitized_data["repository_info"]
+            if repo_info.get("name"):
+                repo_info["name"] = "the project"
+            if repo_info.get("full_name"):
+                repo_info["full_name"] = "user/project"
+
+        # Sanitize repositories list
+        if "repositories" in sanitized_data:
+            for repo in sanitized_data["repositories"]:
+                if isinstance(repo, dict):
+                    if repo.get("name"):
+                        original_name = repo["name"]
+                        repo["name"] = "project"
+                    if repo.get("full_name"):
+                        repo["full_name"] = "user/project"
+                    if repo.get("url"):
+                        repo["url"] = "https://github.com/user/project"
+
+        # Sanitize starred repositories
+        if "user_data" in sanitized_data and "starred_repositories" in sanitized_data["user_data"]:
+            for repo in sanitized_data["user_data"]["starred_repositories"]:
+                if isinstance(repo, dict):
+                    if repo.get("name"):
+                        repo["name"] = "starred-project"
+                    if repo.get("full_name"):
+                        repo["full_name"] = "user/starred-project"
+
+        logger.info("✅ Repository names sanitized from github_data")
+        return sanitized_data
+
+    def _validate_no_repo_names_in_output(self, output: str, github_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Post-generation check to detect any repository names that leaked into the output."""
+        import re
+
+        validation_result = {
+            "is_valid": True,
+            "detected_repo_names": [],
+            "warnings": []
+        }
+
+        # Collect repository names to check for
+        repo_names_to_check = set()
+
+        # From repositories
+        if "repositories" in github_data:
+            for repo in github_data.get("repositories", []):
+                if isinstance(repo, dict) and repo.get("name"):
+                    repo_names_to_check.add(repo["name"])
+
+        # From repository_info
+        if "repository_info" in github_data:
+            repo_info = github_data.get("repository_info", {})
+            if repo_info.get("name"):
+                repo_names_to_check.add(repo_info["name"])
+
+        # Check output for repository names
+        output_lower = output.lower()
+        for repo_name in repo_names_to_check:
+            # Check for exact matches and common variations
+            repo_name_lower = repo_name.lower()
+            repo_name_with_spaces = repo_name.replace("-", " ").replace("_", " ").lower()
+
+            if repo_name_lower in output_lower or repo_name_with_spaces in output_lower:
+                validation_result["is_valid"] = False
+                validation_result["detected_repo_names"].append(repo_name)
+                logger.warning(f"⚠️ Repository name '{repo_name}' detected in recommendation output")
+
+        if not validation_result["is_valid"]:
+            validation_result["warnings"].append(
+                f"Found {len(validation_result['detected_repo_names'])} repository name(s) in the output"
+            )
+
+        return validation_result

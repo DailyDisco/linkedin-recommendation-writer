@@ -714,8 +714,8 @@ class GitHubCommitService:
             "inferred_soft_skills": soft_skills_inference,
         }
 
-    def _infer_soft_skills_from_patterns(self, excellence_patterns: Dict[str, Any]) -> Dict[str, Any]:
-        """Infer soft skills from technical excellence patterns."""
+    def _infer_soft_skills_from_patterns(self, excellence_patterns: Dict[str, Any], pr_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Infer soft skills from technical excellence patterns and PR data."""
         soft_skills_map = {
             "problem_solving": {
                 "patterns": ["bug_fixing", "optimization", "refactoring"],
@@ -747,6 +747,11 @@ class GitHubCommitService:
                 "description": "Team-oriented approach to development",
                 "evidence": "Creates well-documented, maintainable code for team success",
             },
+            "communication": {
+                "patterns": ["documentation", "code_quality"],
+                "description": "Clear and effective communication skills",
+                "evidence": "Articulates technical decisions and maintains clear documentation",
+            },
             "leadership": {
                 "patterns": ["refactoring", "devops_automation", "api_development"],
                 "description": "Technical leadership and system architecture",
@@ -774,6 +779,44 @@ class GitHubCommitService:
 
                 inferred_skills[soft_skill] = {"description": config["description"], "evidence": config["evidence"], "confidence": confidence, "supporting_patterns": list(matching_patterns)}
 
+        # Enhance with PR data if available
+        if pr_data and "pr_analysis" in pr_data:
+            pr_analysis = pr_data["pr_analysis"]
+
+            # Boost collaboration skill based on PR review participation
+            collaboration_patterns = pr_analysis.get("collaboration_patterns", {})
+            if collaboration_patterns.get("discussion_quality") == "high":
+                if "collaboration" in inferred_skills:
+                    inferred_skills["collaboration"]["confidence"] = min(inferred_skills["collaboration"]["confidence"] + 15, 100)
+                    inferred_skills["collaboration"]["evidence"] += " | Active PR review participation"
+                else:
+                    inferred_skills["collaboration"] = {
+                        "description": "Team-oriented approach to development",
+                        "evidence": "Active PR review participation and constructive feedback",
+                        "confidence": 70,
+                        "supporting_patterns": ["pr_collaboration"],
+                    }
+
+            # Boost communication skill based on PR discussions
+            if collaboration_patterns.get("avg_review_comments_per_pr", 0) > 2:
+                if "communication" in inferred_skills:
+                    inferred_skills["communication"]["confidence"] = min(inferred_skills["communication"]["confidence"] + 15, 100)
+                    inferred_skills["communication"]["evidence"] += " | Engages in detailed code review discussions"
+                else:
+                    inferred_skills["communication"] = {
+                        "description": "Clear and effective communication skills",
+                        "evidence": "Engages in detailed code review discussions",
+                        "confidence": 70,
+                        "supporting_patterns": ["pr_communication"],
+                    }
+
+            # Boost reliability based on PR merge rate
+            pr_metrics = pr_analysis.get("pr_metrics", {})
+            if pr_metrics.get("merge_rate", 0) > 70:
+                if "reliability" in inferred_skills:
+                    inferred_skills["reliability"]["confidence"] = min(inferred_skills["reliability"]["confidence"] + 10, 100)
+                    inferred_skills["reliability"]["evidence"] += f" | High PR merge rate ({pr_metrics['merge_rate']}%)"
+
         # Sort by confidence
         sorted_skills = dict(
             sorted(
@@ -783,7 +826,7 @@ class GitHubCommitService:
             )
         )
 
-        return {"skills": sorted_skills, "top_soft_skill": list(sorted_skills.keys())[0] if sorted_skills else None, "inference_method": "pattern_based_analysis"}
+        return {"skills": sorted_skills, "top_soft_skill": list(sorted_skills.keys())[0] if sorted_skills else None, "inference_method": "pattern_and_pr_based_analysis" if pr_data else "pattern_based_analysis"}
 
     def _analyze_tools_and_features(self, commit_messages: List[str]) -> Dict[str, Any]:
         """Extract tools, libraries, and features mentioned in commits."""
@@ -1234,10 +1277,10 @@ class GitHubCommitService:
         return insights
 
     def _extract_technical_patterns(self, commit_messages: List[str]) -> List[str]:
-        """Extract technical focus areas from commit messages."""
+        """Extract technical focus areas from commit messages with enhanced pattern detection."""
         patterns = []
 
-        # Common technical patterns to look for
+        # Enhanced technical patterns with specific problem types
         tech_indicators = {
             "frontend": ["ui", "component", "react", "vue", "angular", "frontend", "interface", "ux", "styling"],
             "backend": ["api", "server", "database", "endpoint", "service", "backend", "authentication", "security"],
@@ -1248,10 +1291,49 @@ class GitHubCommitService:
             "features": ["feature", "implement", "add", "create", "build", "develop"],
         }
 
+        # Specific problem types (enhanced detection)
+        problem_types = {
+            "memory_management": ["memory leak", "memory optimization", "garbage collection", "heap", "memory usage"],
+            "concurrency": ["race condition", "deadlock", "thread", "concurrency", "async", "parallel"],
+            "database_optimization": ["query optimization", "index", "database performance", "n+1", "slow query"],
+            "security_fixes": ["vulnerability", "xss", "sql injection", "csrf", "authentication", "authorization"],
+        }
+
+        # Architectural patterns (enhanced detection)
+        architectural_patterns = {
+            "design_patterns": ["singleton", "factory", "observer", "strategy", "decorator", "adapter"],
+            "architectural_styles": ["mvc", "mvvm", "microservices", "event-driven", "layered", "hexagonal"],
+        }
+
+        # Integration patterns (enhanced detection)
+        integration_patterns = {
+            "api_types": ["rest api", "graphql", "websocket", "grpc", "soap"],
+            "messaging": ["message queue", "pub/sub", "event bus", "kafka", "rabbitmq"],
+        }
+
+        # Check standard technical indicators
         for category, keywords in tech_indicators.items():
             matches = sum(1 for msg in commit_messages for keyword in keywords if keyword.lower() in msg.lower())
             if matches > 0:
                 patterns.append(f"{category.replace('_', ' ').title()}: {matches} contributions")
+
+        # Check specific problem types
+        for category, keywords in problem_types.items():
+            matches = sum(1 for msg in commit_messages for keyword in keywords if keyword.lower() in msg.lower())
+            if matches > 0:
+                patterns.append(f"{category.replace('_', ' ').title()}: {matches} instances")
+
+        # Check architectural patterns
+        for category, keywords in architectural_patterns.items():
+            matches = sum(1 for msg in commit_messages for keyword in keywords if keyword.lower() in msg.lower())
+            if matches > 0:
+                patterns.append(f"{category.replace('_', ' ').title()}: {matches} implementations")
+
+        # Check integration patterns
+        for category, keywords in integration_patterns.items():
+            matches = sum(1 for msg in commit_messages for keyword in keywords if keyword.lower() in msg.lower())
+            if matches > 0:
+                patterns.append(f"{category.replace('_', ' ').title()}: {matches} integrations")
 
         return patterns
 
@@ -1411,3 +1493,484 @@ class GitHubCommitService:
             },
             "quality_distribution": {level: round((count / total_commits) * 100, 1) if total_commits > 0 else 0 for level, count in impact_distribution.items()},
         }
+
+    async def fetch_user_pull_requests_across_repos(
+        self,
+        username: str,
+        repositories: List[Dict[str, Any]],
+        max_prs: int = 50,
+    ) -> Dict[str, Any]:
+        """Fetch pull requests from a user across all their repositories with async batch processing."""
+        try:
+            if not self.github_client:
+                return self._empty_pr_analysis()
+
+            logger.info(f"🎯 PR ANALYSIS: Targeting {max_prs} PRs from user: {username}")
+
+            # Create semaphore to limit concurrent GitHub API requests
+            semaphore = asyncio.Semaphore(self.MAX_CONCURRENT_REQUESTS)
+
+            # Split repositories into batches
+            repo_batches = [repositories[i : i + self.REPOSITORY_BATCH_SIZE] for i in range(0, len(repositories), self.REPOSITORY_BATCH_SIZE)]
+
+            all_prs = []
+            prs_collected = 0
+
+            logger.info(f"📝 Fetching PRs from user '{username}' across {len(repositories)} repositories")
+            logger.info(f"⚡ Processing in {len(repo_batches)} batches with {self.MAX_CONCURRENT_REQUESTS} concurrent requests")
+
+            # Process repository batches concurrently
+            for batch_idx, repo_batch in enumerate(repo_batches):
+                if prs_collected >= max_prs:
+                    break
+
+                logger.info(f"🔄 Processing PR batch {batch_idx + 1}/{len(repo_batches)}")
+
+                # Create tasks for concurrent fetching
+                batch_tasks = []
+                for repo_data in repo_batch:
+                    if prs_collected >= max_prs:
+                        break
+
+                    remaining_prs = max_prs - prs_collected
+                    prs_per_repo = min(10, remaining_prs)  # Max 10 PRs per repo
+
+                    task = self._fetch_user_prs_from_repo_async(semaphore, username, repo_data, prs_per_repo)
+                    batch_tasks.append(task)
+
+                # Execute batch concurrently
+                batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
+
+                # Process results
+                for result in batch_results:
+                    if isinstance(result, Exception):
+                        logger.warning(f"Error in PR batch task: {result}")
+                        continue
+
+                    if isinstance(result, list) and result:
+                        prs_to_add = min(len(result), max_prs - prs_collected)
+                        all_prs.extend(result[:prs_to_add])
+                        prs_collected += prs_to_add
+
+                        if prs_collected >= max_prs:
+                            break
+
+            logger.info(f"🎉 PR COLLECTION COMPLETED: {len(all_prs)} PRs collected from {username}")
+
+            # Analyze the collected PRs
+            pr_analysis = self._perform_pr_analysis(all_prs, username)
+
+            return {
+                "pull_requests": all_prs,
+                "pr_analysis": pr_analysis,
+                "total_prs_collected": len(all_prs),
+            }
+
+        except Exception as e:
+            logger.error(f"Error fetching PRs for {username}: {e}")
+            return self._empty_pr_analysis()
+
+    async def fetch_repository_pull_requests(
+        self,
+        repository_full_name: str,
+        author_username: Optional[str] = None,
+        max_prs: int = 50,
+        force_refresh: bool = False,
+    ) -> List[Dict[str, Any]]:
+        """Fetch pull requests from a specific repository, optionally filtered by author."""
+        cache_key = f"repo_prs:{repository_full_name}:{author_username or 'all'}:{max_prs}"
+
+        # Check cache first
+        if not force_refresh:
+            from app.core.redis_client import get_cache
+            cached_data = await get_cache(cache_key)
+            if cached_data:
+                logger.info(f"💨 CACHE HIT for PRs: {repository_full_name}")
+                return cached_data
+
+        try:
+            if not self.github_client:
+                return []
+
+            repo = self.github_client.get_repo(repository_full_name)
+            pulls = repo.get_pulls(state="all", sort="created", direction="desc")
+
+            prs_data = []
+            count = 0
+
+            for pr in pulls:
+                if count >= max_prs:
+                    break
+
+                # Filter by author if specified
+                if author_username and pr.user.login != author_username:
+                    continue
+
+                pr_data = {
+                    "number": pr.number,
+                    "title": pr.title,
+                    "body": pr.body[:1000] if pr.body else "",  # Truncate body
+                    "state": pr.state,
+                    "created_at": pr.created_at.isoformat() if pr.created_at else None,
+                    "updated_at": pr.updated_at.isoformat() if pr.updated_at else None,
+                    "merged_at": pr.merged_at.isoformat() if pr.merged_at else None,
+                    "closed_at": pr.closed_at.isoformat() if pr.closed_at else None,
+                    "author": pr.user.login if pr.user else None,
+                    "additions": pr.additions,
+                    "deletions": pr.deletions,
+                    "changed_files": pr.changed_files,
+                    "comments": pr.comments,
+                    "review_comments": pr.review_comments,
+                    "commits": pr.commits,
+                    "labels": [label.name for label in pr.labels] if pr.labels else [],
+                    "milestone": pr.milestone.title if pr.milestone else None,
+                    "repository": repository_full_name,
+                }
+                prs_data.append(pr_data)
+                count += 1
+
+            # Cache the results
+            from app.core.redis_client import set_cache
+            await set_cache(cache_key, prs_data, ttl=self.COMMIT_ANALYSIS_CACHE_TTL)
+            logger.info(f"💾 Cached {len(prs_data)} PRs for: {repository_full_name}")
+
+            return prs_data
+
+        except Exception as e:
+            logger.error(f"Error fetching PRs from {repository_full_name}: {e}")
+            return []
+
+    async def _fetch_user_prs_from_repo_async(
+        self,
+        semaphore: asyncio.Semaphore,
+        username: str,
+        repo_data: Dict[str, Any],
+        max_prs_per_repo: int,
+    ) -> List[Dict[str, Any]]:
+        """Fetch PRs from a single repository asynchronously with rate limiting."""
+        async with semaphore:
+            try:
+                loop = asyncio.get_event_loop()
+                prs = await loop.run_in_executor(
+                    None,
+                    self._fetch_user_prs_from_repo_sync,
+                    username,
+                    repo_data,
+                    max_prs_per_repo,
+                )
+                return prs
+
+            except Exception as e:
+                logger.warning(f"Error fetching PRs from {repo_data.get('name', 'unknown')}: {e}")
+                return []
+
+    def _fetch_user_prs_from_repo_sync(
+        self,
+        username: str,
+        repo_data: Dict[str, Any],
+        max_prs_per_repo: int,
+    ) -> List[Dict[str, Any]]:
+        """Synchronous helper to fetch PRs from a repository (runs in thread pool)."""
+        if not self.github_client:
+            return []
+
+        try:
+            # Try to get the repository
+            repo_full_name = repo_data.get("full_name") or f"{username}/{repo_data['name']}"
+            repo = self.github_client.get_repo(repo_full_name)
+
+            pulls = repo.get_pulls(state="all", sort="created", direction="desc")
+
+            prs_data = []
+            count = 0
+
+            for pr in pulls:
+                if count >= max_prs_per_repo:
+                    break
+
+                # Only get PRs authored by this user
+                if pr.user and pr.user.login == username:
+                    pr_data = {
+                        "number": pr.number,
+                        "title": pr.title,
+                        "body": pr.body[:1000] if pr.body else "",
+                        "state": pr.state,
+                        "created_at": pr.created_at.isoformat() if pr.created_at else None,
+                        "merged_at": pr.merged_at.isoformat() if pr.merged_at else None,
+                        "author": pr.user.login,
+                        "additions": pr.additions,
+                        "deletions": pr.deletions,
+                        "changed_files": pr.changed_files,
+                        "comments": pr.comments,
+                        "review_comments": pr.review_comments,
+                        "labels": [label.name for label in pr.labels] if pr.labels else [],
+                        "repository": repo_data.get("name", ""),
+                        "repository_full_name": repo_full_name,
+                    }
+                    prs_data.append(pr_data)
+                    count += 1
+
+            if prs_data:
+                logger.debug(f"✅ Found {len(prs_data)} PRs from {username} in {repo_data.get('name', '')}")
+
+            return prs_data
+
+        except Exception as e:
+            logger.debug(f"Error fetching PRs from {repo_data.get('name', '')}: {e}")
+            return []
+
+    def _perform_pr_analysis(self, prs: List[Dict[str, Any]], username: str) -> Dict[str, Any]:
+        """Perform comprehensive analysis of pull requests."""
+        if not prs:
+            return self._empty_pr_analysis()
+
+        # Analyze collaboration patterns
+        collaboration_patterns = self._analyze_pr_collaboration_patterns(prs)
+
+        # Analyze problem-solving approaches
+        problem_solving = self._analyze_pr_problem_solving(prs)
+
+        # Analyze code quality focus
+        code_quality = self._analyze_pr_code_quality_focus(prs)
+
+        # Calculate PR metrics
+        pr_metrics = self._calculate_pr_metrics(prs)
+
+        return {
+            "total_prs_analyzed": len(prs),
+            "collaboration_patterns": collaboration_patterns,
+            "problem_solving": problem_solving,
+            "code_quality_focus": code_quality,
+            "pr_metrics": pr_metrics,
+        }
+
+    def _analyze_pr_collaboration_patterns(self, prs: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Extract collaboration insights from PRs."""
+        patterns = {
+            "review_participation": 0,
+            "discussion_quality": "unknown",
+            "responsiveness": "unknown",
+            "mentorship_indicators": [],
+        }
+
+        total_review_comments = 0
+        total_comments = 0
+        prs_with_reviews = 0
+
+        for pr in prs:
+            review_comments = pr.get("review_comments", 0)
+            comments = pr.get("comments", 0)
+
+            total_review_comments += review_comments
+            total_comments += comments
+
+            if review_comments > 0:
+                prs_with_reviews += 1
+
+            # Check for mentorship patterns
+            if review_comments > 5:
+                patterns["mentorship_indicators"].append("Active in code review discussions")
+
+        patterns["review_participation"] = prs_with_reviews
+        patterns["avg_review_comments_per_pr"] = round(total_review_comments / len(prs), 1) if prs else 0
+        patterns["avg_comments_per_pr"] = round(total_comments / len(prs), 1) if prs else 0
+
+        # Determine discussion quality
+        if patterns["avg_review_comments_per_pr"] > 3:
+            patterns["discussion_quality"] = "high"
+        elif patterns["avg_review_comments_per_pr"] > 1:
+            patterns["discussion_quality"] = "moderate"
+        else:
+            patterns["discussion_quality"] = "low"
+
+        return patterns
+
+    def _analyze_pr_problem_solving(self, prs: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Extract problem-solving approaches from PRs."""
+        problem_patterns = {
+            "architectural_decisions": 0,
+            "trade_offs_discussed": 0,
+            "problem_types": [],
+            "solution_approaches": [],
+        }
+
+        architectural_keywords = ["architecture", "design", "pattern", "refactor", "restructure"]
+        trade_off_keywords = ["trade-off", "tradeoff", "vs", "versus", "alternative", "option"]
+        problem_keywords = {
+            "bug_fix": ["bug", "fix", "issue", "error", "crash"],
+            "performance": ["performance", "optimize", "speed", "memory", "cache"],
+            "security": ["security", "auth", "vulnerability", "encrypt"],
+            "feature": ["feature", "implement", "add", "new"],
+        }
+
+        for pr in prs:
+            title_lower = pr.get("title", "").lower()
+            body_lower = pr.get("body", "").lower()
+            combined = title_lower + " " + body_lower
+
+            # Check for architectural discussions
+            if any(keyword in combined for keyword in architectural_keywords):
+                problem_patterns["architectural_decisions"] += 1
+
+            # Check for trade-off discussions
+            if any(keyword in combined for keyword in trade_off_keywords):
+                problem_patterns["trade_offs_discussed"] += 1
+
+            # Identify problem types
+            for problem_type, keywords in problem_keywords.items():
+                if any(keyword in title_lower for keyword in keywords):
+                    if problem_type not in problem_patterns["problem_types"]:
+                        problem_patterns["problem_types"].append(problem_type)
+
+        return problem_patterns
+
+    def _analyze_pr_code_quality_focus(self, prs: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Identify code quality indicators from PRs."""
+        quality_indicators = {
+            "test_focus": 0,
+            "refactoring_focus": 0,
+            "documentation_focus": 0,
+            "security_focus": 0,
+            "quality_score": 0,
+        }
+
+        test_keywords = ["test", "testing", "spec", "coverage"]
+        refactor_keywords = ["refactor", "clean", "improve", "optimize"]
+        doc_keywords = ["doc", "documentation", "comment", "readme"]
+        security_keywords = ["security", "auth", "secure", "vulnerability"]
+
+        for pr in prs:
+            title_lower = pr.get("title", "").lower()
+            labels = [label.lower() for label in pr.get("labels", [])]
+            combined = title_lower + " " + " ".join(labels)
+
+            if any(keyword in combined for keyword in test_keywords):
+                quality_indicators["test_focus"] += 1
+
+            if any(keyword in combined for keyword in refactor_keywords):
+                quality_indicators["refactoring_focus"] += 1
+
+            if any(keyword in combined for keyword in doc_keywords):
+                quality_indicators["documentation_focus"] += 1
+
+            if any(keyword in combined for keyword in security_keywords):
+                quality_indicators["security_focus"] += 1
+
+        # Calculate quality score
+        total_prs = len(prs)
+        if total_prs > 0:
+            quality_score = (
+                (quality_indicators["test_focus"] / total_prs) * 30
+                + (quality_indicators["refactoring_focus"] / total_prs) * 25
+                + (quality_indicators["documentation_focus"] / total_prs) * 25
+                + (quality_indicators["security_focus"] / total_prs) * 20
+            )
+            quality_indicators["quality_score"] = round(min(quality_score * 100, 100), 1)
+
+        return quality_indicators
+
+    def _calculate_pr_metrics(self, prs: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Calculate various PR metrics."""
+        metrics = {
+            "total_prs": len(prs),
+            "merged_prs": 0,
+            "open_prs": 0,
+            "closed_prs": 0,
+            "avg_additions": 0,
+            "avg_deletions": 0,
+            "avg_files_changed": 0,
+            "merge_rate": 0,
+        }
+
+        total_additions = 0
+        total_deletions = 0
+        total_files_changed = 0
+
+        for pr in prs:
+            state = pr.get("state", "")
+            if pr.get("merged_at"):
+                metrics["merged_prs"] += 1
+            elif state == "open":
+                metrics["open_prs"] += 1
+            else:
+                metrics["closed_prs"] += 1
+
+            total_additions += pr.get("additions", 0)
+            total_deletions += pr.get("deletions", 0)
+            total_files_changed += pr.get("changed_files", 0)
+
+        if prs:
+            metrics["avg_additions"] = round(total_additions / len(prs), 1)
+            metrics["avg_deletions"] = round(total_deletions / len(prs), 1)
+            metrics["avg_files_changed"] = round(total_files_changed / len(prs), 1)
+            metrics["merge_rate"] = round((metrics["merged_prs"] / len(prs)) * 100, 1)
+
+        return metrics
+
+    def _empty_pr_analysis(self) -> Dict[str, Any]:
+        """Return empty PR analysis structure."""
+        return {
+            "pull_requests": [],
+            "pr_analysis": {
+                "total_prs_analyzed": 0,
+                "collaboration_patterns": {
+                    "review_participation": 0,
+                    "discussion_quality": "unknown",
+                    "avg_review_comments_per_pr": 0,
+                    "avg_comments_per_pr": 0,
+                    "mentorship_indicators": [],
+                },
+                "problem_solving": {
+                    "architectural_decisions": 0,
+                    "trade_offs_discussed": 0,
+                    "problem_types": [],
+                    "solution_approaches": [],
+                },
+                "code_quality_focus": {
+                    "test_focus": 0,
+                    "refactoring_focus": 0,
+                    "documentation_focus": 0,
+                    "security_focus": 0,
+                    "quality_score": 0,
+                },
+                "pr_metrics": {
+                    "total_prs": 0,
+                    "merged_prs": 0,
+                    "open_prs": 0,
+                    "closed_prs": 0,
+                    "merge_rate": 0,
+                },
+            },
+            "total_prs_collected": 0,
+        }
+
+    def _sanitize_pr_data_for_prompt(self, prs: List[Dict[str, Any]], repo_names_to_sanitize: List[str]) -> List[Dict[str, Any]]:
+        """Clean PR data by replacing repository names with generic terms."""
+        sanitized_prs = []
+
+        for pr in prs:
+            sanitized_pr = pr.copy()
+
+            # Replace repo names in title
+            title = sanitized_pr.get("title", "")
+            for repo_name in repo_names_to_sanitize:
+                # Replace various forms of the repo name
+                title = re.sub(rf'\b{re.escape(repo_name)}\b', 'the project', title, flags=re.IGNORECASE)
+                title = re.sub(rf'\b{re.escape(repo_name.replace("-", " "))}\b', 'the project', title, flags=re.IGNORECASE)
+            sanitized_pr["title"] = title
+
+            # Replace repo names in body
+            body = sanitized_pr.get("body", "")
+            if body:
+                for repo_name in repo_names_to_sanitize:
+                    body = re.sub(rf'\b{re.escape(repo_name)}\b', 'the application', body, flags=re.IGNORECASE)
+                    body = re.sub(rf'\b{re.escape(repo_name.replace("-", " "))}\b', 'the application', body, flags=re.IGNORECASE)
+                sanitized_pr["body"] = body
+
+            # Remove repository field (not needed in prompt)
+            sanitized_pr.pop("repository", None)
+            sanitized_pr.pop("repository_full_name", None)
+
+            sanitized_prs.append(sanitized_pr)
+
+        return sanitized_prs

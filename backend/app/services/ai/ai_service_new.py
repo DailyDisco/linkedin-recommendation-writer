@@ -36,6 +36,7 @@ class AIService:
         tone: str = "professional",
         length: str = "medium",
         custom_prompt: Optional[str] = None,
+        shared_work_context: Optional[str] = None,
         target_role: Optional[str] = None,
         specific_skills: Optional[list] = None,
         exclude_keywords: Optional[list] = None,
@@ -55,6 +56,7 @@ class AIService:
                 tone=tone,
                 length=length,
                 custom_prompt=custom_prompt,
+                shared_work_context=shared_work_context,
                 target_role=target_role,
                 specific_skills=specific_skills,
                 exclude_keywords=exclude_keywords,
@@ -128,6 +130,7 @@ class AIService:
         recommendation_type: str = "professional",
         tone: str = "professional",
         length: str = "medium",
+        shared_work_context: Optional[str] = None,
         exclude_keywords: Optional[list] = None,
         display_name: Optional[str] = None,
     ) -> Dict[str, Any]:
@@ -139,6 +142,7 @@ class AIService:
             recommendation_type=recommendation_type,
             tone=tone,
             length=length,
+            shared_work_context=shared_work_context,
             exclude_keywords=exclude_keywords,
             display_name=display_name,
         )

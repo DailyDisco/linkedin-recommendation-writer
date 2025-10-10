@@ -335,6 +335,43 @@ class GitHubRepositoryService:
             if commit_patterns:
                 logger.info(f"   • Pattern keys: {list(commit_patterns.keys())}")
 
+            # Fetch and analyze pull requests
+            logger.info("🔀 STEP 6: ANALYZING PULL REQUESTS")
+            logger.info("-" * 40)
+            prs_start = time.time()
+
+            repo_prs = []
+            pr_analysis = {}
+            try:
+                # For repo_only context, filter PRs by target username
+                author_filter = target_username if analysis_context_type == "repo_only" and target_username else None
+                if author_filter:
+                    logger.info(f"🔒 REPO_ONLY: Fetching PRs ONLY from user: {author_filter}")
+
+                repo_prs = await self.commit_service.fetch_repository_pull_requests(
+                    repository_full_name,
+                    author_username=author_filter,
+                    max_prs=50,
+                    force_refresh=force_refresh
+                )
+
+                if repo_prs:
+                    pr_analysis = self.commit_service._perform_pr_analysis(repo_prs, target_username or owner)
+                    logger.info("✅ PR analysis completed")
+                else:
+                    logger.info("ℹ️  No PRs found for this repository")
+                    pr_analysis = self.commit_service._empty_pr_analysis()["pr_analysis"]
+
+            except Exception as e:
+                logger.error(f"💥 ERROR in PR analysis: {e}")
+                import traceback
+                logger.error(f"Stack trace: {traceback.format_exc()}")
+                pr_analysis = self.commit_service._empty_pr_analysis()["pr_analysis"]
+
+            prs_end = time.time()
+            logger.info(f"⏱️  PR analysis completed in {prs_end - prs_start:.2f} seconds")
+            logger.info(f"✅ Analyzed {len(repo_prs)} PRs from repository")
+
             # Compile final repository analysis
             analysis_end = time.time()
             total_time = analysis_end - analysis_start
@@ -345,6 +382,7 @@ class GitHubRepositoryService:
             logger.info(f"   • repo_commits type: {type(repo_commits)}")
             logger.info(f"   • repo_skills type: {type(repo_skills)}")
             logger.info(f"   • commit_patterns type: {type(commit_patterns)}")
+            logger.info(f"   • repo_prs count: {len(repo_prs)}")
 
             try:
                 result = {
@@ -353,6 +391,8 @@ class GitHubRepositoryService:
                     "commits": repo_commits,
                     "skills": repo_skills,
                     "commit_analysis": commit_patterns,
+                    "pull_requests": repo_prs,
+                    "pr_analysis": pr_analysis,
                     "analyzed_at": datetime.utcnow().isoformat(),
                     "analysis_time_seconds": round(total_time, 2),
                     "analysis_context_type": analysis_context_type,

@@ -31,6 +31,7 @@ class RecommendationEngineService:
         tone: str = "professional",
         length: str = "medium",
         custom_prompt: Optional[str] = None,
+        shared_work_context: Optional[str] = None,
         target_role: Optional[str] = None,
         specific_skills: Optional[List[str]] = None,
         exclude_keywords: Optional[List[str]] = None,
@@ -47,6 +48,7 @@ class RecommendationEngineService:
             tone=tone,
             length=length,
             custom_prompt=custom_prompt,
+            shared_work_context=shared_work_context,
             target_role=target_role,
             specific_skills=specific_skills,
             exclude_keywords=exclude_keywords,
@@ -66,6 +68,7 @@ class RecommendationEngineService:
         recommendation_type: str = "professional",
         tone: str = "professional",
         length: str = "medium",
+        shared_work_context: Optional[str] = None,
         analysis_context_type: str = "profile",
         repository_url: Optional[str] = None,
         force_refresh: bool = False,
@@ -81,6 +84,7 @@ class RecommendationEngineService:
             recommendation_type=recommendation_type,
             tone=tone,
             length=length,
+            shared_work_context=shared_work_context,
             display_name=display_name,
         )
 

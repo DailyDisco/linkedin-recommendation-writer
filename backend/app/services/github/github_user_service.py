@@ -155,6 +155,22 @@ class GitHubUserService:
             if excellence.get("primary_strength"):
                 logger.info(f"   • Primary strength: {excellence['primary_strength'].replace('_', ' ').title()}")
 
+            # Analyze pull requests (up to 50) using the commit service
+            logger.info("🔀 STEP 6: ANALYZING PULL REQUESTS (ASYNC BATCH PROCESSING) with Commit Service")
+            logger.info("-" * 40)
+            prs_start = time.time()
+
+            pr_data = await self.commit_service.fetch_user_pull_requests_across_repos(username, repositories, max_prs=50)
+
+            prs_end = time.time()
+            logger.info(f"⏱️  PR analysis completed in {prs_end - prs_start:.2f} seconds")
+            logger.info("✅ PR analysis results:")
+            logger.info(f"   • Total PRs analyzed: {pr_data.get('total_prs_collected', 0)}")
+
+            pr_analysis = pr_data.get("pr_analysis", {})
+            if pr_analysis.get("pr_metrics", {}).get("merge_rate"):
+                logger.info(f"   • PR merge rate: {pr_analysis['pr_metrics']['merge_rate']}%")
+
             # Compile analysis
             analysis = {
                 "user_data": user_data,
@@ -162,12 +178,14 @@ class GitHubUserService:
                 "languages": languages,
                 "skills": skills,
                 "commit_analysis": commit_analysis,
+                "pull_requests": pr_data.get("pull_requests", []),
+                "pr_analysis": pr_analysis,
                 "analyzed_at": datetime.utcnow().isoformat(),
                 "analysis_context_type": "profile",
             }
 
-            # Cache for longer due to more expensive commit analysis
-            logger.info("💾 STEP 6: CACHING RESULTS")
+            # Cache for longer due to more expensive commit and PR analysis
+            logger.info("💾 STEP 7: CACHING RESULTS")
             logger.info("-" * 40)
             cache_start = time.time()
 
@@ -189,6 +207,7 @@ class GitHubUserService:
             logger.info(f"   • Languages: {lang_end - lang_start:.2f}s ({((lang_end - lang_start)/total_time)*100:.1f}%)")
             logger.info(f"   • Skills: {skills_end - skills_start:.2f}s ({((skills_end - skills_start)/total_time)*100:.1f}%)")
             logger.info(f"   • Commits: {commits_end - commits_start:.2f}s ({((commits_end - commits_start)/total_time)*100:.1f}%)")
+            logger.info(f"   • Pull Requests: {prs_end - prs_start:.2f}s ({((prs_end - prs_start)/total_time)*100:.1f}%)")
             logger.info(f"   • Caching: {cache_end - cache_start:.2f}s ({((cache_end - cache_start)/total_time)*100:.1f}%)")
             logger.info("=" * 60)
 
