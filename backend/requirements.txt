@@ -33,7 +33,6 @@ pydantic-settings==2.10.1  # Pydantic extension for settings management
 
 # Authentication and security
 bcrypt==4.3.0  # Hashing library for passwords
-python-multipart==0.0.20  # Parsing multipart/form-data requests
 email-validator==2.3.0  # Email address validation library
 
 
