@@ -61,28 +61,89 @@ async def init_database() -> None:
 
 
 async def run_migrations() -> None:
-    """Run database migrations using Alembic."""
-    try:
-        from alembic import command
-        from alembic.config import Config
+    """Run database migrations using Alembic.
+    
+    This function runs Alembic migrations automatically on application startup.
+    It includes retry logic for database connection issues and detailed logging.
+    """
+    import time
+    
+    max_retries = 3
+    retry_delay = 2  # seconds
+    
+    for attempt in range(1, max_retries + 1):
+        try:
+            from alembic import command
+            from alembic.config import Config
+            from alembic.script import ScriptDirectory
+            from alembic.runtime.migration import MigrationContext
 
-        # Get the directory containing this file
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        backend_dir = os.path.dirname(os.path.dirname(current_dir))
-        alembic_cfg_path = os.path.join(backend_dir, "alembic.ini")
+            # Get the directory containing this file
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            backend_dir = os.path.dirname(os.path.dirname(current_dir))
+            alembic_cfg_path = os.path.join(backend_dir, "alembic.ini")
 
-        if os.path.exists(alembic_cfg_path):
+            if not os.path.exists(alembic_cfg_path):
+                logger.warning("Alembic configuration not found at %s, skipping migrations", alembic_cfg_path)
+                return
+
+            logger.info("🔄 Starting database migration process (attempt %d/%d)...", attempt, max_retries)
+            
+            # Load Alembic configuration
             alembic_cfg = Config(alembic_cfg_path)
+            script = ScriptDirectory.from_config(alembic_cfg)
+            
+            # Check current database version
+            with engine.begin() as conn:
+                context = MigrationContext.configure(conn.sync_connection)
+                current_rev = context.get_current_revision()
+                head_rev = script.get_current_head()
+                
+                if current_rev == head_rev:
+                    logger.info("✅ Database is already at the latest version: %s", current_rev or "base")
+                    return
+                
+                logger.info("📊 Current database version: %s", current_rev or "base")
+                logger.info("📊 Target database version: %s", head_rev)
+            
+            # Run migrations
+            logger.info("⚙️ Applying database migrations...")
             command.upgrade(alembic_cfg, "head")
-            logger.info("Database migrations completed successfully")
-        else:
-            logger.warning("Alembic configuration not found, skipping migrations")
+            
+            # Verify migration success
+            with engine.begin() as conn:
+                context = MigrationContext.configure(conn.sync_connection)
+                new_rev = context.get_current_revision()
+                
+                if new_rev == head_rev:
+                    logger.info("✅ Database migrations completed successfully! Current version: %s", new_rev)
+                else:
+                    logger.error("❌ Migration verification failed. Expected: %s, Got: %s", head_rev, new_rev)
+                    raise RuntimeError(f"Migration verification failed: expected {head_rev}, got {new_rev}")
+            
+            return  # Success, exit retry loop
 
-    except ImportError:
-        logger.warning("Alembic not available, skipping migrations")
-    except Exception as e:
-        logger.error(f"Failed to run migrations: {e}")
-        raise
+        except ImportError as e:
+            logger.warning("⚠️ Alembic not available: %s. Skipping migrations.", str(e))
+            return
+            
+        except Exception as e:
+            error_msg = str(e)
+            logger.error("❌ Migration attempt %d/%d failed: %s", attempt, max_retries, error_msg)
+            
+            if attempt < max_retries:
+                logger.info("⏳ Retrying in %d seconds...", retry_delay)
+                time.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+            else:
+                logger.critical("❌ All migration attempts failed. Database may be in an inconsistent state!")
+                logger.critical("💡 Suggested actions:")
+                logger.critical("   1. Check database connectivity")
+                logger.critical("   2. Verify migration files are valid")
+                logger.critical("   3. Check alembic_version table in database")
+                logger.critical("   4. Run 'alembic current' to check current version")
+                logger.critical("   5. Run 'alembic upgrade head' manually")
+                raise RuntimeError(f"Database migration failed after {max_retries} attempts: {error_msg}") from e
 
 
 async def get_database_info() -> Dict[str, Any]:

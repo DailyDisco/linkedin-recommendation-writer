@@ -59,7 +59,7 @@ class Settings(BaseSettings):
 
     # Initialization flags
     INIT_DB: bool = Field(default=True, description="Initialize database on startup")
-    RUN_MIGRATIONS: bool = Field(default=False, description="Run database migrations on startup")
+    RUN_MIGRATIONS: bool = Field(default=True, description="Run database migrations on startup")
 
     # CORS Configuration
     ALLOWED_ORIGINS: str = Field(
