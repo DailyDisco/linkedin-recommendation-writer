@@ -4,6 +4,7 @@ import logging
 import os
 from typing import Any, AsyncGenerator, Dict
 
+import sqlalchemy as sa
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
@@ -61,10 +62,11 @@ async def init_database() -> None:
 
 
 async def run_migrations() -> None:
-    """Run database migrations using Alembic.
+    """Run database migrations using Alembic with automatic state recovery.
     
     This function runs Alembic migrations automatically on application startup.
-    It includes retry logic for database connection issues and detailed logging.
+    It includes retry logic for database connection issues, detailed logging,
+    and automatic recovery from migration state mismatches.
     """
     import asyncio
     
@@ -98,10 +100,31 @@ async def run_migrations() -> None:
                 context = MigrationContext.configure(connection)
                 return context.get_current_revision()
             
+            # Helper function to check if tables exist
+            def check_tables_exist(connection):
+                inspector = sa.inspect(connection)
+                existing_tables = inspector.get_table_names()
+                return 'users' in existing_tables
+            
+            # Helper function to stamp database to a specific revision
+            def stamp_database(revision: str):
+                command.stamp(alembic_cfg, revision)
+            
             # Check current database version using run_sync to avoid greenlet issues
             async with engine.begin() as conn:
                 current_rev = await conn.run_sync(get_current_revision)
+                tables_exist = await conn.run_sync(check_tables_exist)
                 head_rev = script.get_current_head()
+                
+                # Handle migration state mismatch: tables exist but Alembic shows no migrations
+                if current_rev is None and tables_exist:
+                    logger.warning("⚠️ Tables exist but Alembic shows no migrations applied (state mismatch)")
+                    logger.info("🔧 Automatically recovering by stamping database to head revision: %s", head_rev)
+                    loop = asyncio.get_event_loop()
+                    await loop.run_in_executor(None, stamp_database, head_rev)
+                    logger.info("✅ Database stamped successfully to revision: %s", head_rev)
+                    logger.info("✅ Migration state recovery completed")
+                    return
                 
                 if current_rev == head_rev:
                     logger.info("✅ Database is already at the latest version: %s", current_rev or "base")

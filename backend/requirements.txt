@@ -37,9 +37,6 @@ bcrypt==4.3.0  # Hashing library for passwords
 python-multipart==0.0.20  # Parsing multipart/form-data requests
 email-validator==2.3.0  # Email address validation library
 
-# Advanced security (minimal set)
-PyJWT[crypto]==2.9.0  # Enhanced JWT handling
-
 # Date and time
 python-dateutil==2.8.2  # Extensions to the standard datetime module
 
