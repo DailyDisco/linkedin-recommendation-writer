@@ -93,10 +93,14 @@ async def run_migrations() -> None:
             alembic_cfg = Config(alembic_cfg_path)
             script = ScriptDirectory.from_config(alembic_cfg)
             
-            # Check current database version
+            # Helper function to get current revision (must be called via run_sync)
+            def get_current_revision(connection):
+                context = MigrationContext.configure(connection)
+                return context.get_current_revision()
+            
+            # Check current database version using run_sync to avoid greenlet issues
             async with engine.begin() as conn:
-                context = MigrationContext.configure(conn.sync_connection)
-                current_rev = context.get_current_revision()
+                current_rev = await conn.run_sync(get_current_revision)
                 head_rev = script.get_current_head()
                 
                 if current_rev == head_rev:
@@ -106,14 +110,13 @@ async def run_migrations() -> None:
                 logger.info("📊 Current database version: %s", current_rev or "base")
                 logger.info("📊 Target database version: %s", head_rev)
             
-            # Run migrations
+            # Run migrations - command.upgrade uses the alembic env.py which handles async properly
             logger.info("⚙️ Applying database migrations...")
             command.upgrade(alembic_cfg, "head")
             
-            # Verify migration success
+            # Verify migration success using run_sync
             async with engine.begin() as conn:
-                context = MigrationContext.configure(conn.sync_connection)
-                new_rev = context.get_current_revision()
+                new_rev = await conn.run_sync(get_current_revision)
                 
                 if new_rev == head_rev:
                     logger.info("✅ Database migrations completed successfully! Current version: %s", new_rev)
