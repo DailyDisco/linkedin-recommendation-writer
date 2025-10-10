@@ -18,7 +18,7 @@ from app.api.v1 import api_router
 from app.core.config import settings
 from app.core.lifecycle import lifespan
 from app.core.logging_config import setup_logging
-from app.core.middleware_setup import setup_middleware
+from app.core.middleware import setup_middleware
 
 # Setup logging
 setup_logging()

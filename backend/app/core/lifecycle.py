@@ -25,9 +25,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info(f"🔌 API Port: {settings.API_PORT}")
     logger.info(f"🐛 Debug Mode: {settings.API_DEBUG}")
 
-    # Validate required environment variables
-    await _validate_environment()
-
     # Initialize services
     await _initialize_database()
     await _initialize_redis()
@@ -38,33 +35,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Shutdown
     logger.info("🔄 Shutting down application...")
-
-
-async def _validate_environment() -> None:
-    """Validate required environment variables."""
-    # Check database URL
-    if settings.DATABASE_URL:
-        logger.info("✅ DATABASE_URL is configured")
-    else:
-        logger.error("❌ DATABASE_URL is not configured!")
-        raise ValueError("DATABASE_URL environment variable is required")
-
-    # Check Redis URL
-    if settings.REDIS_URL:
-        logger.info("✅ REDIS_URL is configured")
-    else:
-        logger.warning("⚠️ REDIS_URL is not configured - caching will be disabled")
-
-    # Check API keys
-    if settings.GITHUB_TOKEN:
-        logger.info("✅ GITHUB_TOKEN is configured")
-    else:
-        logger.warning("⚠️ GITHUB_TOKEN is not configured - GitHub functionality will be limited")
-
-    if settings.GEMINI_API_KEY:
-        logger.info("✅ GEMINI_API_KEY is configured")
-    else:
-        logger.warning("⚠️ GEMINI_API_KEY is not configured - AI recommendations will not work")
 
 
 async def _initialize_database() -> None:
