@@ -9,8 +9,8 @@ services:
       target: development # Use the development stage from the root Dockerfile
     container_name: linkedin-recommender-app
     ports:
-      - '5173:5173' # Vite dev server
-      - '8000:8000' # Backend API
+      - "5173:5173" # Vite dev server
+      - "8000:8000" # Backend API
     environment:
       # API Configuration
       - VITE_API_BASE_URL=http://localhost:8000
@@ -27,7 +27,7 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_PORT=${POSTGRES_PORT}
       # Redis
-      - REDIS_URL=${REDIS_URL}
+      - REDIS_URL=redis://redis:6379/0
       - REDIS_TIMEOUT=${REDIS_TIMEOUT}
       - REDIS_DEFAULT_TTL=${REDIS_DEFAULT_TTL}
       - REDIS_PORT=${REDIS_PORT}
@@ -61,14 +61,14 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     ports:
-      - '${POSTGRES_PORT}:5432'
+      - "${POSTGRES_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - linkedin-recommender-network
     restart: unless-stopped
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -78,14 +78,14 @@ services:
     image: redis:7-alpine
     container_name: linkedin-recommender-redis
     ports:
-      - '${REDIS_PORT}:6379'
+      - "${REDIS_PORT}:6379"
     volumes:
       - redis_data:/data
     networks:
       - linkedin-recommender-network
     restart: unless-stopped
     healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 3

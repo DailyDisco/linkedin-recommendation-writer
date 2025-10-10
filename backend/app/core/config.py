@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     DATABASE_POOL_TIMEOUT: int = Field(default=30, ge=5, le=120, description="Database pool timeout")
 
     # Redis Configuration
-    REDIS_URL: str = Field(default="redis://localhost:6379/0", description="Redis connection URL")
+    REDIS_URL: str = Field(default="redis://redis:6379/0", description="Redis connection URL")
     REDIS_TIMEOUT: int = Field(default=5, ge=1, le=30, description="Redis timeout in seconds")
     REDIS_DEFAULT_TTL: int = Field(default=3600, ge=60, le=86400, description="Default cache TTL")
 
@@ -85,8 +85,6 @@ class Settings(BaseSettings):
 
     # Feature Flags
     ENABLE_RATE_LIMITING: bool = Field(default=True, description="Enable API rate limiting")
-    ENABLE_METRICS: bool = Field(default=False, description="Enable metrics collection")
-    ENABLE_TRACING: bool = Field(default=False, description="Enable request tracing")
 
     @computed_field
     def cors_origins(self) -> List[str]:

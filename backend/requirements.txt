@@ -34,6 +34,7 @@ pydantic-settings==2.10.1  # Pydantic extension for settings management
 # Authentication and security
 bcrypt==4.3.0  # Hashing library for passwords
 email-validator==2.3.0  # Email address validation library
+python-multipart==0.0.20  # Required for FastAPI form data handling (OAuth2 password flow)
 
 
 
