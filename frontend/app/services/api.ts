@@ -14,7 +14,7 @@ import type { AxiosRequestConfig } from 'axios';
 
 // Determine API base URL based on environment
 // Use proxy path for development, full URL for production
-const apiBaseUrl = '/api';
+const apiBaseUrl = '/api/v1';
 
 // Debug logging
 if (typeof window !== 'undefined') {
@@ -92,14 +92,11 @@ api.interceptors.response.use(
 
           // Only redirect to login if the error is 401, user has a token (is logged in),
           // and it's not from the login endpoint itself
-          if (
-            (error as HttpError).config.url &&
-            !(error as HttpError).config.url.endsWith('/login') &&
-            hasToken
-          ) {
+          const errorUrl = (error as HttpError).config?.url;
+          if (errorUrl && !errorUrl.endsWith('/login') && hasToken) {
             console.log(
               'Global 401 interceptor: Redirecting to login for authenticated user.',
-              (error as HttpError).config.url,
+              errorUrl,
               (error as HttpError).response?.status
             );
             // Show toast notification before redirecting
@@ -119,7 +116,7 @@ api.interceptors.response.use(
           } else {
             console.log(
               'Global 401 interceptor: NOT redirecting - user is anonymous or this is login endpoint.',
-              error.config.url,
+              errorUrl,
               error.response?.status,
               'hasToken:',
               hasToken
@@ -142,11 +139,8 @@ api.interceptors.response.use(
 
           console.log('🔐 API Interceptor: Fallback - hasToken:', hasToken);
 
-          if (
-            (error as HttpError).config.url &&
-            !(error as HttpError).config.url.endsWith('/login') &&
-            hasToken
-          ) {
+          const errorUrl = (error as HttpError).config?.url;
+          if (errorUrl && !errorUrl.endsWith('/login') && hasToken) {
             console.log('🔐 API Interceptor: Fallback - redirecting to login');
             toast.error('Your session has expired. Please log in again.');
             localStorage.removeItem('auth-storage');
