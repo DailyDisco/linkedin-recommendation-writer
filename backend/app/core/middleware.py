@@ -19,7 +19,7 @@ from app.core.exceptions import (
     RateLimitError,
     ValidationError,
 )
-from app.core.security_config import security_utils
+from app.core.security_config import filter_pii_for_logging
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +46,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         request_id = getattr(request.state, "request_id", "unknown")
 
         # Sanitize URL and query parameters for logging
-        safe_url = security_utils.filter_pii_for_logging(str(request.url))
+        safe_url = filter_pii_for_logging(str(request.url))
         safe_client = request.client.host if request.client else "unknown"
 
         # Log request
@@ -63,7 +63,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
 
         except Exception as e:
             duration = time.time() - start_time
-            safe_error = security_utils.filter_pii_for_logging(str(e))
+            safe_error = filter_pii_for_logging(str(e))
             logger.error(
                 f"Request failed - ID: {request_id}, Error: {safe_error}, " f"Duration: {duration:.3f}s",
                 exc_info=True,
@@ -133,7 +133,7 @@ class ErrorHandlingMiddleware(BaseHTTPMiddleware):
             return await self._handle_application_error(e, request)
         except ValueError as e:
             # Handle standard Python ValueError
-            logger.warning(f"Validation error: {security_utils.filter_pii_for_logging(str(e))}")
+            logger.warning(f"Validation error: {filter_pii_for_logging(str(e))}")
             return JSONResponse(
                 status_code=400,
                 content={
@@ -145,7 +145,7 @@ class ErrorHandlingMiddleware(BaseHTTPMiddleware):
             )
         except ConnectionError as e:
             # Handle connection errors
-            logger.error(f"Connection error: {security_utils.filter_pii_for_logging(str(e))}")
+            logger.error(f"Connection error: {filter_pii_for_logging(str(e))}")
             return JSONResponse(
                 status_code=503,
                 content={
@@ -157,7 +157,7 @@ class ErrorHandlingMiddleware(BaseHTTPMiddleware):
             )
         except TimeoutError as e:
             # Handle timeout errors
-            logger.error(f"Timeout error: {security_utils.filter_pii_for_logging(str(e))}")
+            logger.error(f"Timeout error: {filter_pii_for_logging(str(e))}")
             return JSONResponse(
                 status_code=504,
                 content={
@@ -170,7 +170,7 @@ class ErrorHandlingMiddleware(BaseHTTPMiddleware):
         except Exception as e:
             # Handle any other unhandled exceptions
             request_id = getattr(request.state, "request_id", "unknown")
-            safe_error = security_utils.filter_pii_for_logging(str(e))
+            safe_error = filter_pii_for_logging(str(e))
             logger.error(f"Unhandled error in request {request_id}: {safe_error}", exc_info=True)
 
             if settings.API_DEBUG:
@@ -223,7 +223,7 @@ class ErrorHandlingMiddleware(BaseHTTPMiddleware):
             safe_details = {}
             for key, value in error.details.items():
                 if isinstance(value, str):
-                    safe_details[key] = security_utils.filter_pii_for_logging(value)
+                    safe_details[key] = filter_pii_for_logging(value)
                 else:
                     safe_details[key] = value
             response_content["details"] = safe_details

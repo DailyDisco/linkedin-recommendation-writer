@@ -66,7 +66,7 @@ async def run_migrations() -> None:
     This function runs Alembic migrations automatically on application startup.
     It includes retry logic for database connection issues and detailed logging.
     """
-    import time
+    import asyncio
     
     max_retries = 3
     retry_delay = 2  # seconds
@@ -110,9 +110,11 @@ async def run_migrations() -> None:
                 logger.info("📊 Current database version: %s", current_rev or "base")
                 logger.info("📊 Target database version: %s", head_rev)
             
-            # Run migrations - command.upgrade uses the alembic env.py which handles async properly
+            # Run migrations in a thread pool to avoid event loop conflicts
+            # command.upgrade loads env.py which calls asyncio.run(), which conflicts with the running loop
             logger.info("⚙️ Applying database migrations...")
-            command.upgrade(alembic_cfg, "head")
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, command.upgrade, alembic_cfg, "head")
             
             # Verify migration success using run_sync
             async with engine.begin() as conn:
@@ -136,7 +138,7 @@ async def run_migrations() -> None:
             
             if attempt < max_retries:
                 logger.info("⏳ Retrying in %d seconds...", retry_delay)
-                time.sleep(retry_delay)
+                await asyncio.sleep(retry_delay)
                 retry_delay *= 2  # Exponential backoff
             else:
                 logger.critical("❌ All migration attempts failed. Database may be in an inconsistent state!")

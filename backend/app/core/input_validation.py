@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional, Set
 import magic
 from fastapi import HTTPException, UploadFile
 
-from app.core.security_config import security_utils
+from app.core.security_config import sanitize_text, validate_url
 
 
 class FileUploadValidator:
@@ -231,7 +231,7 @@ class InputValidator:
 
     def _validate_url(self, url: str, **kwargs) -> Dict[str, Any]:
         """Validate URL."""
-        return {"valid": security_utils.validate_url(url), "sanitized": url.strip() if security_utils.validate_url(url) else url}
+        return {"valid": validate_url(url), "sanitized": url.strip() if validate_url(url) else url}
 
     def _validate_phone(self, phone: str, **kwargs) -> Dict[str, Any]:
         """Validate phone number."""
@@ -300,7 +300,7 @@ class InputValidator:
         if len(text) > max_length:
             return {"valid": False, "error": f"Text exceeds maximum length of {max_length}"}
 
-        sanitized = security_utils.sanitize_text(text)
+        sanitized = sanitize_text(text)
 
         return {"valid": True, "sanitized": sanitized}
 

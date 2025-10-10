@@ -37,15 +37,8 @@ bcrypt==4.3.0  # Hashing library for passwords
 python-multipart==0.0.20  # Parsing multipart/form-data requests
 email-validator==2.3.0  # Email address validation library
 
-# Advanced security
-bleach==6.1.0  # HTML sanitization
-defusedxml==0.7.1  # XML parsing security
-slowapi==0.1.9  # Rate limiting
+# Advanced security (minimal set)
 PyJWT[crypto]==2.9.0  # Enhanced JWT handling
-
-# API key security
-cryptography>=44.0.1  # Already included for encryption
-python-magic>=0.4.27  # File type detection
 
 # Date and time
 python-dateutil==2.8.2  # Extensions to the standard datetime module
@@ -74,6 +67,6 @@ loguru==0.7.3  # Opinionated logging library
 # Background tasks
 celery==5.5.3  # Distributed task queue
 
-# Monitoring and metrics (optional)
-prometheus-client==0.22.1  # Python client for Prometheus metrics
+# Monitoring and metrics (optional - removed for simplification)
+# prometheus-client==0.22.1  # Python client for Prometheus metrics
 

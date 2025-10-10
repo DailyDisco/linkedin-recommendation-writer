@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
-from app.core.security_config import security_utils
+from app.core.security_config import sanitize_text, validate_github_username, validate_url
 
 
 class RecommendationRequest(BaseModel):
@@ -38,9 +38,9 @@ class RecommendationRequest(BaseModel):
 
     @field_validator("github_username")
     @classmethod
-    def validate_github_username(cls, v: str) -> str:
+    def validate_github_username_field(cls, v: str) -> str:
         """Validate GitHub username format."""
-        if not security_utils.validate_github_username(v):
+        if not validate_github_username(v):
             raise ValueError("Invalid GitHub username format")
         return v
 
@@ -48,7 +48,7 @@ class RecommendationRequest(BaseModel):
     @classmethod
     def validate_repository_url(cls, v: Optional[str]) -> Optional[str]:
         """Validate repository URL if provided."""
-        if v and not security_utils.validate_url(v, ["github.com"]):
+        if v and not validate_url(v, ["github.com"]):
             raise ValueError("Invalid repository URL or not a GitHub URL")
         return v
 
@@ -57,7 +57,7 @@ class RecommendationRequest(BaseModel):
     def sanitize_text_fields(cls, v: Optional[str]) -> Optional[str]:
         """Sanitize text fields to remove dangerous content."""
         if v:
-            return security_utils.sanitize_text(v)
+            return sanitize_text(v)
         return v
 
     @field_validator("include_keywords", "exclude_keywords", "include_specific_skills")
@@ -69,7 +69,7 @@ class RecommendationRequest(BaseModel):
             sanitized = []
             for item in v[:20]:  # Limit to 20 items
                 if isinstance(item, str):
-                    sanitized_item = security_utils.sanitize_text(item)
+                    sanitized_item = sanitize_text(item)
                     if sanitized_item and len(sanitized_item) <= 100:  # Max 100 chars per item
                         sanitized.append(sanitized_item)
             return sanitized if sanitized else None

@@ -2,7 +2,7 @@
 
 from typing import Any, Dict, Optional
 
-from app.core.security_config import security_utils
+from app.core.security_config import filter_pii_for_logging
 
 
 class BaseApplicationError(Exception):
@@ -39,11 +39,11 @@ class BaseApplicationError(Exception):
 
     def get_safe_message(self) -> str:
         """Get a sanitized error message safe for logging."""
-        return security_utils.filter_pii_for_logging(self.message)
+        return filter_pii_for_logging(self.message)
 
     def get_user_friendly_message(self) -> str:
         """Get a user-friendly message safe for client responses."""
-        return security_utils.filter_pii_for_logging(self.user_message)
+        return filter_pii_for_logging(self.user_message)
 
     def to_dict(self, include_details: bool = False) -> Dict[str, Any]:
         """Convert error to dictionary format for API responses."""
@@ -57,7 +57,7 @@ class BaseApplicationError(Exception):
             safe_details = {}
             for key, value in self.details.items():
                 if isinstance(value, str):
-                    safe_details[key] = security_utils.filter_pii_for_logging(value)
+                    safe_details[key] = filter_pii_for_logging(value)
                 else:
                     safe_details[key] = value
             result["details"] = safe_details
