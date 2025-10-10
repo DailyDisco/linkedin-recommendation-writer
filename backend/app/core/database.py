@@ -94,7 +94,7 @@ async def run_migrations() -> None:
             script = ScriptDirectory.from_config(alembic_cfg)
             
             # Check current database version
-            with engine.begin() as conn:
+            async with engine.begin() as conn:
                 context = MigrationContext.configure(conn.sync_connection)
                 current_rev = context.get_current_revision()
                 head_rev = script.get_current_head()
@@ -111,7 +111,7 @@ async def run_migrations() -> None:
             command.upgrade(alembic_cfg, "head")
             
             # Verify migration success
-            with engine.begin() as conn:
+            async with engine.begin() as conn:
                 context = MigrationContext.configure(conn.sync_connection)
                 new_rev = context.get_current_revision()
                 
