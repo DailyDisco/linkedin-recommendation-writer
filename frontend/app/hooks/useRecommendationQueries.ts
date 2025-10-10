@@ -267,7 +267,7 @@ export const useGenerateRecommendationOptionsStream = () => {
                 );
               }
 
-              const retryUrl = `/api/recommendations/generate-options/stream?${params.toString()}`;
+              const retryUrl = `/api/v1/recommendations/generate-options/stream?${params.toString()}`;
               console.log('Retrying with URL:', retryUrl);
 
               // Set the retry URL to trigger reconnection
@@ -350,7 +350,7 @@ export const useGenerateRecommendationOptionsStream = () => {
         params.append('repository_url', request.repository_url);
       }
 
-      const newStreamUrl = `/api/recommendations/generate-options/stream?${params.toString()}`;
+      const newStreamUrl = `/api/v1/recommendations/generate-options/stream?${params.toString()}`;
       setStreamUrl(newStreamUrl);
 
       return () => disconnectRef.current?.();

@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # Add the backend directory to the Python path
 import sys
 import os
-sys.path.insert(0, os.path.dirname(__file__))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from app.core.dependencies import get_database_session
 from app.models.user import User
@@ -215,3 +215,4 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n❌ Unexpected error: {e}")
         sys.exit(1)
+
