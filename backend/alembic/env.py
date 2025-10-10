@@ -9,6 +9,9 @@ from alembic import context
 # access to the values within the .ini file in use.
 config = context.config
 
+# Import application settings to use the actual DATABASE_URL
+from app.core.config import settings
+
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
 # Disabled: The application already has logging configured, and this causes
@@ -45,6 +48,10 @@ def run_migrations_offline() -> None:
     script output.
 
     """
+    # Override the sqlalchemy.url from alembic.ini with the actual DATABASE_URL
+    # from environment variables to ensure we use the correct connection string
+    config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+    
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
@@ -69,6 +76,10 @@ async def run_async_migrations():
     and associate a connection with the context.
 
     """
+    
+    # Override the sqlalchemy.url from alembic.ini with the actual DATABASE_URL
+    # from environment variables to ensure we use the correct connection string
+    config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
