@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, lazy, Suspense } from 'react';
 import { Github, Loader2, Users, User } from 'lucide-react';
 import { Link } from 'react-router';
 import { toast } from 'sonner';
@@ -12,14 +12,21 @@ declare global {
     testRepositoryUrlParsing?: typeof testRepositoryUrlParsing;
   }
 }
-import RecommendationModal from '../components/RecommendationModal';
-import RegistrationModal from '../components/RegistrationModal';
+
+// Lazy load heavy modal components for better bundle splitting
+const RecommendationModal = lazy(
+  () => import('../components/RecommendationModal')
+);
+const RegistrationModal = lazy(
+  () => import('../components/RegistrationModal')
+);
+
 import { ContributorSkeleton } from '../components/ui/loading-skeleton';
 import ErrorBoundary from '../components/ui/error-boundary';
 import { LazyContributorList } from '../components/ui/memo-components';
 import { testRepositoryUrlParsing } from '../utils/debug-url-parser';
-import { useAuth } from '../hooks/useAuth'; // Import useAuth hook
-import { useRecommendationCount } from '../hooks/useRecommendationCount'; // Import anonymous count hook
+import { useAuth } from '../hooks/useAuth';
+import { useRecommendationCount } from '../hooks/useRecommendationCount';
 import { trackEngagement } from '../utils/analytics';
 
 const parseRepositoryInput = (input: string): string => {
@@ -744,28 +751,32 @@ export default function GeneratorPage() {
           </div>
         </div>
 
-        {/* Registration Modal */}
-        <RegistrationModal
-          isOpen={showRegistrationModal}
-          onClose={() => {
-            setShowRegistrationModal(false);
-            setHasDismissedRegistrationModal(true);
-          }}
-        />
-
-        {/* Recommendation Modal */}
-        {selectedContributor && (
-          <RecommendationModal
-            contributor={selectedContributor}
-            isOpen={showRecommendationModal}
+        {/* Registration Modal - lazy loaded */}
+        <Suspense fallback={null}>
+          <RegistrationModal
+            isOpen={showRegistrationModal}
             onClose={() => {
-              setShowRecommendationModal(false);
-              setSelectedContributor(null);
+              setShowRegistrationModal(false);
+              setHasDismissedRegistrationModal(true);
             }}
-            isLoggedIn={isLoggedIn}
-            initialInputValue={formData.input_value}
-            mode={mode}
           />
+        </Suspense>
+
+        {/* Recommendation Modal - lazy loaded */}
+        {selectedContributor && (
+          <Suspense fallback={null}>
+            <RecommendationModal
+              contributor={selectedContributor}
+              isOpen={showRecommendationModal}
+              onClose={() => {
+                setShowRecommendationModal(false);
+                setSelectedContributor(null);
+              }}
+              isLoggedIn={isLoggedIn}
+              initialInputValue={formData.input_value}
+              mode={mode}
+            />
+          </Suspense>
         )}
       </div>
     </ErrorBoundary>

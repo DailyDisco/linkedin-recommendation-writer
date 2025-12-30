@@ -502,6 +502,135 @@ class AIRecommendationService:
             logger.error(f"Error generating AI recommendation: {e}")
             raise
 
+    async def generate_recommendation_with_quality_gate(
+        self,
+        github_data: Dict[str, Any],
+        recommendation_type: str = "professional",
+        tone: str = "professional",
+        length: str = "medium",
+        custom_prompt: Optional[str] = None,
+        shared_work_context: Optional[str] = None,
+        target_role: Optional[str] = None,
+        specific_skills: Optional[list] = None,
+        exclude_keywords: Optional[list] = None,
+        focus_keywords: Optional[List[str]] = None,
+        focus_weights: Optional[Dict[str, float]] = None,
+        analysis_context_type: str = "profile",
+        repository_url: Optional[str] = None,
+        force_refresh: bool = False,
+        display_name: Optional[str] = None,
+        min_quality_score: int = 65,
+        max_retries: int = 3,
+    ) -> Dict[str, Any]:
+        """Generate a recommendation with quality gate - automatically retries if quality is too low.
+
+        Args:
+            min_quality_score: Minimum acceptable quality score (0-100). Default 65.
+            max_retries: Maximum number of generation attempts. Default 3.
+            Other args: Same as generate_recommendation.
+
+        Returns:
+            Best quality recommendation result, with quality_gate_metadata added.
+        """
+        if not self.client:
+            raise ValueError("Gemini AI not configured")
+
+        best_result = None
+        best_score = 0
+        attempts_log = []
+
+        for attempt in range(1, max_retries + 1):
+            logger.info(f"🎯 QUALITY GATE: Attempt {attempt}/{max_retries}")
+
+            # Adjust parameters based on retry attempt
+            adjusted_temperature_boost = (attempt - 1) * 0.1  # Increase creativity on retries
+
+            try:
+                # Generate recommendation
+                result = await self.generate_recommendation(
+                    github_data=github_data,
+                    recommendation_type=recommendation_type,
+                    tone=tone,
+                    length=length,
+                    custom_prompt=custom_prompt,
+                    shared_work_context=shared_work_context,
+                    target_role=target_role,
+                    specific_skills=specific_skills,
+                    exclude_keywords=exclude_keywords,
+                    focus_keywords=focus_keywords,
+                    focus_weights=focus_weights,
+                    analysis_context_type=analysis_context_type,
+                    repository_url=repository_url,
+                    force_refresh=True if attempt > 1 else force_refresh,  # Force fresh on retries
+                    display_name=display_name,
+                )
+
+                # Calculate average quality score across options
+                options = result.get("options", [])
+                if not options:
+                    logger.warning(f"⚠️ Attempt {attempt}: No options generated")
+                    attempts_log.append({"attempt": attempt, "score": 0, "reason": "no_options"})
+                    continue
+
+                # Get best option quality
+                option_scores = []
+                for option in options:
+                    validation = option.get("validation_results", {})
+                    score = validation.get("overall_quality_score", 50)
+                    option_scores.append(score)
+
+                avg_score = sum(option_scores) / len(option_scores)
+                max_option_score = max(option_scores)
+
+                logger.info(f"📊 Attempt {attempt} quality: avg={avg_score:.1f}, max={max_option_score:.1f}")
+                attempts_log.append({
+                    "attempt": attempt,
+                    "avg_score": avg_score,
+                    "max_score": max_option_score,
+                    "option_scores": option_scores,
+                })
+
+                # Track best result
+                if max_option_score > best_score:
+                    best_score = max_option_score
+                    best_result = result
+
+                # Check if quality meets threshold
+                if max_option_score >= min_quality_score:
+                    logger.info(f"✅ QUALITY GATE PASSED: Score {max_option_score:.1f} >= {min_quality_score}")
+                    break
+                else:
+                    logger.info(f"⚠️ Quality {max_option_score:.1f} < {min_quality_score}, retrying...")
+
+                    # Add more specific instructions for retry
+                    if attempt < max_retries:
+                        if not specific_skills:
+                            specific_skills = []
+                        # Extract top skills to emphasize on retry
+                        skills_data = github_data.get("skills", {})
+                        top_skills = skills_data.get("technical_skills", [])[:3]
+                        specific_skills = list(set(specific_skills + top_skills))
+
+            except Exception as e:
+                logger.error(f"❌ Attempt {attempt} failed: {e}")
+                attempts_log.append({"attempt": attempt, "error": str(e)})
+                if attempt == max_retries:
+                    raise
+
+        # Return best result with metadata
+        if best_result:
+            best_result["quality_gate_metadata"] = {
+                "attempts": len(attempts_log),
+                "final_score": best_score,
+                "min_threshold": min_quality_score,
+                "passed": best_score >= min_quality_score,
+                "attempts_log": attempts_log,
+            }
+            logger.info(f"🏁 QUALITY GATE COMPLETE: Best score {best_score:.1f} after {len(attempts_log)} attempts")
+            return best_result
+
+        raise ValueError("Failed to generate recommendation after all attempts")
+
     async def _generate_multiple_options(
         self,
         initial_prompt: str,
@@ -512,15 +641,22 @@ class AIRecommendationService:
         focus_keywords: Optional[List[str]] = None,
         focus_weights: Optional[Dict[str, float]] = None,
         display_name: Optional[str] = None,
+        parallel: bool = True,
     ) -> List[Dict[str, Any]]:
-        """Generate 2 different recommendation options."""
+        """Generate 2 different recommendation options.
+
+        Args:
+            parallel: If True, generate options concurrently for faster response.
+                     Default True. Set False if hitting rate limits.
+        """
+        import asyncio
         import time
 
         logger.info("🎭 GENERATING MULTIPLE OPTIONS")
+        logger.info(f"⚡ Mode: {'PARALLEL' if parallel else 'SEQUENTIAL'}")
         logger.info("=" * 60)
         pipeline_start = time.time()
 
-        options = []
         base_username = github_data["user_data"]["github_username"]
 
         # Extract display name for consistent naming (prioritizes first name)
@@ -529,6 +665,153 @@ class AIRecommendationService:
 
         # Generate 2 different options with varying approaches
         option_configs = self._get_dynamic_option_configs(github_data)
+
+        if parallel:
+            # PARALLEL GENERATION - Generate all options concurrently
+            options = await self._generate_options_parallel(
+                initial_prompt=initial_prompt,
+                option_configs=option_configs,
+                base_username=base_username,
+                recommendation_type=recommendation_type,
+                tone=tone,
+                length=length,
+                focus_keywords=focus_keywords,
+                focus_weights=focus_weights,
+                display_name=display_name,
+                github_data=github_data,
+            )
+        else:
+            # SEQUENTIAL GENERATION - Generate options one by one (original behavior)
+            options = await self._generate_options_sequential(
+                initial_prompt=initial_prompt,
+                option_configs=option_configs,
+                base_username=base_username,
+                recommendation_type=recommendation_type,
+                tone=tone,
+                length=length,
+                focus_keywords=focus_keywords,
+                focus_weights=focus_weights,
+                display_name=display_name,
+                github_data=github_data,
+            )
+
+        pipeline_end = time.time()
+        total_pipeline_time = pipeline_end - pipeline_start
+
+        logger.info("🎉 MULTIPLE OPTIONS GENERATION COMPLETED")
+        logger.info(f"⏱️  Total time: {total_pipeline_time:.2f} seconds")
+        if parallel and len(options) > 1:
+            logger.info(f"⚡ Parallel speedup: ~{len(options)}x faster than sequential")
+
+        return options
+
+    async def _generate_options_parallel(
+        self,
+        initial_prompt: str,
+        option_configs: List[Dict[str, Any]],
+        base_username: str,
+        recommendation_type: str,
+        tone: str,
+        length: str,
+        focus_keywords: Optional[List[str]],
+        focus_weights: Optional[Dict[str, float]],
+        display_name: str,
+        github_data: Dict[str, Any],
+    ) -> List[Dict[str, Any]]:
+        """Generate options in parallel using asyncio.gather for faster response."""
+        import asyncio
+
+        logger.info(f"🚀 Starting parallel generation of {len(option_configs)} options")
+
+        # Prepare all generation tasks
+        async def generate_single_option_task(config: Dict[str, Any], index: int) -> Dict[str, Any]:
+            """Task wrapper for single option generation."""
+            try:
+                # Create customized prompt for this option
+                option_prompt = self.prompt_service.build_option_prompt(
+                    initial_prompt,
+                    str(config["custom_instruction"]),
+                    str(config["focus"]),
+                    focus_keywords,
+                    focus_weights,
+                )
+
+                # Generate the option
+                temp_modifier = config.get("temperature_modifier", 0.7)
+                temp_modifier = float(temp_modifier) if isinstance(temp_modifier, (int, float, str)) else 0.7
+
+                # Prepare generation parameters for formatting and validation
+                option_gen_params = {
+                    "github_username": base_username,
+                    "recommendation_type": recommendation_type,
+                    "tone": tone,
+                    "length": length,
+                    "focus": config["focus"],
+                }
+
+                option_content, validation_results = await self._generate_single_option(
+                    option_prompt, temp_modifier, length, option_gen_params, github_data
+                )
+
+                # Create option object
+                return {
+                    "id": index,
+                    "name": config["name"],
+                    "content": option_content.strip(),
+                    "title": self.prompt_service.extract_title(option_content, base_username, None, display_name),
+                    "word_count": len(option_content.split()),
+                    "focus": config["focus"],
+                    "validation_results": validation_results,
+                    "success": True,
+                }
+            except Exception as e:
+                logger.error(f"❌ Error generating {config['name']}: {e}")
+                return {
+                    "id": index,
+                    "name": config["name"],
+                    "content": "",
+                    "error": str(e),
+                    "success": False,
+                }
+
+        # Create tasks for all options
+        tasks = [
+            generate_single_option_task(config, i + 1)
+            for i, config in enumerate(option_configs)
+        ]
+
+        # Execute all tasks concurrently
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Process results
+        options = []
+        for result in results:
+            if isinstance(result, Exception):
+                logger.error(f"❌ Task exception: {result}")
+                continue
+            if isinstance(result, dict) and result.get("success"):
+                options.append(result)
+                logger.info(f"✅ {result['name']}: {result['word_count']} words generated")
+
+        return options
+
+    async def _generate_options_sequential(
+        self,
+        initial_prompt: str,
+        option_configs: List[Dict[str, Any]],
+        base_username: str,
+        recommendation_type: str,
+        tone: str,
+        length: str,
+        focus_keywords: Optional[List[str]],
+        focus_weights: Optional[Dict[str, float]],
+        display_name: str,
+        github_data: Dict[str, Any],
+    ) -> List[Dict[str, Any]]:
+        """Generate options sequentially (original behavior, useful if rate-limited)."""
+        import time
+
+        options = []
 
         for i, config in enumerate(option_configs, 1):
             logger.info(f"📝 GENERATING {config['name']}: {config['focus']}")
@@ -557,7 +840,9 @@ class AIRecommendationService:
                 "focus": config["focus"],
             }
 
-            option_content, validation_results = await self._generate_single_option(option_prompt, temp_modifier, length, option_gen_params, github_data)
+            option_content, validation_results = await self._generate_single_option(
+                option_prompt, temp_modifier, length, option_gen_params, github_data
+            )
 
             option_end = time.time()
 
@@ -578,16 +863,39 @@ class AIRecommendationService:
             logger.info(f"✅ Generated {option['word_count']} words")
             logger.info(f"   • Preview: {option_content[:100]}...")
 
-        pipeline_end = time.time()
-        total_pipeline_time = pipeline_end - pipeline_start
+        return options
 
+    async def _generate_multiple_options_legacy(
+        self,
+        initial_prompt: str,
+        github_data: Dict[str, Any],
+        recommendation_type: str,
+        tone: str,
+        length: str,
+        focus_keywords: Optional[List[str]] = None,
+        focus_weights: Optional[Dict[str, float]] = None,
+        display_name: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Legacy sequential generation - kept for backwards compatibility."""
+        return await self._generate_multiple_options(
+            initial_prompt=initial_prompt,
+            github_data=github_data,
+            recommendation_type=recommendation_type,
+            tone=tone,
+            length=length,
+            focus_keywords=focus_keywords,
+            focus_weights=focus_weights,
+            display_name=display_name,
+            parallel=False,
+        )
+
+    def _log_generation_complete(self, options: List[Dict[str, Any]], total_time: float) -> None:
+        """Log completion of multiple options generation."""
         logger.info("🎉 MULTIPLE OPTIONS GENERATION COMPLETED")
         logger.info("-" * 40)
-        logger.info(f"⏱️  Total time: {total_pipeline_time:.2f} seconds")
+        logger.info(f"⏱️  Total time: {total_time:.2f} seconds")
         logger.info(f"📊 Generated {len(options)} options")
         logger.info("=" * 60)
-
-        return options
 
     def _get_dynamic_option_configs(self, github_data: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Generate dynamic recommendation options based on inferred personality traits."""
@@ -1031,7 +1339,15 @@ class AIRecommendationService:
         return validation_results
 
     def _detect_generic_content(self, content: str) -> Dict[str, Any]:
-        """Detect generic, cliché, or overly common phrases in the recommendation."""
+        """Detect generic, cliché, or overly common phrases in the recommendation.
+
+        Enhanced detection includes:
+        - Buzzwords and clichés
+        - LinkedIn platitudes
+        - Vague descriptors
+        - Specificity requirements (technology mentions, examples, outcomes)
+        - Structural quality checks
+        """
         generic_indicators = {
             "buzzwords": [
                 "passionate",
@@ -1048,6 +1364,12 @@ class AIRecommendationService:
                 "customer-focused",
                 "self-motivated",
                 "excellent communication",
+                "dynamic",
+                "synergistic",
+                "motivated",
+                "enthusiastic",
+                "driven",
+                "committed",
             ],
             "generic_phrases": [
                 "worked on various projects",
@@ -1059,8 +1381,65 @@ class AIRecommendationService:
                 "gained experience in",
                 "developed skills in",
                 "learned to use",
+                "has a strong background",
+                "brings a wealth of experience",
+                "demonstrated ability to",
+                "proven track record",
+                "exceeded expectations",
+                "went above and beyond",
+                "takes initiative",
+                "adds value",
             ],
-            "vague_descriptors": ["good at", "skilled in", "experienced with", "knowledge of", "understanding of", "familiar with", "comfortable with"],
+            "vague_descriptors": [
+                "good at",
+                "skilled in",
+                "experienced with",
+                "knowledge of",
+                "understanding of",
+                "familiar with",
+                "comfortable with",
+                "proficient in",
+                "competent in",
+                "capable of",
+            ],
+            "linkedin_platitudes": [
+                "pleasure to work with",
+                "asset to any team",
+                "would be an asset",
+                "highly recommend",
+                "would not hesitate to recommend",
+                "without hesitation",
+                "any team would be lucky",
+                "lucky to have",
+                "pleasure of working",
+                "honor to work with",
+                "privilege to work",
+                "strongly recommend",
+                "wholeheartedly recommend",
+                "cannot recommend enough",
+                "one of the best",
+                "among the best",
+                "top performer",
+                "star performer",
+                "outstanding individual",
+                "exceptional talent",
+            ],
+            "ai_tells": [
+                "it's worth noting",
+                "importantly",
+                "furthermore",
+                "moreover",
+                "additionally",
+                "in conclusion",
+                "to summarize",
+                "it should be mentioned",
+                "notably",
+                "indeed",
+                "certainly",
+                "undoubtedly",
+                "without a doubt",
+                "needless to say",
+            ],
         }
 
         content_lower = content.lower()
@@ -1090,24 +1469,111 @@ class AIRecommendationService:
                 vague_descriptor_count += 1
                 found_vague_descriptors.append(descriptor)
 
+        # Count LinkedIn platitudes (heavily penalized)
+        platitude_count = 0
+        found_platitudes = []
+        for platitude in generic_indicators["linkedin_platitudes"]:
+            if platitude in content_lower:
+                platitude_count += 1
+                found_platitudes.append(platitude)
+
+        # Count AI tells
+        ai_tell_count = 0
+        found_ai_tells = []
+        for tell in generic_indicators["ai_tells"]:
+            if tell in content_lower:
+                ai_tell_count += 1
+                found_ai_tells.append(tell)
+
+        # SPECIFICITY REQUIREMENTS CHECK
+        specificity_score = 100
+        specificity_issues = []
+
+        # Check for technology/skill mentions (at least 1 specific tech)
+        tech_indicators = [
+            "python", "javascript", "typescript", "java", "go", "rust", "c++", "c#",
+            "react", "vue", "angular", "node", "django", "flask", "fastapi", "spring",
+            "docker", "kubernetes", "aws", "gcp", "azure", "postgresql", "mongodb",
+            "redis", "graphql", "rest", "api", "microservices", "machine learning",
+            "tensorflow", "pytorch", "sql", "nosql", "ci/cd", "git", "linux",
+        ]
+        has_tech = any(tech in content_lower for tech in tech_indicators)
+        if not has_tech:
+            specificity_score -= 15
+            specificity_issues.append("No specific technology mentioned")
+
+        # Check for specific examples/incidents
+        example_indicators = [
+            "when", "during", "there was", "i remember", "one time", "specifically",
+            "for example", "in particular", "instance", "situation", "project",
+            "incident", "challenge", "problem we faced", "deadline",
+        ]
+        has_example = sum(1 for ind in example_indicators if ind in content_lower) >= 2
+        if not has_example:
+            specificity_score -= 20
+            specificity_issues.append("No specific examples or incidents mentioned")
+
+        # Check for outcome/impact statements
+        outcome_indicators = [
+            "resulted in", "led to", "improved", "reduced", "increased", "saved",
+            "achieved", "delivered", "completed", "launched", "shipped", "fixed",
+            "solved", "built", "created", "implemented", "automated", "streamlined",
+            "within an hour", "in record time", "ahead of schedule", "under budget",
+        ]
+        has_outcome = any(ind in content_lower for ind in outcome_indicators)
+        if not has_outcome:
+            specificity_score -= 15
+            specificity_issues.append("No specific outcomes or impact mentioned")
+
+        # Check for first-person perspective (personal voice)
+        first_person = ["i worked", "i saw", "i observed", "i watched", "i noticed",
+                       "impressed me", "what i", "my experience", "i've seen",
+                       "i remember", "i learned", "we worked", "our team"]
+        has_personal_voice = sum(1 for fp in first_person if fp in content_lower) >= 2
+        if not has_personal_voice:
+            specificity_score -= 10
+            specificity_issues.append("Lacks personal voice/first-person perspective")
+
         # Calculate generic score (higher = more generic)
-        generic_score = min(100, (buzzword_count + generic_phrase_count + vague_descriptor_count) * 5)
+        base_generic_score = (
+            buzzword_count * 5 +
+            generic_phrase_count * 7 +
+            vague_descriptor_count * 4 +
+            platitude_count * 10 +  # Heavy penalty for platitudes
+            ai_tell_count * 8       # Heavy penalty for AI tells
+        )
+        generic_score = min(100, base_generic_score)
+
+        # Combine with specificity (lack of specificity adds to generic score)
+        specificity_penalty = max(0, 100 - specificity_score) * 0.5
+        final_generic_score = min(100, generic_score + specificity_penalty)
 
         # Assess severity
         if buzzword_count > 3:
             detected_issues.append(f"High buzzword usage ({buzzword_count} detected) - makes content less authentic")
         if generic_phrase_count > 2:
             detected_issues.append(f"Multiple generic phrases ({generic_phrase_count} detected) - lacks specificity")
-        if generic_score > 60:
+        if platitude_count > 1:
+            detected_issues.append(f"LinkedIn platitudes detected ({platitude_count}) - sounds template-like")
+        if ai_tell_count > 0:
+            detected_issues.append(f"AI-style phrases detected ({ai_tell_count}) - sounds robotic")
+        if final_generic_score > 60:
             detected_issues.append("Content appears highly generic and could benefit from more specific examples")
 
+        # Add specificity issues
+        detected_issues.extend(specificity_issues)
+
         return {
-            "generic_score": generic_score,
+            "generic_score": final_generic_score,
             "issues": detected_issues,
             "buzzwords_detected": found_buzzwords,
             "generic_phrases_detected": found_generic_phrases,
             "vague_descriptors_detected": found_vague_descriptors,
-            "is_too_generic": generic_score > 40,
+            "linkedin_platitudes_detected": found_platitudes,
+            "ai_tells_detected": found_ai_tells,
+            "specificity_score": specificity_score,
+            "specificity_issues": specificity_issues,
+            "is_too_generic": final_generic_score > 40,
             "suggestions": (
                 ["Replace buzzwords with specific examples and achievements", "Include concrete project names and technical details", "Focus on measurable outcomes rather than general descriptors"]
                 if generic_score > 30
@@ -1167,6 +1633,320 @@ class AIRecommendationService:
 
         validation_results["structure_score"] = max(0, int(validation_results["structure_score"]))  # Explicitly cast to int
         return validation_results
+
+    def calculate_confidence_score(
+        self,
+        github_data: Dict[str, Any],
+        recommendation: str,
+        validation_results: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Calculate confidence score for a generated recommendation.
+
+        This provides transparency about recommendation quality by scoring:
+        - Data richness: How much GitHub data was available
+        - Evidence strength: How well the recommendation uses actual data
+        - Specificity: How specific and unique the recommendation is
+        - Natural voice: How human-like the writing sounds
+
+        Returns:
+            Dict with overall score (0-100), breakdown by category, and limitations.
+        """
+        scores = {}
+        limitations = []
+
+        # 1. DATA RICHNESS SCORE (0-100)
+        data_richness = self._score_data_richness(github_data)
+        scores["data_richness"] = data_richness["score"]
+        limitations.extend(data_richness.get("limitations", []))
+
+        # 2. EVIDENCE STRENGTH SCORE (0-100)
+        evidence_strength = self._score_evidence_in_text(recommendation, github_data)
+        scores["evidence_strength"] = evidence_strength["score"]
+
+        # 3. SPECIFICITY SCORE (0-100)
+        specificity = self._score_specificity(recommendation)
+        scores["specificity"] = specificity["score"]
+
+        # 4. NATURAL VOICE SCORE (0-100)
+        naturalness = self._score_naturalness(recommendation)
+        scores["natural_voice"] = naturalness["score"]
+
+        # Calculate weighted overall score
+        weights = {
+            "data_richness": 0.25,
+            "evidence_strength": 0.30,
+            "specificity": 0.25,
+            "natural_voice": 0.20,
+        }
+
+        overall = sum(scores[key] * weights[key] for key in weights)
+
+        # Determine confidence level
+        if overall >= 80:
+            confidence_level = "high"
+            confidence_message = "High confidence - recommendation is well-supported by data"
+        elif overall >= 60:
+            confidence_level = "medium"
+            confidence_message = "Medium confidence - recommendation has good foundation but could be stronger"
+        elif overall >= 40:
+            confidence_level = "low"
+            confidence_message = "Low confidence - limited data or evidence available"
+        else:
+            confidence_level = "very_low"
+            confidence_message = "Very low confidence - recommendation may be too generic"
+
+        return {
+            "overall_score": round(overall, 1),
+            "confidence_level": confidence_level,
+            "confidence_message": confidence_message,
+            "breakdown": {
+                "data_richness": {
+                    "score": scores["data_richness"],
+                    "description": "How much GitHub data was available to inform the recommendation",
+                },
+                "evidence_strength": {
+                    "score": scores["evidence_strength"],
+                    "description": "How well the recommendation uses actual data points from the profile",
+                },
+                "specificity": {
+                    "score": scores["specificity"],
+                    "description": "How specific and unique the recommendation is vs generic praise",
+                },
+                "natural_voice": {
+                    "score": scores["natural_voice"],
+                    "description": "How natural and human-like the writing sounds",
+                },
+            },
+            "limitations": limitations,
+            "suggestions": self._generate_confidence_suggestions(scores, limitations),
+        }
+
+    def _score_data_richness(self, github_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Score how rich the available GitHub data is."""
+        score = 0
+        max_score = 100
+        limitations = []
+
+        # Check user data (20 points)
+        user_data = github_data.get("user_data", {})
+        if user_data.get("full_name"):
+            score += 5
+        if user_data.get("bio"):
+            score += 10
+        else:
+            limitations.append("No bio available - personality signals limited")
+        if user_data.get("company"):
+            score += 5
+
+        # Check repositories (25 points)
+        repositories = github_data.get("repositories", [])
+        if len(repositories) >= 5:
+            score += 25
+        elif len(repositories) >= 3:
+            score += 15
+        elif len(repositories) >= 1:
+            score += 10
+        else:
+            limitations.append("No repositories found - technical skills cannot be verified")
+
+        # Check languages (15 points)
+        languages = github_data.get("languages", [])
+        if len(languages) >= 3:
+            score += 15
+        elif len(languages) >= 1:
+            score += 10
+        else:
+            limitations.append("No language data - tech stack unknown")
+
+        # Check commit analysis (25 points)
+        commit_analysis = github_data.get("commit_analysis", {})
+        total_commits = commit_analysis.get("total_commits_analyzed", 0)
+        if total_commits >= 50:
+            score += 25
+        elif total_commits >= 20:
+            score += 15
+        elif total_commits >= 5:
+            score += 10
+        else:
+            limitations.append("Limited commit history - contribution patterns unclear")
+
+        # Check skills (15 points)
+        skills = github_data.get("skills", {})
+        technical_skills = skills.get("technical_skills", [])
+        if len(technical_skills) >= 5:
+            score += 15
+        elif len(technical_skills) >= 2:
+            score += 10
+        elif len(technical_skills) >= 1:
+            score += 5
+        else:
+            limitations.append("No specific skills detected")
+
+        return {
+            "score": min(score, max_score),
+            "limitations": limitations,
+        }
+
+    def _score_evidence_in_text(
+        self,
+        recommendation: str,
+        github_data: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Score how well the recommendation uses actual data."""
+        score = 0
+        recommendation_lower = recommendation.lower()
+
+        # Check for language mentions (25 points)
+        languages = github_data.get("languages", [])
+        language_names = [
+            lang.get("language", lang) if isinstance(lang, dict) else str(lang)
+            for lang in languages[:5]
+        ]
+        languages_mentioned = sum(1 for lang in language_names if lang.lower() in recommendation_lower)
+        score += min(25, languages_mentioned * 10)
+
+        # Check for framework/tool mentions (25 points)
+        skills = github_data.get("skills", {})
+        frameworks = skills.get("frameworks", [])
+        tools = skills.get("tools", [])
+        all_tools = frameworks + tools
+        tools_mentioned = sum(1 for tool in all_tools[:10] if tool.lower() in recommendation_lower)
+        score += min(25, tools_mentioned * 8)
+
+        # Check for contribution pattern mentions (25 points)
+        commit_analysis = github_data.get("commit_analysis", {})
+        excellence = commit_analysis.get("excellence_areas", {})
+        primary_strength = excellence.get("primary_strength", "")
+
+        strength_keywords = {
+            "bug_fixing": ["fix", "debug", "troubleshoot", "resolve"],
+            "optimization": ["optimize", "performance", "efficient"],
+            "refactoring": ["refactor", "clean", "maintain"],
+            "testing": ["test", "quality", "reliable"],
+            "documentation": ["document", "clear", "explain"],
+        }
+
+        if primary_strength and primary_strength in strength_keywords:
+            if any(kw in recommendation_lower for kw in strength_keywords[primary_strength]):
+                score += 25
+            else:
+                score += 10  # Partial credit
+
+        # Check for user name usage (25 points)
+        user_data = github_data.get("user_data", {})
+        username = user_data.get("github_username", "")
+        full_name = user_data.get("full_name", "")
+        first_name = full_name.split()[0] if full_name else ""
+
+        if first_name and first_name.lower() in recommendation_lower:
+            score += 25
+        elif username and username.lower() in recommendation_lower:
+            score += 15
+
+        return {"score": min(score, 100)}
+
+    def _score_specificity(self, recommendation: str) -> Dict[str, Any]:
+        """Score how specific vs generic the recommendation is."""
+        score = 100
+        recommendation_lower = recommendation.lower()
+
+        # Penalize generic buzzwords
+        buzzwords = [
+            "passionate", "dedicated", "hardworking", "team player",
+            "innovative", "creative", "proactive", "results-driven",
+        ]
+        buzzword_count = sum(1 for bw in buzzwords if bw in recommendation_lower)
+        score -= buzzword_count * 5
+
+        # Penalize generic phrases
+        generic_phrases = [
+            "asset to any team", "highly recommend", "pleasure to work with",
+            "without hesitation", "would be lucky",
+        ]
+        generic_count = sum(1 for phrase in generic_phrases if phrase in recommendation_lower)
+        score -= generic_count * 10
+
+        # Reward specific indicators
+        specific_indicators = [
+            "when", "during", "specifically", "for example", "i remember",
+            "one time", "project", "deadline", "challenge",
+        ]
+        specific_count = sum(1 for ind in specific_indicators if ind in recommendation_lower)
+        score += min(20, specific_count * 5)
+
+        # Reward outcome mentions
+        outcome_words = [
+            "resulted", "improved", "reduced", "saved", "achieved",
+            "delivered", "fixed", "solved", "built", "launched",
+        ]
+        outcome_count = sum(1 for word in outcome_words if word in recommendation_lower)
+        score += min(15, outcome_count * 5)
+
+        return {"score": max(0, min(100, score))}
+
+    def _score_naturalness(self, recommendation: str) -> Dict[str, Any]:
+        """Score how natural and human-like the writing is."""
+        score = 100
+        recommendation_lower = recommendation.lower()
+
+        # Penalize AI tells
+        ai_tells = [
+            "it's worth noting", "importantly", "furthermore", "moreover",
+            "additionally", "in conclusion", "notably", "indeed",
+        ]
+        ai_tell_count = sum(1 for tell in ai_tells if tell in recommendation_lower)
+        score -= ai_tell_count * 10
+
+        # Reward first-person voice
+        first_person = ["i ", "i've", "my ", "we ", "our "]
+        first_person_count = sum(1 for fp in first_person if fp in recommendation_lower)
+        score += min(15, first_person_count * 3)
+
+        # Check sentence variety (penalize if all similar length)
+        sentences = [s.strip() for s in recommendation.split(".") if s.strip()]
+        if len(sentences) >= 3:
+            lengths = [len(s.split()) for s in sentences]
+            avg_len = sum(lengths) / len(lengths)
+            variance = sum((l - avg_len) ** 2 for l in lengths) / len(lengths)
+            if variance > 20:  # Good variety
+                score += 10
+            elif variance < 5:  # Too uniform
+                score -= 10
+
+        # Reward emotional language
+        emotion_words = [
+            "impressed", "amazed", "appreciate", "admire", "respect",
+            "enjoy", "love", "proud", "grateful", "pleasure",
+        ]
+        emotion_count = sum(1 for word in emotion_words if word in recommendation_lower)
+        score += min(10, emotion_count * 3)
+
+        return {"score": max(0, min(100, score))}
+
+    def _generate_confidence_suggestions(
+        self,
+        scores: Dict[str, int],
+        limitations: List[str],
+    ) -> List[str]:
+        """Generate suggestions to improve confidence."""
+        suggestions = []
+
+        if scores.get("data_richness", 0) < 60:
+            suggestions.append("Consider requesting additional context about shared work experience")
+
+        if scores.get("evidence_strength", 0) < 60:
+            suggestions.append("Try regenerating with specific skills or projects highlighted")
+
+        if scores.get("specificity", 0) < 60:
+            suggestions.append("Request more specific examples using keyword refinement")
+
+        if scores.get("natural_voice", 0) < 60:
+            suggestions.append("Consider adjusting tone to 'casual' or 'friendly' for more natural output")
+
+        if limitations:
+            suggestions.append(f"Note: {len(limitations)} data limitation(s) may affect accuracy")
+
+        return suggestions[:3]  # Return top 3 suggestions
 
     async def regenerate_recommendation(
         self,

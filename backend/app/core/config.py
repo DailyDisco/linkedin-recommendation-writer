@@ -50,6 +50,32 @@ class Settings(BaseSettings):
     GEMINI_TEMPERATURE: float = Field(default=0.7, ge=0.0, le=2.0, description="Gemini temperature")
     GEMINI_MAX_TOKENS: int = Field(default=2048, ge=100, le=8192, description="Gemini max tokens")
 
+    # AI Quality Settings
+    AI_QUALITY_TIER: Literal["fast", "balanced", "quality"] = Field(
+        default="balanced",
+        description="AI quality tier: fast (gemini-2.5-flash-lite), balanced (gemini-2.0-flash), quality (gemini-1.5-pro)"
+    )
+    AI_ENABLE_QUALITY_GATE: bool = Field(
+        default=True,
+        description="Enable quality gate with automatic retry for low-quality outputs"
+    )
+    AI_QUALITY_GATE_MIN_SCORE: int = Field(
+        default=65,
+        ge=0,
+        le=100,
+        description="Minimum quality score required (0-100)"
+    )
+    AI_QUALITY_GATE_MAX_RETRIES: int = Field(
+        default=3,
+        ge=1,
+        le=5,
+        description="Maximum retry attempts for quality gate"
+    )
+    AI_PARALLEL_GENERATION: bool = Field(
+        default=True,
+        description="Enable parallel option generation for faster response"
+    )
+
     # Logging
     LOG_LEVEL: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(default="DEBUG", description="Logging level")
     LOG_FORMAT: str = Field(
@@ -86,12 +112,34 @@ class Settings(BaseSettings):
     # Feature Flags
     ENABLE_RATE_LIMITING: bool = Field(default=True, description="Enable API rate limiting")
 
+    # Admin Configuration
+    ADMIN_EMAILS: str = Field(default="", description="Comma-separated list of admin email addresses")
+
+    # Stripe Configuration
+    STRIPE_SECRET_KEY: str = Field(default="", description="Stripe secret API key")
+    STRIPE_PUBLISHABLE_KEY: str = Field(default="", description="Stripe publishable API key")
+    STRIPE_WEBHOOK_SECRET: str = Field(default="", description="Stripe webhook signing secret")
+    STRIPE_PRICE_ID_PRO: str = Field(default="", description="Stripe Price ID for Pro plan")
+    STRIPE_PRICE_ID_TEAM: str = Field(default="", description="Stripe Price ID for Team plan")
+    STRIPE_TRIAL_DAYS: int = Field(default=7, ge=0, le=30, description="Trial period in days")
+
+    # Billing Feature Flags
+    BILLING_ENABLED: bool = Field(default=True, description="Enable billing features")
+    TRIALS_ENABLED: bool = Field(default=True, description="Enable free trials")
+
     @computed_field
     def cors_origins(self) -> List[str]:
         """Get CORS origins as a list."""
         if not self.ALLOWED_ORIGINS.strip():
             return []
         return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",")]
+
+    @computed_field
+    def admin_emails(self) -> List[str]:
+        """Get admin emails as a list."""
+        if not self.ADMIN_EMAILS.strip():
+            return []
+        return [email.strip().lower() for email in self.ADMIN_EMAILS.split(",")]
 
     @computed_field
     def is_development(self) -> bool:
@@ -102,6 +150,71 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         """Check if running in production mode."""
         return self.ENVIRONMENT == "production"
+
+    @computed_field
+    def recommended_model(self) -> str:
+        """Get recommended Gemini model based on quality tier.
+
+        Quality tiers:
+        - fast: gemini-2.5-flash-lite (cheapest, fastest, good for testing)
+        - balanced: gemini-2.0-flash (good balance of quality and speed)
+        - quality: gemini-1.5-pro (highest quality, slower, more expensive)
+        """
+        tier_models = {
+            "fast": "gemini-2.5-flash-lite",
+            "balanced": "gemini-2.0-flash",
+            "quality": "gemini-1.5-pro",
+        }
+        return tier_models.get(self.AI_QUALITY_TIER, self.GEMINI_MODEL)
+
+    @computed_field
+    def recommended_temperature(self) -> float:
+        """Get recommended temperature based on quality tier.
+
+        Higher quality tiers use slightly lower temperature for more consistency.
+        """
+        tier_temps = {
+            "fast": 0.8,      # More creative, faster iteration
+            "balanced": 0.7,  # Good balance
+            "quality": 0.6,   # More consistent, higher quality
+        }
+        return tier_temps.get(self.AI_QUALITY_TIER, self.GEMINI_TEMPERATURE)
+
+    def get_dynamic_temperature(self, recommendation_type: str, tone: str) -> float:
+        """Get dynamic temperature based on recommendation type and tone.
+
+        Args:
+            recommendation_type: Type of recommendation (professional, technical, etc.)
+            tone: Tone of recommendation (professional, casual, friendly, formal)
+
+        Returns:
+            Adjusted temperature value
+        """
+        base_temp = self.recommended_temperature
+
+        # Tone adjustments
+        tone_adjustments = {
+            "professional": -0.1,  # More consistent
+            "formal": -0.15,       # Very consistent
+            "casual": +0.15,       # More creative
+            "friendly": +0.1,      # Slightly more creative
+        }
+
+        # Type adjustments
+        type_adjustments = {
+            "technical": -0.1,     # More precise
+            "professional": -0.05,
+            "leadership": +0.05,   # More inspiring
+            "academic": -0.1,      # More formal
+            "personal": +0.1,      # More creative
+        }
+
+        temp = base_temp
+        temp += tone_adjustments.get(tone, 0)
+        temp += type_adjustments.get(recommendation_type, 0)
+
+        # Clamp to valid range
+        return max(0.3, min(1.5, temp))
 
     @field_validator("GITHUB_TOKEN")
     @classmethod

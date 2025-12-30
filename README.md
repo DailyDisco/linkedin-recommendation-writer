@@ -94,7 +94,6 @@ This project leverages a modern full-stack architecture with the following key t
 - **PostgreSQL**: A powerful, open-source object-relational database system.
 - **Redis 6.4.0**: In-memory data store for caching and session management.
 - **Alembic 1.16.5**: Database migration tool for SQLAlchemy.
-- **Celery 5.5.3**: Distributed task queue for background processing.
 
 **AI/Machine Learning:**
 
@@ -174,6 +173,7 @@ Access your local app:
 The project includes a comprehensive Makefile for managing development tasks:
 
 **Container Management:**
+
 ```bash
 make build          # Build all services for development
 make build-no-cache # Build without cache
@@ -186,6 +186,7 @@ make shell          # Open shell in app container
 ```
 
 **Testing & Code Quality:**
+
 ```bash
 make test-frontend    # Run frontend tests
 make test-backend     # Run backend tests
@@ -196,6 +197,7 @@ make format-backend   # Format backend code
 ```
 
 **Production Commands:**
+
 ```bash
 make prod-build  # Build for production
 make prod-up     # Start production services
@@ -204,6 +206,7 @@ make prod-logs   # Show production logs
 ```
 
 **Utility Commands:**
+
 ```bash
 make clean       # Remove all containers, volumes, and images
 make db-connect  # Connect to development database

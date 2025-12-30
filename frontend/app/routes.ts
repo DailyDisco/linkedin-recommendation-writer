@@ -18,6 +18,11 @@ export default [
   // Public routes - accessible to all users
   route('generate', 'routes/generate.tsx'),
   route('about', 'routes/about.tsx'),
+  route('pricing', 'routes/pricing.tsx'),
+
+  // Checkout routes
+  route('checkout/success', 'routes/checkout/success.tsx'),
+  route('checkout/cancel', 'routes/checkout/cancel.tsx'),
 
   // Authentication layout with nested routes
   // Example: layout creates shared UI without affecting URL structure
@@ -28,6 +33,7 @@ export default [
 
   route('profile', 'routes/profile.tsx'), // renders at "/profile"
   route('history', 'routes/history.tsx'), // renders at "/history"
+  route('settings/billing', 'routes/settings/billing.tsx'), // renders at "/settings/billing"
 
   // Protected routes - require authentication
   // Using prefix to group related functionality under "/app"

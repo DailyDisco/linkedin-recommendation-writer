@@ -7,6 +7,38 @@ from app.services.ai.human_story_generator import HumanStoryGenerator
 
 logger = logging.getLogger(__name__)
 
+# Few-shot examples for high-quality recommendations
+FEW_SHOT_EXAMPLES = {
+    "excellent": [
+        {
+            "context": "Senior backend developer, 3 years working together",
+            "recommendation": """I had the pleasure of working alongside Marcus for three years on our payment processing platform. What immediately stood out was his ability to break down complex distributed systems problems into digestible pieces for the team.
+
+There was this one incident during our Black Friday traffic surge - while everyone was scrambling to add more instances, Marcus had already identified the real bottleneck: a misconfigured connection pool that was causing cascading failures. His fix went live in under an hour, and he documented the debugging process so thoroughly that we've used it as training material since.
+
+Beyond the technical skills, Marcus has this rare quality of making everyone around him better. Junior devs actively sought his code reviews because they knew they'd learn something. I'd recommend him without hesitation for any team that values both technical excellence and genuine mentorship.""",
+        },
+        {
+            "context": "Full-stack developer, collaborated on open source project",
+            "recommendation": """Working with Elena on the dashboard redesign project showed me what focused engineering looks like. She didn't just implement features - she obsessed over the details that users would actually notice: loading states, error messages that made sense, keyboard navigation that felt natural.
+
+I remember when we hit a particularly nasty state management bug that had stumped the team for days. Elena spent an evening building a custom debugging tool that visualized the state transitions, and within an hour of using it, we'd found the race condition. That tool is now part of our standard toolkit.
+
+What I appreciate most is her directness in code reviews. She'll push back on overcomplicated solutions but always with a better alternative ready. Any team looking for someone who combines craft with pragmatism would be lucky to have her.""",
+        },
+    ],
+    "avoid": [
+        {
+            "issues": ["Too generic", "No evidence", "Buzzword heavy"],
+            "example": "John is a dedicated and passionate developer who demonstrates strong technical skills. He is a team player who works well with others and consistently delivers quality work. I highly recommend him for any development role.",
+        },
+        {
+            "issues": ["No specific examples", "Vague praise", "Could describe anyone"],
+            "example": "Sarah is an excellent programmer with great attention to detail. She goes above and beyond and is always willing to help. She would be an asset to any team.",
+        },
+    ],
+}
+
 
 class PromptService:
     """Service for building and formatting AI prompts with natural human storytelling."""
@@ -79,6 +111,9 @@ class PromptService:
             f"NEVER use placeholders like '[Colleague's Name]', '[Name]', or '[Person]' - always use '{person_reference}'.",
             f"Write the recommendation as if you know {person_reference} personally and have worked with them directly.",
         ]
+
+        # Add few-shot examples for quality guidance
+        prompt_parts.extend(self._build_few_shot_section())
 
         # Add shared work context if provided
         if shared_work_context:
@@ -699,6 +734,61 @@ class PromptService:
         prompt_parts.extend(base_guidelines)
 
         return "\n".join(prompt_parts)
+
+    def _build_few_shot_section(self) -> List[str]:
+        """Build few-shot examples section for prompt quality guidance."""
+        section = [
+            "",
+            "=" * 60,
+            "QUALITY REFERENCE - STUDY THESE EXAMPLES CAREFULLY:",
+            "=" * 60,
+            "",
+            "EXAMPLE OF AN EXCELLENT RECOMMENDATION:",
+            "-" * 40,
+        ]
+
+        # Add one excellent example
+        excellent = FEW_SHOT_EXAMPLES["excellent"][0]
+        section.extend([
+            f"Context: {excellent['context']}",
+            "",
+            excellent["recommendation"],
+            "",
+            "-" * 40,
+            "",
+            "KEY QUALITIES TO EMULATE:",
+            "- Specific incident with concrete details (the Black Friday surge story)",
+            "- Shows impact with measurable outcomes ('under an hour', 'used as training material')",
+            "- Describes character through actions, not adjectives",
+            "- Personal voice throughout ('I had the pleasure', 'What immediately stood out')",
+            "- Natural paragraph flow with varied sentence lengths",
+            "- Ends with genuine, specific endorsement",
+            "",
+            "=" * 60,
+            "WHAT TO AVOID - DO NOT WRITE LIKE THIS:",
+            "=" * 60,
+        ]
+        )
+
+        # Add one avoid example
+        avoid = FEW_SHOT_EXAMPLES["avoid"][0]
+        section.extend([
+            "",
+            f"BAD EXAMPLE (Issues: {', '.join(avoid['issues'])}):",
+            f'"{avoid["example"]}"',
+            "",
+            "WHY THIS IS BAD:",
+            "- No specific examples or incidents",
+            "- Uses buzzwords instead of evidence ('dedicated', 'passionate', 'team player')",
+            "- Could describe literally anyone - nothing unique",
+            "- No personal voice or relationship shown",
+            "- Generic praise without substance",
+            "",
+            "=" * 60,
+            "",
+        ])
+
+        return section
 
     def _get_length_guideline(self, length: str) -> str:
         """Get word count guideline for different lengths."""

@@ -4,13 +4,11 @@ import type {
   GitHubProfileAnalysis,
   RepositoryContributorsResponse,
   Recommendation,
-  RecommendationRequest,
   RecommendationOption,
-  RegenerateRequest,
-  RecommendationOptionsResponse,
 } from '../types';
 import type { RecommendationFormData } from '../hooks/useRecommendationState';
 import type { AxiosRequestConfig } from 'axios';
+import { useAuthStore } from '../hooks/useAuthStore';
 
 // Determine API base URL based on environment
 // Use proxy path for development, full URL for production
@@ -77,76 +75,49 @@ api.interceptors.response.use(
       console.log('🔐 API Interceptor: Error response:', error.response);
       console.log('🔐 API Interceptor: Timestamp:', new Date().toISOString());
 
-      // Import the auth store dynamically to avoid circular dependencies
-      import('../hooks/useAuthStore')
-        .then(({ useAuthStore }) => {
-          const authStore = useAuthStore.getState();
+      // Access the auth store directly (static import)
+      const authStore = useAuthStore.getState();
 
-          // Check if user is logged in using the Zustand store
-          const hasToken = !!authStore.accessToken;
-          console.log('🔐 API Interceptor: Has token:', hasToken);
+      // Check if user is logged in using the Zustand store
+      const hasToken = !!authStore.accessToken;
+      console.log('🔐 API Interceptor: Has token:', hasToken);
+      console.log(
+        '🔐 API Interceptor: Token exists:',
+        !!authStore.accessToken
+      );
+
+      // Only redirect to login if the error is 401, user has a token (is logged in),
+      // and it's not from the login endpoint itself
+      const errorUrl = (error as HttpError).config?.url;
+      if (errorUrl && !errorUrl.endsWith('/login') && hasToken) {
+        console.log(
+          'Global 401 interceptor: Redirecting to login for authenticated user.',
+          errorUrl,
+          (error as HttpError).response?.status
+        );
+        // Show toast notification before redirecting
+        toast.error('Your session has expired. Please log in again.');
+
+        console.log('🔐 API Interceptor: Calling store logout method');
+        // Use the proper logout method from the store instead of directly manipulating localStorage
+        authStore.logout();
+
+        // Small delay to ensure logout completes before redirect
+        setTimeout(() => {
           console.log(
-            '🔐 API Interceptor: Token exists:',
-            !!authStore.accessToken
+            '🔐 API Interceptor: Redirecting to login after logout'
           );
-
-          // Only redirect to login if the error is 401, user has a token (is logged in),
-          // and it's not from the login endpoint itself
-          const errorUrl = (error as HttpError).config?.url;
-          if (errorUrl && !errorUrl.endsWith('/login') && hasToken) {
-            console.log(
-              'Global 401 interceptor: Redirecting to login for authenticated user.',
-              errorUrl,
-              (error as HttpError).response?.status
-            );
-            // Show toast notification before redirecting
-            toast.error('Your session has expired. Please log in again.');
-
-            console.log('🔐 API Interceptor: Calling store logout method');
-            // Use the proper logout method from the store instead of directly manipulating localStorage
-            authStore.logout();
-
-            // Small delay to ensure logout completes before redirect
-            setTimeout(() => {
-              console.log(
-                '🔐 API Interceptor: Redirecting to login after logout'
-              );
-              window.location.href = '/login';
-            }, 100);
-          } else {
-            console.log(
-              'Global 401 interceptor: NOT redirecting - user is anonymous or this is login endpoint.',
-              errorUrl,
-              error.response?.status,
-              'hasToken:',
-              hasToken
-            );
-          }
-        })
-        .catch(() => {
-          console.error('🔐 API Interceptor: Failed to load auth store');
-          // Fallback to basic localStorage handling if dynamic import fails
-          const authStorage = localStorage.getItem('auth-storage');
-          let hasToken = false;
-          if (authStorage) {
-            try {
-              const parsed = JSON.parse(authStorage);
-              hasToken = !!parsed?.state?.accessToken;
-            } catch {
-              // Ignore parsing errors
-            }
-          }
-
-          console.log('🔐 API Interceptor: Fallback - hasToken:', hasToken);
-
-          const errorUrl = (error as HttpError).config?.url;
-          if (errorUrl && !errorUrl.endsWith('/login') && hasToken) {
-            console.log('🔐 API Interceptor: Fallback - redirecting to login');
-            toast.error('Your session has expired. Please log in again.');
-            localStorage.removeItem('auth-storage');
-            window.location.href = '/login';
-          }
-        });
+          window.location.href = '/login';
+        }, 100);
+      } else {
+        console.log(
+          'Global 401 interceptor: NOT redirecting - user is anonymous or this is login endpoint.',
+          errorUrl,
+          error.response?.status,
+          'hasToken:',
+          hasToken
+        );
+      }
     } else if (
       error.response?.status === 503 ||
       error.response?.status === 502 ||
@@ -226,58 +197,10 @@ export const githubApi = {
 };
 
 export const recommendationApi = {
-  // Removed login and register as they are now in apiClient
-  generate: async (request: RecommendationRequest): Promise<Recommendation> => {
-    const response = await api.post('/recommendations/generate', request);
-    return response.data;
-  },
-
-  generateOptions: async (
-    request: RecommendationRequest
-  ): Promise<RecommendationOptionsResponse> => {
-    const response = await api.post(
-      '/recommendations/generate-options',
-      request
-    );
-    return response.data;
-  },
-
-  createFromOption: async (
-    githubUsername: string,
-    selectedOption: RecommendationOption,
-    allOptions: RecommendationOption[],
-    analysisType?: string,
-    repositoryUrl?: string,
-    recommendationType?: string,
-    tone?: string,
-    length?: string
-  ): Promise<Recommendation> => {
-    const response = await api.post('/recommendations/create-from-option', {
-      github_username: githubUsername,
-      selected_option: selectedOption,
-      all_options: allOptions,
-      analysis_context_type: analysisType || 'profile',
-      repository_url: repositoryUrl,
-      recommendation_type: recommendationType,
-      tone: tone,
-      length: length,
-    });
-    return response.data;
-  },
-
-  regenerate: async (request: RegenerateRequest): Promise<Recommendation> => {
-    const response = await api.post('/recommendations/regenerate', request);
-    return response.data;
-  },
-
+  // Only keeping methods that are actively used and not duplicated in apiClient
   getAll: async (): Promise<Recommendation[]> => {
     const response = await api.get('/recommendations/');
     return response.data.recommendations;
-  },
-
-  getById: async (id: number): Promise<Recommendation> => {
-    const response = await api.get(`/recommendations/${id}`);
-    return response.data;
   },
 
   getUserDetails: async (): Promise<{
@@ -509,6 +432,63 @@ export const apiClient = {
       `/recommendations/${recommendationId}/versions/revert`,
       data
     );
+    return response.data;
+  },
+};
+
+// Billing API
+export const billingApi = {
+  async getPlans() {
+    const response = await api.get('/billing/plans');
+    return response.data;
+  },
+
+  async createCheckoutSession(data: {
+    price_id: string;
+    success_url?: string;
+    cancel_url?: string;
+  }) {
+    const response = await api.post('/billing/checkout', data);
+    return response.data;
+  },
+
+  async createPortalSession() {
+    const response = await api.post('/billing/portal');
+    return response.data;
+  },
+
+  async getSubscription() {
+    const response = await api.get('/billing/subscription');
+    return response.data;
+  },
+
+  async getUsage() {
+    const response = await api.get('/billing/usage');
+    return response.data;
+  },
+
+  async getFeatures() {
+    const response = await api.get('/billing/features');
+    return response.data;
+  },
+
+  // API Keys (Team tier only)
+  async createApiKey(data: {
+    name: string;
+    scopes?: string[];
+    expires_in_days?: number;
+  }) {
+    const response = await api.post('/billing/api-keys', data);
+    return response.data;
+  },
+
+  async listApiKeys() {
+    const response = await api.get('/billing/api-keys');
+    return response.data;
+  },
+
+  async revokeApiKey(keyId: number) {
+    const response = await api.delete(`/billing/api-keys/${keyId}`);
     return response.data;
   },
 };

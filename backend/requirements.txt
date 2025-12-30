@@ -51,6 +51,9 @@ mypy==1.17.1  # Optional static type checker for Python
 # GitHub API
 PyGithub==2.7.0  # Python library to access the GitHub API
 
+# Payments and subscriptions
+stripe==13.5.0  # Stripe API client for payments and subscriptions
+
 # Monitoring and metrics (optional - removed for simplification)
 # prometheus-client==0.22.1  # Python client for Prometheus metrics
 

@@ -1976,3 +1976,567 @@ class GitHubCommitService:
             sanitized_prs.append(sanitized_pr)
 
         return sanitized_prs
+
+    # =========================================================================
+    # ISSUE & DISCUSSION ANALYSIS - Enhanced contributor signals
+    # =========================================================================
+
+    async def analyze_contributor_issues(
+        self,
+        username: str,
+        repositories: List[Dict[str, Any]],
+        max_issues: int = 50,
+    ) -> Dict[str, Any]:
+        """Analyze issues opened, closed, and commented on by the contributor.
+
+        This provides additional signals about:
+        - Problem-solving approach (issues filed vs resolved)
+        - Communication quality (issue descriptions, comments)
+        - Community engagement (helping others with their issues)
+        - Technical depth (complexity of issues tackled)
+        """
+        try:
+            if not self.github_client:
+                return self._empty_issue_analysis()
+
+            logger.info(f"🔍 ISSUE ANALYSIS: Analyzing issues for {username}")
+
+            issues_opened = []
+            issues_commented = []
+            issues_closed_by_user = []
+
+            semaphore = asyncio.Semaphore(self.MAX_CONCURRENT_REQUESTS)
+
+            async def fetch_repo_issues(repo_data: Dict[str, Any]) -> Dict[str, Any]:
+                """Fetch issues for a single repository."""
+                async with semaphore:
+                    try:
+                        loop = asyncio.get_event_loop()
+                        return await loop.run_in_executor(
+                            None,
+                            self._fetch_repo_issues_sync,
+                            username,
+                            repo_data,
+                            max_issues // len(repositories) if repositories else 10,
+                        )
+                    except Exception as e:
+                        logger.warning(f"Error fetching issues from {repo_data.get('name')}: {e}")
+                        return {"opened": [], "commented": [], "closed_by_user": []}
+
+            # Fetch issues from all repositories concurrently
+            tasks = [fetch_repo_issues(repo) for repo in repositories[:10]]  # Limit to 10 repos
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            for result in results:
+                if isinstance(result, dict):
+                    issues_opened.extend(result.get("opened", []))
+                    issues_commented.extend(result.get("commented", []))
+                    issues_closed_by_user.extend(result.get("closed_by_user", []))
+
+            # Analyze issue patterns
+            analysis = self._analyze_issue_patterns(
+                issues_opened[:max_issues],
+                issues_commented[:max_issues],
+                issues_closed_by_user[:max_issues],
+            )
+
+            logger.info(f"✅ Issue analysis complete: {len(issues_opened)} opened, "
+                       f"{len(issues_commented)} commented, {len(issues_closed_by_user)} closed")
+
+            return {
+                "total_issues_opened": len(issues_opened),
+                "total_issues_commented": len(issues_commented),
+                "total_issues_closed": len(issues_closed_by_user),
+                "issue_patterns": analysis,
+                "communication_quality": self._assess_communication_quality(
+                    issues_opened + issues_commented
+                ),
+                "problem_solving_signals": self._extract_problem_solving_signals(
+                    issues_opened, issues_closed_by_user
+                ),
+            }
+
+        except Exception as e:
+            logger.error(f"Error in issue analysis: {e}")
+            return self._empty_issue_analysis()
+
+    def _fetch_repo_issues_sync(
+        self,
+        username: str,
+        repo_data: Dict[str, Any],
+        max_per_repo: int,
+    ) -> Dict[str, Any]:
+        """Synchronously fetch issues from a repository."""
+        if not self.github_client:
+            return {"opened": [], "commented": [], "closed_by_user": []}
+
+        try:
+            repo_name = repo_data.get("full_name") or f"{username}/{repo_data['name']}"
+            repo = self.github_client.get_repo(repo_name)
+
+            issues_opened = []
+            issues_commented = []
+            issues_closed_by_user = []
+
+            # Get all issues (open and closed)
+            all_issues = repo.get_issues(state="all", sort="created", direction="desc")
+
+            count = 0
+            for issue in all_issues:
+                if count >= max_per_repo:
+                    break
+
+                # Skip PRs (they show up in issues API)
+                if issue.pull_request is not None:
+                    continue
+
+                issue_data = {
+                    "number": issue.number,
+                    "title": issue.title,
+                    "body": (issue.body[:500] if issue.body else ""),
+                    "state": issue.state,
+                    "created_at": issue.created_at.isoformat() if issue.created_at else None,
+                    "closed_at": issue.closed_at.isoformat() if issue.closed_at else None,
+                    "labels": [label.name for label in issue.labels],
+                    "comments_count": issue.comments,
+                    "repository": repo_name,
+                }
+
+                # Check if user opened this issue
+                if issue.user and issue.user.login == username:
+                    issues_opened.append(issue_data)
+
+                # Check if user closed this issue (assignee who closed)
+                if issue.state == "closed" and issue.closed_by:
+                    if issue.closed_by.login == username:
+                        issues_closed_by_user.append(issue_data)
+
+                count += 1
+
+            # Get issues where user commented (sample)
+            try:
+                for issue in all_issues[:20]:  # Check first 20 issues
+                    if issue.pull_request is not None:
+                        continue
+                    if issue.comments > 0:
+                        comments = issue.get_comments()
+                        for comment in comments:
+                            if comment.user and comment.user.login == username:
+                                issues_commented.append({
+                                    "issue_number": issue.number,
+                                    "issue_title": issue.title,
+                                    "comment_body": comment.body[:300] if comment.body else "",
+                                    "created_at": comment.created_at.isoformat() if comment.created_at else None,
+                                })
+                                break  # Only count once per issue
+            except Exception:
+                pass  # Comments are optional enhancement
+
+            return {
+                "opened": issues_opened,
+                "commented": issues_commented,
+                "closed_by_user": issues_closed_by_user,
+            }
+
+        except Exception as e:
+            logger.debug(f"Could not fetch issues from {repo_data.get('name')}: {e}")
+            return {"opened": [], "commented": [], "closed_by_user": []}
+
+    def _analyze_issue_patterns(
+        self,
+        issues_opened: List[Dict[str, Any]],
+        issues_commented: List[Dict[str, Any]],
+        issues_closed: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """Analyze patterns in issue activity."""
+        patterns = {
+            "issue_types": {},
+            "collaboration_indicators": [],
+            "technical_depth_signals": [],
+            "responsiveness_indicators": [],
+        }
+
+        # Analyze labels for issue type distribution
+        all_labels = []
+        for issue in issues_opened + issues_closed:
+            all_labels.extend(issue.get("labels", []))
+
+        if all_labels:
+            label_counts = Counter(all_labels)
+            patterns["issue_types"] = dict(label_counts.most_common(5))
+
+            # Extract signals from labels
+            label_lower = [l.lower() for l in all_labels]
+            if any("bug" in l for l in label_lower):
+                patterns["technical_depth_signals"].append("Active in bug identification and resolution")
+            if any("enhancement" in l or "feature" in l for l in label_lower):
+                patterns["technical_depth_signals"].append("Contributes to feature development discussions")
+            if any("help" in l or "question" in l for l in label_lower):
+                patterns["collaboration_indicators"].append("Helps others by answering questions")
+
+        # Analyze comment activity
+        if len(issues_commented) > 5:
+            patterns["collaboration_indicators"].append("Actively participates in issue discussions")
+        if len(issues_commented) > 10:
+            patterns["collaboration_indicators"].append("Strong community engagement through issue comments")
+
+        # Analyze issue resolution
+        if len(issues_closed) > 0:
+            patterns["responsiveness_indicators"].append(
+                f"Resolved {len(issues_closed)} issues demonstrating follow-through"
+            )
+
+        # Analyze ratio of opened vs closed
+        if issues_opened and issues_closed:
+            resolve_ratio = len(issues_closed) / len(issues_opened)
+            if resolve_ratio > 0.5:
+                patterns["responsiveness_indicators"].append(
+                    "Strong issue resolution rate - follows through on reported problems"
+                )
+
+        return patterns
+
+    def _assess_communication_quality(
+        self,
+        issues: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """Assess communication quality from issue content."""
+        if not issues:
+            return {"score": 0, "indicators": []}
+
+        indicators = []
+        scores = []
+
+        for issue in issues[:20]:  # Sample first 20
+            body = issue.get("body", "") or ""
+            title = issue.get("title", "") or ""
+
+            issue_score = 0
+
+            # Check for clear title
+            if len(title) > 10 and len(title) < 100:
+                issue_score += 20
+
+            # Check for detailed description
+            if len(body) > 100:
+                issue_score += 20
+            if len(body) > 300:
+                issue_score += 10
+
+            # Check for code blocks (technical depth)
+            if "```" in body:
+                issue_score += 15
+                if "code blocks" not in [i.lower() for i in indicators]:
+                    indicators.append("Uses code blocks for clarity")
+
+            # Check for steps to reproduce or structured content
+            if any(keyword in body.lower() for keyword in ["steps", "reproduce", "expected", "actual"]):
+                issue_score += 15
+                if "structured" not in str(indicators).lower():
+                    indicators.append("Provides structured, reproducible issue reports")
+
+            # Check for links/references
+            if "http" in body or "[" in body:
+                issue_score += 10
+
+            scores.append(min(issue_score, 100))
+
+        avg_score = sum(scores) / len(scores) if scores else 0
+
+        if avg_score > 70:
+            indicators.append("Excellent technical communication")
+        elif avg_score > 50:
+            indicators.append("Good communication with technical context")
+        elif avg_score > 30:
+            indicators.append("Clear communication style")
+
+        return {
+            "score": round(avg_score, 1),
+            "indicators": indicators,
+        }
+
+    def _extract_problem_solving_signals(
+        self,
+        issues_opened: List[Dict[str, Any]],
+        issues_closed: List[Dict[str, Any]],
+    ) -> List[str]:
+        """Extract problem-solving signals from issue activity."""
+        signals = []
+
+        if not issues_opened and not issues_closed:
+            return signals
+
+        # Analyze complexity of issues tackled
+        all_issues = issues_opened + issues_closed
+        complex_keywords = [
+            "race condition", "memory leak", "performance", "security",
+            "architecture", "refactor", "migration", "integration",
+            "scalability", "optimization", "deadlock", "concurrency",
+        ]
+
+        complex_issues = 0
+        for issue in all_issues:
+            title_body = (issue.get("title", "") + " " + issue.get("body", "")).lower()
+            if any(keyword in title_body for keyword in complex_keywords):
+                complex_issues += 1
+
+        if complex_issues > 0:
+            signals.append(f"Tackles complex technical issues ({complex_issues} found)")
+
+        # Check for systematic debugging
+        debug_keywords = ["reproduce", "steps", "expected", "actual", "root cause", "investigation"]
+        systematic_issues = sum(
+            1 for issue in all_issues
+            if any(kw in (issue.get("body", "") or "").lower() for kw in debug_keywords)
+        )
+        if systematic_issues > 2:
+            signals.append("Demonstrates systematic debugging approach")
+
+        # Check for proactive issue identification
+        if len(issues_opened) > len(issues_closed):
+            signals.append("Proactively identifies and reports issues")
+        elif len(issues_closed) > len(issues_opened):
+            signals.append("Focuses on resolving existing issues")
+
+        return signals
+
+    def _empty_issue_analysis(self) -> Dict[str, Any]:
+        """Return empty issue analysis structure."""
+        return {
+            "total_issues_opened": 0,
+            "total_issues_commented": 0,
+            "total_issues_closed": 0,
+            "issue_patterns": {
+                "issue_types": {},
+                "collaboration_indicators": [],
+                "technical_depth_signals": [],
+                "responsiveness_indicators": [],
+            },
+            "communication_quality": {"score": 0, "indicators": []},
+            "problem_solving_signals": [],
+        }
+
+    async def analyze_code_review_comments(
+        self,
+        username: str,
+        repositories: List[Dict[str, Any]],
+        max_reviews: int = 30,
+    ) -> Dict[str, Any]:
+        """Analyze code review comments to extract collaboration signals.
+
+        This provides insights about:
+        - Review quality and depth
+        - Teaching/mentoring patterns
+        - Constructive feedback style
+        - Technical expertise areas
+        """
+        try:
+            if not self.github_client:
+                return self._empty_review_analysis()
+
+            logger.info(f"💬 REVIEW ANALYSIS: Analyzing code reviews for {username}")
+
+            all_reviews = []
+            semaphore = asyncio.Semaphore(self.MAX_CONCURRENT_REQUESTS)
+
+            async def fetch_repo_reviews(repo_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+                """Fetch review comments for a single repository."""
+                async with semaphore:
+                    try:
+                        loop = asyncio.get_event_loop()
+                        return await loop.run_in_executor(
+                            None,
+                            self._fetch_repo_reviews_sync,
+                            username,
+                            repo_data,
+                            max_reviews // len(repositories) if repositories else 5,
+                        )
+                    except Exception as e:
+                        logger.debug(f"Error fetching reviews from {repo_data.get('name')}: {e}")
+                        return []
+
+            # Fetch reviews from all repositories concurrently
+            tasks = [fetch_repo_reviews(repo) for repo in repositories[:10]]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            for result in results:
+                if isinstance(result, list):
+                    all_reviews.extend(result)
+
+            # Analyze review patterns
+            analysis = self._analyze_review_patterns(all_reviews[:max_reviews])
+
+            logger.info(f"✅ Review analysis complete: {len(all_reviews)} reviews analyzed")
+
+            return {
+                "total_reviews": len(all_reviews),
+                "review_patterns": analysis,
+                "mentorship_signals": self._extract_mentorship_signals(all_reviews),
+                "technical_focus_areas": self._extract_review_focus_areas(all_reviews),
+            }
+
+        except Exception as e:
+            logger.error(f"Error in review analysis: {e}")
+            return self._empty_review_analysis()
+
+    def _fetch_repo_reviews_sync(
+        self,
+        username: str,
+        repo_data: Dict[str, Any],
+        max_per_repo: int,
+    ) -> List[Dict[str, Any]]:
+        """Synchronously fetch review comments from a repository."""
+        if not self.github_client:
+            return []
+
+        try:
+            repo_name = repo_data.get("full_name") or f"{username}/{repo_data['name']}"
+            repo = self.github_client.get_repo(repo_name)
+
+            reviews = []
+
+            # Get recent PRs and their reviews
+            pulls = repo.get_pulls(state="all", sort="updated", direction="desc")
+
+            pr_count = 0
+            for pr in pulls:
+                if pr_count >= max_per_repo:
+                    break
+
+                try:
+                    # Get review comments
+                    review_comments = pr.get_review_comments()
+                    for comment in review_comments:
+                        if comment.user and comment.user.login == username:
+                            reviews.append({
+                                "pr_number": pr.number,
+                                "pr_title": pr.title,
+                                "body": comment.body[:500] if comment.body else "",
+                                "path": comment.path,
+                                "created_at": comment.created_at.isoformat() if comment.created_at else None,
+                            })
+                except Exception:
+                    continue
+
+                pr_count += 1
+
+            return reviews
+
+        except Exception as e:
+            logger.debug(f"Could not fetch reviews from {repo_data.get('name')}: {e}")
+            return []
+
+    def _analyze_review_patterns(self, reviews: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Analyze patterns in code review activity."""
+        if not reviews:
+            return {"quality_indicators": [], "style_indicators": []}
+
+        quality_indicators = []
+        style_indicators = []
+
+        # Analyze review content
+        total_length = 0
+        constructive_count = 0
+        question_count = 0
+        suggestion_count = 0
+
+        constructive_phrases = [
+            "consider", "might want to", "could", "suggestion", "alternatively",
+            "what about", "have you tried", "one approach", "another option",
+        ]
+        question_phrases = ["?", "why", "how come", "what if", "did you consider"]
+        suggestion_phrases = ["suggest", "recommend", "better to", "prefer", "instead"]
+
+        for review in reviews:
+            body = (review.get("body", "") or "").lower()
+            total_length += len(body)
+
+            if any(phrase in body for phrase in constructive_phrases):
+                constructive_count += 1
+            if any(phrase in body for phrase in question_phrases):
+                question_count += 1
+            if any(phrase in body for phrase in suggestion_phrases):
+                suggestion_count += 1
+
+        avg_length = total_length / len(reviews) if reviews else 0
+
+        # Generate indicators
+        if avg_length > 100:
+            quality_indicators.append("Provides detailed, thorough code reviews")
+        elif avg_length > 50:
+            quality_indicators.append("Gives substantive feedback in reviews")
+
+        if constructive_count > len(reviews) * 0.3:
+            style_indicators.append("Uses constructive, collaborative review style")
+
+        if question_count > len(reviews) * 0.2:
+            style_indicators.append("Asks thoughtful questions to understand context")
+
+        if suggestion_count > len(reviews) * 0.2:
+            style_indicators.append("Offers actionable suggestions for improvement")
+
+        return {
+            "quality_indicators": quality_indicators,
+            "style_indicators": style_indicators,
+            "avg_review_length": round(avg_length, 1),
+            "constructive_ratio": round(constructive_count / len(reviews) * 100, 1) if reviews else 0,
+        }
+
+    def _extract_mentorship_signals(self, reviews: List[Dict[str, Any]]) -> List[str]:
+        """Extract mentorship and teaching signals from reviews."""
+        signals = []
+
+        if not reviews:
+            return signals
+
+        teaching_phrases = [
+            "here's why", "the reason", "because", "this helps", "this ensures",
+            "best practice", "pattern", "convention", "typically", "usually",
+            "in general", "keep in mind", "remember that", "note that",
+        ]
+
+        teaching_count = 0
+        for review in reviews:
+            body = (review.get("body", "") or "").lower()
+            if any(phrase in body for phrase in teaching_phrases):
+                teaching_count += 1
+
+        if teaching_count > len(reviews) * 0.3:
+            signals.append("Explains reasoning to help others learn")
+        if teaching_count > len(reviews) * 0.5:
+            signals.append("Strong mentorship through code review education")
+
+        return signals
+
+    def _extract_review_focus_areas(self, reviews: List[Dict[str, Any]]) -> List[str]:
+        """Extract technical focus areas from review content."""
+        focus_areas = []
+
+        if not reviews:
+            return focus_areas
+
+        # Check file paths for technology patterns
+        paths = [review.get("path", "") for review in reviews if review.get("path")]
+
+        path_patterns = {
+            "Frontend": [".tsx", ".jsx", ".vue", ".css", ".scss"],
+            "Backend": [".py", ".go", ".java", ".rb", ".php"],
+            "Infrastructure": ["dockerfile", "docker-compose", ".yaml", ".yml", "terraform"],
+            "Testing": ["test", "spec", "__tests__"],
+            "Database": ["migration", "schema", ".sql"],
+        }
+
+        for area, patterns in path_patterns.items():
+            if any(any(pattern in path.lower() for pattern in patterns) for path in paths):
+                focus_areas.append(f"{area} expertise")
+
+        return focus_areas[:3]  # Return top 3
+
+    def _empty_review_analysis(self) -> Dict[str, Any]:
+        """Return empty review analysis structure."""
+        return {
+            "total_reviews": 0,
+            "review_patterns": {"quality_indicators": [], "style_indicators": []},
+            "mentorship_signals": [],
+            "technical_focus_areas": [],
+        }

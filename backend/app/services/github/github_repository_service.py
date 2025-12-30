@@ -1,6 +1,6 @@
 import logging
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, cast
 
 from github import Github
@@ -395,7 +395,7 @@ class GitHubRepositoryService:
                     "commit_analysis": commit_patterns,
                     "pull_requests": repo_prs,
                     "pr_analysis": pr_analysis,
-                    "analyzed_at": datetime.utcnow().isoformat(),
+                    "analyzed_at": datetime.now(timezone.utc).isoformat(),
                     "analysis_time_seconds": round(total_time, 2),
                     "analysis_context_type": analysis_context_type,
                 }

@@ -1,7 +1,7 @@
 """GitHub API endpoints."""
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
@@ -41,7 +41,7 @@ async def _process_github_analysis_background(task_id: str, username: str, force
 
         # Update task status to processing
         await set_cache(
-            f"task_status:{task_id}", {"status": "processing", "username": username, "started_at": datetime.utcnow().isoformat(), "message": "Initializing GitHub analysis...", "progress": 5}, ttl=3600
+            f"task_status:{task_id}", {"status": "processing", "username": username, "started_at": datetime.now(timezone.utc).isoformat(), "message": "Initializing GitHub analysis...", "progress": 5}, ttl=3600
         )
 
         # Perform the analysis
@@ -52,7 +52,7 @@ async def _process_github_analysis_background(task_id: str, username: str, force
             await set_cache(f"task_result:{task_id}", analysis, ttl=3600)
             await set_cache(
                 f"task_status:{task_id}",
-                {"status": "completed", "username": username, "completed_at": datetime.utcnow().isoformat(), "message": "Analysis completed successfully", "progress": 100},
+                {"status": "completed", "username": username, "completed_at": datetime.now(timezone.utc).isoformat(), "message": "Analysis completed successfully", "progress": 100},
                 ttl=3600,
             )
             logger.info(f"✅ Background analysis completed for {username}")
@@ -60,7 +60,7 @@ async def _process_github_analysis_background(task_id: str, username: str, force
             # Store error result
             await set_cache(
                 f"task_status:{task_id}",
-                {"status": "failed", "username": username, "completed_at": datetime.utcnow().isoformat(), "message": "Analysis failed - user not found or analysis error", "progress": 0},
+                {"status": "failed", "username": username, "completed_at": datetime.now(timezone.utc).isoformat(), "message": "Analysis failed - user not found or analysis error", "progress": 0},
                 ttl=3600,
             )
             logger.error(f"❌ Background analysis failed for {username}")
@@ -68,7 +68,7 @@ async def _process_github_analysis_background(task_id: str, username: str, force
     except Exception as e:
         logger.error(f"💥 Background analysis error for {username}: {e}")
         await set_cache(
-            f"task_status:{task_id}", {"status": "failed", "username": username, "completed_at": datetime.utcnow().isoformat(), "message": f"Analysis failed: {str(e)}", "progress": 0}, ttl=3600
+            f"task_status:{task_id}", {"status": "failed", "username": username, "completed_at": datetime.now(timezone.utc).isoformat(), "message": f"Analysis failed: {str(e)}", "progress": 0}, ttl=3600
         )
 
 
@@ -130,7 +130,7 @@ async def analyze_github_profile(
     logger.info(f"🚀 Starting background GitHub analysis for {request.username}")
 
     # Generate unique task ID
-    task_id = f"github_profile_{request.username}_{int(datetime.utcnow().timestamp())}"
+    task_id = f"github_profile_{request.username}_{int(datetime.now(timezone.utc).timestamp())}"
 
     # Start background task
     background_tasks.add_task(_process_github_analysis_background, task_id=task_id, username=request.username, force_refresh=request.force_refresh, max_repositories=10)
@@ -142,7 +142,7 @@ async def analyze_github_profile(
         languages=[],
         skills={"status": "processing", "task_id": task_id, "message": "Analysis in progress"},
         commit_analysis={"task_id": task_id, "status": "processing", "message": "GitHub profile analysis started"},
-        analyzed_at=datetime.utcnow().isoformat(),
+        analyzed_at=datetime.now(timezone.utc).isoformat(),
         analysis_context_type="profile",
     )
 
@@ -246,7 +246,7 @@ async def get_github_profile_async(
     """Get a GitHub profile analysis asynchronously (returns task ID immediately)."""
 
     # Generate unique task ID
-    task_id = f"github_profile_{username}_{int(datetime.utcnow().timestamp())}"
+    task_id = f"github_profile_{username}_{int(datetime.now(timezone.utc).timestamp())}"
 
     # Start background task
     background_tasks.add_task(_process_github_analysis_background, task_id=task_id, username=username, force_refresh=force_refresh, max_repositories=10)
@@ -367,7 +367,7 @@ async def stream_github_analysis_progress(task_id: str):
                 progress = status_data.get("progress", 0)
 
                 # Create progress update
-                progress_data = {"task_id": task_id, "status": status, "stage": message, "progress": progress, "timestamp": datetime.utcnow().isoformat()}
+                progress_data = {"task_id": task_id, "status": status, "stage": message, "progress": progress, "timestamp": datetime.now(timezone.utc).isoformat()}
 
                 # If completed, include result
                 if status == "completed":
@@ -425,7 +425,7 @@ async def start_github_analysis_stream(
 
         # Set initial status
         await set_cache(
-            f"task_status:{task_id}", {"status": "queued", "username": request.username, "started_at": datetime.utcnow().isoformat(), "message": "Analysis queued...", "progress": 0}, ttl=3600
+            f"task_status:{task_id}", {"status": "queued", "username": request.username, "started_at": datetime.now(timezone.utc).isoformat(), "message": "Analysis queued...", "progress": 0}, ttl=3600
         )
 
         # Start background analysis

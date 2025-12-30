@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from github import Github
@@ -182,7 +182,7 @@ class GitHubUserService:
                 "commit_analysis": commit_analysis,
                 "pull_requests": pr_data.get("pull_requests", []),
                 "pr_analysis": pr_analysis,
-                "analyzed_at": datetime.utcnow().isoformat(),
+                "analyzed_at": datetime.now(timezone.utc).isoformat(),
                 "analysis_context_type": "profile",
             }
 

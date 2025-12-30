@@ -2,7 +2,7 @@
 
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import desc, select
@@ -1515,7 +1515,7 @@ class RecommendationService:
                             "username": github_username,
                             "contributions_to_repo": len(filtered_commits),  # Only count commits to this specific repo
                         },
-                        "analyzed_at": datetime.utcnow().isoformat(),
+                        "analyzed_at": datetime.now(timezone.utc).isoformat(),
                         "analysis_context_type": "repo_only",
                         "repository_url": repository_url,
                         "ai_focus_instruction": (

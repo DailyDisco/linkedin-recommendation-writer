@@ -177,3 +177,99 @@ export interface RecommendationOptionsResponse {
   generation_parameters?: Record<string, unknown>;
   generation_prompt?: string;
 }
+
+// Billing types
+export type TierType = 'free' | 'pro' | 'team';
+export type SubscriptionStatus = 'active' | 'past_due' | 'cancelled' | 'trialing';
+
+export interface TierLimits {
+  daily_generations: number;
+  options_per_generation: number;
+}
+
+export interface Plan {
+  id: TierType;
+  name: string;
+  price_cents: number;
+  interval: 'month' | 'year' | null;
+  stripe_price_id: string | null;
+  features: string[];
+  limits: TierLimits;
+  is_popular?: boolean;
+}
+
+export interface PlansResponse {
+  plans: Plan[];
+}
+
+export interface Subscription {
+  id: number | null;
+  tier: TierType;
+  status: SubscriptionStatus;
+  stripe_subscription_id: string | null;
+  stripe_customer_id: string | null;
+  current_period_start: string | null;
+  current_period_end: string | null;
+  cancel_at_period_end: boolean;
+  trial_end: string | null;
+}
+
+export interface UsageHistoryItem {
+  date: string;
+  count: number;
+}
+
+export interface Usage {
+  tier: TierType;
+  period_start: string;
+  period_end: string;
+  generations_used: number;
+  generations_limit: number;
+  generations_remaining: number;
+  resets_at: string;
+  history: UsageHistoryItem[];
+}
+
+export interface FeatureAccess {
+  tier: TierType;
+  features: {
+    multiple_options: boolean;
+    keyword_refinement: boolean;
+    all_tones: boolean;
+    version_history: boolean;
+    api_access: boolean;
+    priority_support: boolean;
+  };
+  limits: TierLimits;
+}
+
+export interface CheckoutResponse {
+  checkout_url: string;
+  session_id: string;
+}
+
+export interface PortalResponse {
+  portal_url: string;
+}
+
+export interface ApiKey {
+  id: number;
+  name: string;
+  key_prefix: string;
+  scopes: string[];
+  is_active: boolean;
+  last_used_at: string | null;
+  usage_count: number;
+  expires_at: string | null;
+  created_at: string;
+}
+
+export interface ApiKeyCreated {
+  id: number;
+  name: string;
+  key: string;
+  key_prefix: string;
+  scopes: string[];
+  expires_at: string | null;
+  created_at: string;
+}

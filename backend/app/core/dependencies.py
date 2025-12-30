@@ -318,7 +318,14 @@ async def increment_anonymous_user_count(request: Request) -> None:
 
 
 async def check_generation_limit(user: Union[User, AnonymousUser], db: AsyncSession) -> None:
-    """Check generation limits for both authenticated and anonymous users."""
+    """Check generation limits for both authenticated and anonymous users.
+
+    Uses subscription tier limits for authenticated users:
+    - free: 3/day
+    - pro: 50/day
+    - team: unlimited
+    - admin: unlimited
+    """
     today = date.today()
 
     # Reset count if it's a new day for authenticated users
@@ -329,13 +336,24 @@ async def check_generation_limit(user: Union[User, AnonymousUser], db: AsyncSess
             await db.commit()
             await db.refresh(user)
 
-    # Check limits
-    daily_limit = user.daily_limit
+    # Get effective daily limit based on subscription tier
+    if isinstance(user, User):
+        daily_limit = user.effective_daily_limit
+        # -1 means unlimited (team/admin tiers)
+        if daily_limit == -1:
+            return
+    else:
+        daily_limit = user.daily_limit  # Anonymous users use default limit
+
     if user.recommendation_count >= daily_limit:
         user_type = "anonymous" if isinstance(user, AnonymousUser) else "authenticated"
+        tier_info = ""
+        if isinstance(user, User):
+            tier_info = f" (tier: {user.effective_tier})"
         raise HTTPException(
             status_code=429,  # Too Many Requests
-            detail=f"Daily generation limit ({daily_limit}) exceeded for {user_type} user. Please try again tomorrow.",
+            detail=f"Daily generation limit ({daily_limit}) exceeded for {user_type} user{tier_info}. Please upgrade or try again tomorrow.",
+            headers={"X-Upgrade-URL": "/pricing"},
         )
 
 
@@ -347,8 +365,9 @@ async def increment_generation_count(user: Union[User, AnonymousUser], request: 
         await db.commit()
         await db.refresh(user)
 
-        daily_limit = user.daily_limit or 5  # Default to 5 for registered users
-        logger.info(f"User {user.username} (ID: {user.id}) has used {user.recommendation_count}/{daily_limit} generations today")
+        daily_limit = user.effective_daily_limit
+        limit_display = "unlimited" if daily_limit == -1 else str(daily_limit)
+        logger.info(f"User {user.username} (ID: {user.id}, tier: {user.effective_tier}) has used {user.recommendation_count}/{limit_display} generations today")
     else:
         # Anonymous user - increment in Redis
         await increment_anonymous_user_count(request)

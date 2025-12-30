@@ -86,7 +86,7 @@ async def register_user(
     hashed_password = hash_password(user_in.password)
     user = User(email=user_in.email, username=user_in.username, hashed_password=hashed_password)
 
-    if user_in.email == "diegoespinowork@gmail.com":
+    if user_in.email and user_in.email.lower() in settings.admin_emails:
         user.role = "admin"  # type: ignore
     elif user_in.role:  # Allow setting role if provided in schema (e.g. for premium users)
         user.role = user_in.role  # type: ignore
