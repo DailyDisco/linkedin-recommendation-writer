@@ -101,20 +101,41 @@ if [ -n "$HAS_FRONTEND" ]; then
     exit 1
   fi
 
-  # Run frontend formatting fix
-  if ! (cd frontend && npm run prettier:fix); then
-    echo -e "${YELLOW}💡 Frontend formatting fix failed${NC}"
-    failed=1
-  else
-    echo -e "${GREEN}✅ Frontend formatting fix completed successfully${NC}"
+  # Try to load nvm/fnm if npm isn't available
+  if ! command -v npm &>/dev/null; then
+    # Try nvm
+    if [ -f "$HOME/.nvm/nvm.sh" ]; then
+      source "$HOME/.nvm/nvm.sh"
+    # Try fnm
+    elif command -v fnm &>/dev/null; then
+      eval "$(fnm env)"
+    # Try volta
+    elif [ -d "$HOME/.volta" ]; then
+      export PATH="$HOME/.volta/bin:$PATH"
+    fi
   fi
 
-  # Run frontend linting
-  if ! (cd frontend && npm run lint); then
-    echo -e "${YELLOW}💡 Fix the linting issues above${NC}"
-    failed=1
+  # Check if npm is available
+  if ! command -v npm &>/dev/null; then
+    echo -e "${YELLOW}⚠️  npm not found in PATH${NC}"
+    echo -e "${CYAN}💡 Frontend is likely using a Node version manager (nvm/fnm/volta).${NC}"
+    echo -e "${CYAN}   Skipping frontend checks. Run manually: cd frontend && npm run lint${NC}"
   else
-    echo -e "${GREEN}✅ Frontend linting completed successfully${NC}"
+    # Run frontend formatting fix
+    if ! (cd frontend && npm run prettier:fix); then
+      echo -e "${YELLOW}💡 Frontend formatting fix failed${NC}"
+      failed=1
+    else
+      echo -e "${GREEN}✅ Frontend formatting fix completed successfully${NC}"
+    fi
+
+    # Run frontend linting
+    if ! (cd frontend && npm run lint); then
+      echo -e "${YELLOW}💡 Fix the linting issues above${NC}"
+      failed=1
+    else
+      echo -e "${GREEN}✅ Frontend linting completed successfully${NC}"
+    fi
   fi
 fi
 

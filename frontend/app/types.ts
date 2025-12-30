@@ -180,7 +180,11 @@ export interface RecommendationOptionsResponse {
 
 // Billing types
 export type TierType = 'free' | 'pro' | 'team';
-export type SubscriptionStatus = 'active' | 'past_due' | 'cancelled' | 'trialing';
+export type SubscriptionStatus =
+  | 'active'
+  | 'past_due'
+  | 'cancelled'
+  | 'trialing';
 
 export interface TierLimits {
   daily_generations: number;

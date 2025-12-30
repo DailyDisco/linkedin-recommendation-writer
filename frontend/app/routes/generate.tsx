@@ -1,4 +1,11 @@
-import { useState, useCallback, useMemo, useEffect, lazy, Suspense } from 'react';
+import {
+  useState,
+  useCallback,
+  useMemo,
+  useEffect,
+  lazy,
+  Suspense,
+} from 'react';
 import { Github, Loader2, Users, User } from 'lucide-react';
 import { Link } from 'react-router';
 import { toast } from 'sonner';
@@ -17,9 +24,7 @@ declare global {
 const RecommendationModal = lazy(
   () => import('../components/RecommendationModal')
 );
-const RegistrationModal = lazy(
-  () => import('../components/RegistrationModal')
-);
+const RegistrationModal = lazy(() => import('../components/RegistrationModal'));
 
 import { ContributorSkeleton } from '../components/ui/loading-skeleton';
 import ErrorBoundary from '../components/ui/error-boundary';

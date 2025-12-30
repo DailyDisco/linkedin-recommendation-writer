@@ -81,10 +81,7 @@ api.interceptors.response.use(
       // Check if user is logged in using the Zustand store
       const hasToken = !!authStore.accessToken;
       console.log('🔐 API Interceptor: Has token:', hasToken);
-      console.log(
-        '🔐 API Interceptor: Token exists:',
-        !!authStore.accessToken
-      );
+      console.log('🔐 API Interceptor: Token exists:', !!authStore.accessToken);
 
       // Only redirect to login if the error is 401, user has a token (is logged in),
       // and it's not from the login endpoint itself
@@ -104,9 +101,7 @@ api.interceptors.response.use(
 
         // Small delay to ensure logout completes before redirect
         setTimeout(() => {
-          console.log(
-            '🔐 API Interceptor: Redirecting to login after logout'
-          );
+          console.log('🔐 API Interceptor: Redirecting to login after logout');
           window.location.href = '/login';
         }, 100);
       } else {
