@@ -25,6 +25,10 @@ export interface AuthState {
   userDetailsError: string | null;
   isAuthenticating: boolean;
   lastFetchTime: number;
+  /** True when the store has been hydrated from localStorage */
+  isHydrated: boolean;
+  /** Computed property: true when user is logged in */
+  isLoggedIn: boolean;
 }
 
 export interface AuthActions {
@@ -57,8 +61,12 @@ export const useAuthStore = create<AuthStore>()(
         userDetailsError: null,
         isAuthenticating: false,
         lastFetchTime: 0,
+        isHydrated: false,
 
-        // Remove computed property - will use selector in useAuth hook instead
+        // Computed property - derived from accessToken
+        get isLoggedIn() {
+          return !!get().accessToken;
+        },
 
         // Actions
         setUserDetails: (userDetails: AuthState['userDetails']) => {
@@ -240,8 +248,12 @@ export const useAuthStore = create<AuthStore>()(
           accessToken: state.accessToken,
           lastFetchTime: state.lastFetchTime,
         }),
-        onRehydrateStorage: () => _state => {
-          // Store rehydration complete
+        onRehydrateStorage: () => () => {
+          // Mark store as hydrated once rehydration is complete
+          // Use setTimeout to ensure state update happens after hydration
+          setTimeout(() => {
+            useAuthStore.setState({ isHydrated: true });
+          }, 0);
         },
       }
     ),
