@@ -2,18 +2,22 @@
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 import stripe
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.models.credit_purchase import CreditPurchase
 from app.models.subscription import Subscription
-from app.models.user import User
+from app.models.user import CREDIT_PACKS, User
 from app.models.webhook_event import StripeWebhookEvent
 
 logger = logging.getLogger(__name__)
+
+# Map price IDs to pack types
+PRICE_TO_PACK: dict[str, str] = {}  # Populated at runtime from settings
 
 
 class StripeService:
@@ -127,6 +131,83 @@ class StripeService:
             }
         except stripe.StripeError as e:
             logger.error(f"Failed to create checkout session for user {user.id}: {e}")
+            raise
+
+    async def create_credit_pack_checkout(
+        self,
+        user: User,
+        pack_type: Literal["starter", "pro"],
+        success_url: str,
+        cancel_url: str,
+        db: AsyncSession,
+    ) -> dict:
+        """Create a Stripe Checkout session for a one-time credit pack purchase.
+
+        Args:
+            user: User making the purchase
+            pack_type: Type of credit pack (starter or pro)
+            success_url: URL to redirect after successful checkout
+            cancel_url: URL to redirect if checkout is cancelled
+            db: Database session
+
+        Returns:
+            Dict with checkout_url and session_id
+        """
+        # Get the correct price ID
+        if pack_type == "starter":
+            price_id = settings.STRIPE_PRICE_ID_STARTER
+        else:
+            price_id = settings.STRIPE_PRICE_ID_PRO_PACK
+
+        if not price_id:
+            raise ValueError(f"No Stripe price configured for {pack_type} pack")
+
+        pack_info = CREDIT_PACKS.get(pack_type)
+        if not pack_info:
+            raise ValueError(f"Invalid pack type: {pack_type}")
+
+        customer_id = await self.get_or_create_customer(user, db)
+
+        # Create a pending credit purchase record
+        purchase = CreditPurchase(
+            user_id=user.id,
+            pack_type=pack_type,
+            credits_amount=pack_info["credits"],
+            price_cents=pack_info["price_cents"],
+            status="pending",
+        )
+        db.add(purchase)
+        await db.flush()  # Get the purchase ID
+
+        try:
+            session = stripe.checkout.Session.create(
+                customer=customer_id,
+                mode="payment",  # One-time payment, not subscription
+                line_items=[{"price": price_id, "quantity": 1}],
+                success_url=success_url,
+                cancel_url=cancel_url,
+                metadata={
+                    "user_id": str(user.id),
+                    "purchase_type": "credit_pack",
+                    "pack_type": pack_type,
+                    "credits_amount": str(pack_info["credits"]),
+                    "purchase_id": str(purchase.id),
+                },
+            )
+
+            # Update purchase with session ID
+            purchase.stripe_checkout_session_id = session.id
+
+            await db.commit()
+
+            logger.info(f"Created credit pack checkout {session.id} for user {user.id}, pack={pack_type}")
+            return {
+                "checkout_url": session.url,
+                "session_id": session.id,
+            }
+        except stripe.StripeError as e:
+            logger.error(f"Failed to create credit pack checkout for user {user.id}: {e}")
+            await db.rollback()
             raise
 
     async def create_portal_session(
@@ -264,7 +345,43 @@ class StripeService:
         if not user.stripe_customer_id:
             user.stripe_customer_id = session.customer
 
-        logger.info(f"Checkout completed for user {user_id}")
+        # Check if this is a credit pack purchase
+        purchase_type = session.metadata.get("purchase_type")
+        if purchase_type == "credit_pack":
+            await self._handle_credit_pack_purchase(session, user, db)
+        else:
+            logger.info(f"Checkout completed for user {user_id}")
+
+    async def _handle_credit_pack_purchase(
+        self, session: Any, user: User, db: AsyncSession
+    ) -> None:
+        """Handle credit pack purchase completion."""
+        pack_type = session.metadata.get("pack_type")
+        credits_amount = int(session.metadata.get("credits_amount", 0))
+        purchase_id = int(session.metadata.get("purchase_id", 0))
+
+        if not pack_type or not credits_amount:
+            logger.error(f"Invalid credit pack metadata for session {session.id}")
+            return
+
+        # Update the credit purchase record
+        if purchase_id:
+            result = await db.execute(
+                select(CreditPurchase).where(CreditPurchase.id == purchase_id)
+            )
+            purchase = result.scalar_one_or_none()
+            if purchase:
+                purchase.complete()
+                if session.payment_intent:
+                    purchase.stripe_payment_intent_id = session.payment_intent
+
+        # Add credits to user
+        user.add_credits(credits_amount, pack_type)
+
+        logger.info(
+            f"Credit pack purchase completed for user {user.id}: "
+            f"pack={pack_type}, credits={credits_amount}, new_balance={user.credits}"
+        )
 
     async def _handle_subscription_created(self, event: Any, db: AsyncSession) -> None:
         """Handle customer.subscription.created event."""
@@ -413,10 +530,14 @@ class StripeService:
         """Get tier name from Stripe price ID."""
         if not price_id:
             return "free"
-        if price_id == settings.STRIPE_PRICE_ID_PRO:
-            return "pro"
+        # New unlimited subscription
+        if price_id == settings.STRIPE_PRICE_ID_UNLIMITED:
+            return "unlimited"
+        # Legacy support
         if price_id == settings.STRIPE_PRICE_ID_TEAM:
-            return "team"
+            return "unlimited"
+        if price_id == settings.STRIPE_PRICE_ID_PRO:
+            return "unlimited"  # Migrate old pro to unlimited
         return "free"
 
     async def _has_had_trial(self, user: User, db: AsyncSession) -> bool:

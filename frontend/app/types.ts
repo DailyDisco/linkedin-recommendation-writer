@@ -179,7 +179,8 @@ export interface RecommendationOptionsResponse {
 }
 
 // Billing types
-export type TierType = 'free' | 'pro' | 'team';
+export type TierType = 'free' | 'pro' | 'unlimited' | 'admin';
+export type PackType = 'starter' | 'pro';
 export type SubscriptionStatus =
   | 'active'
   | 'past_due'
@@ -187,10 +188,42 @@ export type SubscriptionStatus =
   | 'trialing';
 
 export interface TierLimits {
-  daily_generations: number;
   options_per_generation: number;
 }
 
+// Credit pack for one-time purchase
+export interface CreditPack {
+  id: PackType;
+  name: string;
+  credits: number;
+  price_cents: number;
+  options_per_generation: number;
+  stripe_price_id: string | null;
+  description: string;
+}
+
+export interface CreditPacksResponse {
+  packs: CreditPack[];
+}
+
+export interface CreditBalance {
+  credits: number;
+  lifetime_credits_purchased: number;
+  last_pack_purchased: string | null;
+  has_unlimited: boolean;
+}
+
+export interface CreditPurchase {
+  id: number;
+  pack_type: string;
+  credits_amount: number;
+  price_cents: number;
+  status: string;
+  created_at: string;
+  completed_at: string | null;
+}
+
+// Subscription plan (unlimited monthly only)
 export interface Plan {
   id: TierType;
   name: string;

@@ -320,56 +320,64 @@ async def increment_anonymous_user_count(request: Request) -> None:
 async def check_generation_limit(user: Union[User, AnonymousUser], db: AsyncSession) -> None:
     """Check generation limits for both authenticated and anonymous users.
 
-    Uses subscription tier limits for authenticated users:
-    - free: 3/day
-    - pro: 50/day
-    - team: unlimited
-    - admin: unlimited
+    Credit-based system:
+    - Anonymous users: 3 per day (IP-based)
+    - Free users: 3 lifetime credits (can purchase more)
+    - Credit pack users: Uses credits from purchased packs
+    - Unlimited subscribers: No limits
+    - Admin: No limits
     """
+    # For authenticated users with credits or subscription
+    if isinstance(user, User):
+        # Unlimited subscribers and admins have no limits
+        if user.has_unlimited_generations or user.role == "admin":
+            return
+
+        # Check if user has credits
+        if not user.can_generate:
+            raise HTTPException(
+                status_code=429,  # Too Many Requests
+                detail=f"No credits remaining. Purchase a credit pack to continue.",
+                headers={"X-Upgrade-URL": "/pricing"},
+            )
+        return
+
+    # Anonymous users - daily limit based on IP
     today = date.today()
 
-    # Reset count if it's a new day for authenticated users
-    if isinstance(user, User) and user.last_recommendation_date:
-        if user.last_recommendation_date.date() < today:
-            user.recommendation_count = 0  # type: ignore
-            user.last_recommendation_date = today  # type: ignore
-            await db.commit()
-            await db.refresh(user)
-
-    # Get effective daily limit based on subscription tier
-    if isinstance(user, User):
-        daily_limit = user.effective_daily_limit
-        # -1 means unlimited (team/admin tiers)
-        if daily_limit == -1:
-            return
-    else:
-        daily_limit = user.daily_limit  # Anonymous users use default limit
-
-    if user.recommendation_count >= daily_limit:
-        user_type = "anonymous" if isinstance(user, AnonymousUser) else "authenticated"
-        tier_info = ""
-        if isinstance(user, User):
-            tier_info = f" (tier: {user.effective_tier})"
+    # Check if count needs reset (handled in get_anonymous_user_data)
+    if user.recommendation_count >= user.daily_limit:
         raise HTTPException(
             status_code=429,  # Too Many Requests
-            detail=f"Daily generation limit ({daily_limit}) exceeded for {user_type} user{tier_info}. Please upgrade or try again tomorrow.",
+            detail=f"Daily limit ({user.daily_limit}) exceeded for anonymous users. Sign up for free credits or try again tomorrow.",
             headers={"X-Upgrade-URL": "/pricing"},
         )
 
 
 async def increment_generation_count(user: Union[User, AnonymousUser], request: Request, db: AsyncSession) -> None:
-    """Increment generation count for both authenticated and anonymous users."""
+    """Increment generation count / deduct credits for both authenticated and anonymous users."""
     if isinstance(user, User):
-        # Authenticated user - increment in database
-        user.recommendation_count += 1  # type: ignore
-        await db.commit()
-        await db.refresh(user)
-
-        daily_limit = user.effective_daily_limit
-        limit_display = "unlimited" if daily_limit == -1 else str(daily_limit)
-        logger.info(f"User {user.username} (ID: {user.id}, tier: {user.effective_tier}) has used {user.recommendation_count}/{limit_display} generations today")
+        # Authenticated user - deduct credit (unless unlimited)
+        if user.has_unlimited_generations or user.role == "admin":
+            # Track usage but don't deduct credits
+            user.recommendation_count += 1  # type: ignore
+            await db.commit()
+            await db.refresh(user)
+            logger.info(f"User {user.username} (ID: {user.id}, tier: {user.effective_tier}) generated (unlimited)")
+        else:
+            # Deduct one credit
+            success = user.use_credit()
+            if not success:
+                raise HTTPException(
+                    status_code=429,
+                    detail="No credits remaining. Purchase a credit pack to continue.",
+                    headers={"X-Upgrade-URL": "/pricing"},
+                )
+            user.recommendation_count += 1  # type: ignore
+            await db.commit()
+            await db.refresh(user)
+            logger.info(f"User {user.username} (ID: {user.id}) used 1 credit, {user.credits} remaining")
     else:
         # Anonymous user - increment in Redis
         await increment_anonymous_user_count(request)
-
         logger.info(f"Anonymous user {user.ip_address} has used {user.recommendation_count + 1}/{user.daily_limit} generations today")

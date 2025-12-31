@@ -9,11 +9,11 @@ services:
       target: development # Use the development stage from the root Dockerfile
     container_name: linkedin-recommender-app
     ports:
-      - "5173:5173" # Vite dev server
-      - "8000:8000" # Backend API
+      - "5174:5173" # Vite dev server (host 5174 -> container 5173)
+      - "8002:8000" # Backend API (host 8002 -> container 8000)
     environment:
       # API Configuration
-      - VITE_API_BASE_URL=http://localhost:8000
+      - VITE_API_BASE_URL=http://localhost:8002
       - VITE_API_TIMEOUT=${VITE_API_TIMEOUT}
       # Shared Environment
       - NODE_ENV=${NODE_ENV}
@@ -61,7 +61,7 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     ports:
-      - "${POSTGRES_PORT}:5432"
+      - "5434:5432" # Host port 5434 to avoid conflicts
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -78,7 +78,7 @@ services:
     image: redis:7-alpine
     container_name: linkedin-recommender-redis
     ports:
-      - "${REDIS_PORT}:6379"
+      - "6380:6379"  # Host 6380 to avoid conflicts with other Redis instances
     volumes:
       - redis_data:/data
     networks:

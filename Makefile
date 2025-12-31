@@ -1,5 +1,5 @@
 # LinkedIn Recommendation Writer - Docker Development Commands
-.PHONY: help build up down logs clean test prod prod-up prod-down
+.PHONY: help build dev dev-down dev-logs logs clean test prod prod-down prod-logs
 
 # Default target
 help: ## Show this help message
@@ -18,13 +18,13 @@ build: ## Build all services for development
 build-no-cache: ## Build all services without cache
 	docker compose build --no-cache
 
-up: ## Start all services in development mode
+dev: ## Start all services in development mode
 	docker compose up -d
 
-up-logs: ## Start all services and show logs
+dev-logs: ## Start all services and show logs
 	docker compose up
 
-down: ## Stop all services
+dev-down: ## Stop all services
 	docker compose down -v
 
 logs: ## Show logs from all services
@@ -56,13 +56,32 @@ format-backend: ## Format backend code
 	docker compose exec app sh -c "cd /app/backend && black . && isort ."
 
 # ============================
+# Database Commands
+# ============================
+
+db-seed: ## Seed database with test data
+	docker compose exec app sh -c "cd /app/backend && python -m app.scripts.seed"
+
+db-seed-clean: ## Clean and reseed database
+	docker compose exec app sh -c "cd /app/backend && python -m app.scripts.seed --clean"
+
+db-seed-minimal: ## Seed database with minimal data
+	docker compose exec app sh -c "cd /app/backend && python -m app.scripts.seed --minimal"
+
+db-migrate: ## Run database migrations
+	docker compose exec app sh -c "cd /app/backend && alembic upgrade head"
+
+db-migrate-down: ## Rollback last migration
+	docker compose exec app sh -c "cd /app/backend && alembic downgrade -1"
+
+# ============================
 # Production Commands
 # ============================
 
 prod-build: ## Build all services for production
 	docker compose -f docker-compose.prod.yml build
 
-prod-up: ## Start all services in production mode
+prod: ## Start all services in production mode
 	docker compose -f docker-compose.prod.yml up -d
 
 prod-down: ## Stop all production services

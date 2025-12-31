@@ -13,7 +13,10 @@
     "audit": "npm audit --audit-level=moderate",
     "lint:frontend": "cd frontend && npm run lint",
     "build:frontend": "cd frontend && npm run build",
-    "typecheck:frontend": "cd frontend && npm run typecheck"
+    "typecheck:frontend": "cd frontend && npm run typecheck",
+    "db:seed": "cd backend && python -m app.scripts.seed",
+    "db:seed:clean": "cd backend && python -m app.scripts.seed --clean",
+    "db:seed:minimal": "cd backend && python -m app.scripts.seed --minimal"
   },
   "keywords": [],
   "author": "",

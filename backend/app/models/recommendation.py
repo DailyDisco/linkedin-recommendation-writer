@@ -1,6 +1,6 @@
 """Recommendation model."""
 
-from datetime import datetime, timezone
+from datetime import datetime
 
 from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
@@ -43,8 +43,8 @@ class Recommendation(Base):
     generated_options = Column(JSON, nullable=True)  # Store all generated options for reference
 
     # Metadata
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
     user = relationship("User", back_populates="recommendations")
@@ -83,7 +83,7 @@ class RecommendationVersion(Base):
     word_count = Column(Integer, default=0)
 
     # Metadata
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
     created_by = Column(String, nullable=True)  # 'system', 'user', etc.
 
     # Relationships

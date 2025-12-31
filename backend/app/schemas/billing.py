@@ -6,16 +6,67 @@ from typing import List, Literal, Optional
 from pydantic import BaseModel, Field
 
 
-# Tier types
-TierType = Literal["free", "pro", "team"]
+# Tier types (credit-based system)
+TierType = Literal["free", "pro", "unlimited", "admin"]
+PackType = Literal["starter", "pro"]
 SubscriptionStatus = Literal["active", "past_due", "cancelled", "trialing"]
 
 
-# Plan schemas
+# Credit pack schemas
+class CreditPack(BaseModel):
+    """Credit pack available for purchase."""
+
+    id: PackType
+    name: str
+    credits: int
+    price_cents: int
+    options_per_generation: int
+    stripe_price_id: Optional[str] = None
+    description: str
+
+
+class CreditPacksResponse(BaseModel):
+    """Response containing available credit packs."""
+
+    packs: List[CreditPack]
+
+
+class CreditBalanceResponse(BaseModel):
+    """User's current credit balance."""
+
+    credits: int
+    lifetime_credits_purchased: int
+    last_pack_purchased: Optional[str] = None
+    has_unlimited: bool = False
+
+
+class CreditPurchaseRequest(BaseModel):
+    """Request to purchase a credit pack."""
+
+    pack_id: PackType
+    success_url: Optional[str] = Field(default=None, description="URL to redirect after success")
+    cancel_url: Optional[str] = Field(default=None, description="URL to redirect after cancel")
+
+
+class CreditPurchaseResponse(BaseModel):
+    """Response for a credit purchase record."""
+
+    id: int
+    pack_type: str
+    credits_amount: int
+    price_cents: int
+    status: str
+    created_at: datetime
+    completed_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# Plan schemas (for unlimited subscription)
 class TierLimits(BaseModel):
     """Limits for a subscription tier."""
 
-    daily_generations: int = Field(description="Daily generation limit (-1 for unlimited)")
     options_per_generation: int = Field(description="Number of options per generation")
 
 
@@ -184,63 +235,62 @@ class FeatureAccess(BaseModel):
     features: dict = Field(default_factory=dict)
 
 
-# Predefined plans
-FREE_PLAN = Plan(
-    id="free",
-    name="Free",
-    price_cents=0,
-    interval=None,
-    stripe_price_id=None,
-    features=[
-        "3 recommendations per day",
-        "1 option per generation",
-        "Basic tones",
-    ],
-    limits=TierLimits(daily_generations=3, options_per_generation=1),
+# Predefined credit packs
+STARTER_PACK = CreditPack(
+    id="starter",
+    name="Starter Pack",
+    credits=10,
+    price_cents=500,
+    options_per_generation=1,
+    description="Perfect for occasional use",
 )
 
-PRO_PLAN = Plan(
+PRO_PACK = CreditPack(
     id="pro",
-    name="Pro",
-    price_cents=900,
-    interval="month",
-    stripe_price_id=None,  # Set from config
-    features=[
-        "50 recommendations per day",
-        "3 options per generation",
-        "All tones",
-        "Keyword refinement",
-        "Version history",
-    ],
-    limits=TierLimits(daily_generations=50, options_per_generation=3),
-    is_popular=True,
+    name="Pro Pack",
+    credits=50,
+    price_cents=1500,
+    options_per_generation=3,
+    description="Best value - includes 3 options per generation",
 )
 
-TEAM_PLAN = Plan(
-    id="team",
-    name="Team",
+
+# Unlimited subscription plan
+UNLIMITED_PLAN = Plan(
+    id="unlimited",
+    name="Unlimited Monthly",
     price_cents=2900,
     interval="month",
     stripe_price_id=None,  # Set from config
     features=[
         "Unlimited recommendations",
-        "5 options per generation",
+        "3 options per generation",
         "All tones",
         "Keyword refinement",
-        "Version history",
         "API access",
         "Priority support",
     ],
-    limits=TierLimits(daily_generations=-1, options_per_generation=5),
+    limits=TierLimits(options_per_generation=3),
+    is_popular=False,
 )
 
 
-def get_plans(stripe_price_id_pro: str, stripe_price_id_team: str) -> List[Plan]:
-    """Get all plans with Stripe price IDs populated."""
-    pro = PRO_PLAN.model_copy()
+def get_credit_packs(
+    stripe_price_id_starter: Optional[str] = None,
+    stripe_price_id_pro: Optional[str] = None,
+) -> List[CreditPack]:
+    """Get all credit packs with Stripe price IDs populated."""
+    starter = STARTER_PACK.model_copy()
+    starter.stripe_price_id = stripe_price_id_starter
+
+    pro = PRO_PACK.model_copy()
     pro.stripe_price_id = stripe_price_id_pro
 
-    team = TEAM_PLAN.model_copy()
-    team.stripe_price_id = stripe_price_id_team
+    return [starter, pro]
 
-    return [FREE_PLAN, pro, team]
+
+def get_unlimited_plan(stripe_price_id: Optional[str] = None) -> Plan:
+    """Get unlimited plan with Stripe price ID populated."""
+    plan = UNLIMITED_PLAN.model_copy()
+    plan.stripe_price_id = stripe_price_id
+    return plan

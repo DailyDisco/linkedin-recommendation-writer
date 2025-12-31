@@ -14,14 +14,25 @@ if TYPE_CHECKING:
     from app.models.usage_record import UsageRecord
 
 
-# Tier limits configuration
+# Tier limits configuration (credits-based system)
+# -1 means unlimited (for subscription users)
 TIER_LIMITS = {
-    "anonymous": {"daily_generations": 3, "options_per_generation": 1},
-    "free": {"daily_generations": 3, "options_per_generation": 1},
-    "pro": {"daily_generations": 50, "options_per_generation": 3},
-    "team": {"daily_generations": -1, "options_per_generation": 5},  # -1 = unlimited
-    "admin": {"daily_generations": -1, "options_per_generation": 5},
+    "anonymous": {"options_per_generation": 1},
+    "free": {"options_per_generation": 1},
+    "pro": {"options_per_generation": 3},  # Pro credit pack buyers
+    "unlimited": {"options_per_generation": 3},  # $29/mo subscription
+    "team": {"options_per_generation": 5},
+    "admin": {"options_per_generation": 5},
 }
+
+# Credit pack definitions
+CREDIT_PACKS = {
+    "starter": {"credits": 10, "price_cents": 500, "options_per_generation": 1},
+    "pro": {"credits": 50, "price_cents": 1500, "options_per_generation": 3},
+}
+
+# Default credits for new users
+DEFAULT_FREE_CREDITS = 3
 
 
 class User(Base):
@@ -35,8 +46,8 @@ class User(Base):
     full_name = Column(String, nullable=True)
     hashed_password = Column(String, nullable=False)
     is_active = Column(Boolean, default=True, index=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Recommendation limits
     recommendation_count = Column(Integer, default=0)  # Number of recommendations created today
@@ -48,9 +59,14 @@ class User(Base):
     default_tone = Column(String, default="professional")  # New field for default recommendation tone
     language = Column(String, default="en")  # New field for user language preference (e.g., "en", "es")
 
+    # Credits system (pay-as-you-go)
+    credits = Column(Integer, default=DEFAULT_FREE_CREDITS, nullable=False)  # Current credit balance
+    lifetime_credits_purchased = Column(Integer, default=0, nullable=False)  # Track total purchases
+    last_credit_pack = Column(String(50), nullable=True)  # Last pack purchased: starter, pro
+
     # Stripe / Subscription fields
     stripe_customer_id = Column(String(255), unique=True, nullable=True, index=True)
-    subscription_tier = Column(String(50), default="free", nullable=False, index=True)  # free, pro, team
+    subscription_tier = Column(String(50), default="free", nullable=False, index=True)  # free, unlimited
     subscription_status = Column(String(50), default="active", nullable=False)  # active, past_due, cancelled, trialing
 
     # Relationships
@@ -62,20 +78,21 @@ class User(Base):
 
     @property
     def effective_tier(self) -> str:
-        """Get effective subscription tier (considers admin role)."""
+        """Get effective tier based on subscription or credit pack history."""
         if self.role == "admin":
             return "admin"
-        return self.subscription_tier or "free"
+        # Unlimited monthly subscribers
+        if self.subscription_tier == "unlimited" and self.subscription_status == "active":
+            return "unlimited"
+        # Users who bought pro pack get pro features
+        if self.last_credit_pack == "pro":
+            return "pro"
+        return "free"
 
     @property
     def tier_limits(self) -> dict:
         """Get limits for user's current tier."""
         return TIER_LIMITS.get(self.effective_tier, TIER_LIMITS["free"])
-
-    @property
-    def effective_daily_limit(self) -> int:
-        """Get effective daily generation limit based on tier."""
-        return self.tier_limits["daily_generations"]
 
     @property
     def options_per_generation(self) -> int:
@@ -84,28 +101,49 @@ class User(Base):
 
     @property
     def has_unlimited_generations(self) -> bool:
-        """Check if user has unlimited generations."""
-        return self.effective_daily_limit == -1
+        """Check if user has unlimited generations (subscription)."""
+        return self.subscription_tier == "unlimited" and self.subscription_status == "active"
 
     @property
-    def is_pro_or_higher(self) -> bool:
-        """Check if user has Pro tier or higher."""
-        return self.effective_tier in ("pro", "team", "admin")
+    def has_credits(self) -> bool:
+        """Check if user has credits available."""
+        return self.credits > 0 or self.has_unlimited_generations
 
     @property
-    def is_team_or_higher(self) -> bool:
-        """Check if user has Team tier or higher."""
-        return self.effective_tier in ("team", "admin")
+    def can_generate(self) -> bool:
+        """Check if user can generate a recommendation."""
+        return self.has_credits or self.has_unlimited_generations or self.role == "admin"
+
+    @property
+    def is_subscriber(self) -> bool:
+        """Check if user has active unlimited subscription."""
+        return self.subscription_tier == "unlimited" and self.subscription_status == "active"
 
     @property
     def can_use_api(self) -> bool:
-        """Check if user can use API (Team tier feature)."""
-        return self.is_team_or_higher
+        """Check if user can use API (subscription or purchased credits)."""
+        return self.is_subscriber or self.lifetime_credits_purchased >= 50
 
     @property
     def can_use_keyword_refinement(self) -> bool:
-        """Check if user can use keyword refinement (Pro+ feature)."""
-        return self.is_pro_or_higher
+        """Check if user can use keyword refinement (pro pack or subscriber)."""
+        return self.last_credit_pack == "pro" or self.is_subscriber or self.role == "admin"
+
+    def use_credit(self) -> bool:
+        """Deduct one credit. Returns True if successful, False if no credits."""
+        if self.has_unlimited_generations or self.role == "admin":
+            return True
+        if self.credits > 0:
+            self.credits -= 1
+            return True
+        return False
+
+    def add_credits(self, amount: int, pack_type: str | None = None) -> None:
+        """Add credits to user's balance."""
+        self.credits += amount
+        self.lifetime_credits_purchased += amount
+        if pack_type:
+            self.last_credit_pack = pack_type
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, username={self.username}, email={self.email}, tier={self.effective_tier})>"

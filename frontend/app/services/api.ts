@@ -433,11 +433,38 @@ export const apiClient = {
 
 // Billing API
 export const billingApi = {
+  // Plans (unlimited subscription only)
   async getPlans() {
     const response = await api.get('/billing/plans');
     return response.data;
   },
 
+  // Credit Packs (one-time purchases)
+  async getCreditPacks() {
+    const response = await api.get('/billing/credit-packs');
+    return response.data;
+  },
+
+  async getCreditBalance() {
+    const response = await api.get('/billing/credits');
+    return response.data;
+  },
+
+  async purchaseCreditPack(data: {
+    pack_id: 'starter' | 'pro';
+    success_url?: string;
+    cancel_url?: string;
+  }) {
+    const response = await api.post('/billing/credits/purchase', data);
+    return response.data;
+  },
+
+  async getCreditHistory() {
+    const response = await api.get('/billing/credits/history');
+    return response.data;
+  },
+
+  // Subscription checkout (for unlimited monthly)
   async createCheckoutSession(data: {
     price_id: string;
     success_url?: string;
@@ -467,7 +494,7 @@ export const billingApi = {
     return response.data;
   },
 
-  // API Keys (Team tier only)
+  // API Keys (subscribers or 50+ credits purchased)
   async createApiKey(data: {
     name: string;
     scopes?: string[];

@@ -1,6 +1,7 @@
 """Database models package."""
 
 from app.models.api_key import ApiKey
+from app.models.credit_purchase import CreditPurchase
 from app.models.github_profile import GitHubProfile
 from app.models.recommendation import Recommendation
 from app.models.subscription import Subscription
@@ -16,4 +17,5 @@ __all__ = [
     "UsageRecord",
     "ApiKey",
     "StripeWebhookEvent",
+    "CreditPurchase",
 ]

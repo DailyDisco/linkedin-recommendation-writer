@@ -119,13 +119,21 @@ class Settings(BaseSettings):
     STRIPE_SECRET_KEY: str = Field(default="", description="Stripe secret API key")
     STRIPE_PUBLISHABLE_KEY: str = Field(default="", description="Stripe publishable API key")
     STRIPE_WEBHOOK_SECRET: str = Field(default="", description="Stripe webhook signing secret")
-    STRIPE_PRICE_ID_PRO: str = Field(default="", description="Stripe Price ID for Pro plan")
-    STRIPE_PRICE_ID_TEAM: str = Field(default="", description="Stripe Price ID for Team plan")
+
+    # Credit Pack Price IDs (one-time purchases)
+    STRIPE_PRICE_ID_STARTER: str = Field(default="", description="Stripe Price ID for Starter pack (10 credits)")
+    STRIPE_PRICE_ID_PRO_PACK: str = Field(default="", description="Stripe Price ID for Pro pack (50 credits)")
+
+    # Subscription Price ID
+    STRIPE_PRICE_ID_UNLIMITED: str = Field(default="", description="Stripe Price ID for Unlimited monthly")
+
+    # Legacy (deprecated)
+    STRIPE_PRICE_ID_PRO: str = Field(default="", description="[Deprecated] Use STRIPE_PRICE_ID_PRO_PACK")
+    STRIPE_PRICE_ID_TEAM: str = Field(default="", description="[Deprecated] Use STRIPE_PRICE_ID_UNLIMITED")
     STRIPE_TRIAL_DAYS: int = Field(default=7, ge=0, le=30, description="Trial period in days")
 
     # Billing Feature Flags
     BILLING_ENABLED: bool = Field(default=True, description="Enable billing features")
-    TRIALS_ENABLED: bool = Field(default=True, description="Enable free trials")
 
     @computed_field
     def cors_origins(self) -> List[str]:
