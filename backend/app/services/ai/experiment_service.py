@@ -188,11 +188,7 @@ class ExperimentService:
             return force_variant
 
         # Get enabled variants with their weights
-        enabled_variants = [
-            (variant, config)
-            for variant, config in self.VARIANT_CONFIGS.items()
-            if config.enabled
-        ]
+        enabled_variants = [(variant, config) for variant, config in self.VARIANT_CONFIGS.items() if config.enabled]
 
         if not enabled_variants:
             return ExperimentVariant.BASELINE
@@ -249,14 +245,16 @@ class ExperimentService:
         if not config.prompt_additions:
             return base_prompt
 
-        additions = "\n".join([
-            "",
-            "=" * 40,
-            f"EXPERIMENT: {config.description}",
-            "=" * 40,
-            *config.prompt_additions,
-            "",
-        ])
+        additions = "\n".join(
+            [
+                "",
+                "=" * 40,
+                f"EXPERIMENT: {config.description}",
+                "=" * 40,
+                *config.prompt_additions,
+                "",
+            ]
+        )
 
         return base_prompt + additions
 
@@ -296,9 +294,7 @@ class ExperimentService:
         Returns:
             Experiment ID for tracking
         """
-        experiment_id = hashlib.md5(
-            f"{variant.value}:{username}:{datetime.now().isoformat()}".encode()
-        ).hexdigest()[:12]
+        experiment_id = hashlib.md5(f"{variant.value}:{username}:{datetime.now().isoformat()}".encode()).hexdigest()[:12]
 
         result = ExperimentResult(
             experiment_id=experiment_id,
@@ -315,10 +311,7 @@ class ExperimentService:
         self._results.append(result)
         self._update_variant_stats(result)
 
-        logger.info(
-            f"🧪 Experiment logged: {experiment_id} | "
-            f"variant={variant.value} | score={quality_score:.1f}"
-        )
+        logger.info(f"🧪 Experiment logged: {experiment_id} | " f"variant={variant.value} | score={quality_score:.1f}")
 
         return experiment_id
 
@@ -363,7 +356,7 @@ class ExperimentService:
 
             # Calculate standard deviation
             variance = sum((s - avg_score) ** 2 for s in scores) / count
-            std_dev = variance ** 0.5
+            std_dev = variance**0.5
 
             stats[variant] = {
                 "sample_count": count,
@@ -371,11 +364,7 @@ class ExperimentService:
                 "std_dev": round(std_dev, 2),
                 "min_score": min(scores),
                 "max_score": max(scores),
-                "selection_rate": (
-                    round(data["selected_count"] / count * 100, 1)
-                    if count > 0
-                    else 0
-                ),
+                "selection_rate": (round(data["selected_count"] / count * 100, 1) if count > 0 else 0),
                 "avg_generation_time_ms": round(avg_time, 1),
             }
 
@@ -392,11 +381,7 @@ class ExperimentService:
         """
         stats = self.get_variant_stats()
 
-        eligible = [
-            (variant, data)
-            for variant, data in stats.items()
-            if data["sample_count"] >= min_samples
-        ]
+        eligible = [(variant, data) for variant, data in stats.items() if data["sample_count"] >= min_samples]
 
         if not eligible:
             return None
@@ -430,14 +415,9 @@ class ExperimentService:
                 indent=2,
             )
         elif format == "csv":
-            lines = [
-                "experiment_id,variant,timestamp,github_username,quality_score,user_selected,generation_time_ms"
-            ]
+            lines = ["experiment_id,variant,timestamp,github_username,quality_score,user_selected,generation_time_ms"]
             for r in self._results:
-                lines.append(
-                    f"{r.experiment_id},{r.variant},{r.timestamp},"
-                    f"{r.github_username},{r.quality_score},{r.user_selected},{r.generation_time_ms}"
-                )
+                lines.append(f"{r.experiment_id},{r.variant},{r.timestamp}," f"{r.github_username},{r.quality_score},{r.user_selected},{r.generation_time_ms}")
             return "\n".join(lines)
         else:
             raise ValueError(f"Unknown format: {format}")

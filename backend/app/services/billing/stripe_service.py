@@ -282,9 +282,7 @@ class StripeService:
         event_type = event.type
 
         # Check for duplicate event (idempotency)
-        existing = await db.execute(
-            select(StripeWebhookEvent).where(StripeWebhookEvent.stripe_event_id == event_id)
-        )
+        existing = await db.execute(select(StripeWebhookEvent).where(StripeWebhookEvent.stripe_event_id == event_id))
         if existing.scalar_one_or_none():
             logger.info(f"Duplicate webhook event {event_id}, skipping")
             return True
@@ -352,9 +350,7 @@ class StripeService:
         else:
             logger.info(f"Checkout completed for user {user_id}")
 
-    async def _handle_credit_pack_purchase(
-        self, session: Any, user: User, db: AsyncSession
-    ) -> None:
+    async def _handle_credit_pack_purchase(self, session: Any, user: User, db: AsyncSession) -> None:
         """Handle credit pack purchase completion."""
         pack_type = session.metadata.get("pack_type")
         credits_amount = int(session.metadata.get("credits_amount", 0))
@@ -366,9 +362,7 @@ class StripeService:
 
         # Update the credit purchase record
         if purchase_id:
-            result = await db.execute(
-                select(CreditPurchase).where(CreditPurchase.id == purchase_id)
-            )
+            result = await db.execute(select(CreditPurchase).where(CreditPurchase.id == purchase_id))
             purchase = result.scalar_one_or_none()
             if purchase:
                 purchase.complete()
@@ -378,10 +372,7 @@ class StripeService:
         # Add credits to user
         user.add_credits(credits_amount, pack_type)
 
-        logger.info(
-            f"Credit pack purchase completed for user {user.id}: "
-            f"pack={pack_type}, credits={credits_amount}, new_balance={user.credits}"
-        )
+        logger.info(f"Credit pack purchase completed for user {user.id}: " f"pack={pack_type}, credits={credits_amount}, new_balance={user.credits}")
 
     async def _handle_subscription_created(self, event: Any, db: AsyncSession) -> None:
         """Handle customer.subscription.created event."""
@@ -399,9 +390,7 @@ class StripeService:
         customer_id = subscription.customer
 
         # Find user by Stripe customer ID
-        result = await db.execute(
-            select(User).where(User.stripe_customer_id == customer_id)
-        )
+        result = await db.execute(select(User).where(User.stripe_customer_id == customer_id))
         user = result.scalar_one_or_none()
 
         if not user:
@@ -413,9 +402,7 @@ class StripeService:
         user.subscription_status = "cancelled"
 
         # Update subscription record
-        sub_result = await db.execute(
-            select(Subscription).where(Subscription.user_id == user.id)
-        )
+        sub_result = await db.execute(select(Subscription).where(Subscription.user_id == user.id))
         sub = sub_result.scalar_one_or_none()
         if sub:
             sub.status = "cancelled"
@@ -429,9 +416,7 @@ class StripeService:
         customer_id = invoice.customer
 
         # Find user
-        result = await db.execute(
-            select(User).where(User.stripe_customer_id == customer_id)
-        )
+        result = await db.execute(select(User).where(User.stripe_customer_id == customer_id))
         user = result.scalar_one_or_none()
 
         if user:
@@ -444,9 +429,7 @@ class StripeService:
         customer_id = invoice.customer
 
         # Find user
-        result = await db.execute(
-            select(User).where(User.stripe_customer_id == customer_id)
-        )
+        result = await db.execute(select(User).where(User.stripe_customer_id == customer_id))
         user = result.scalar_one_or_none()
 
         if user:
@@ -466,9 +449,7 @@ class StripeService:
         if user_id:
             result = await db.execute(select(User).where(User.id == user_id))
         else:
-            result = await db.execute(
-                select(User).where(User.stripe_customer_id == customer_id)
-            )
+            result = await db.execute(select(User).where(User.stripe_customer_id == customer_id))
         user = result.scalar_one_or_none()
 
         if not user:
@@ -497,9 +478,7 @@ class StripeService:
         user.subscription_status = status
 
         # Update or create subscription record
-        sub_result = await db.execute(
-            select(Subscription).where(Subscription.user_id == user.id)
-        )
+        sub_result = await db.execute(select(Subscription).where(Subscription.user_id == user.id))
         sub = sub_result.scalar_one_or_none()
 
         if not sub:
@@ -513,12 +492,8 @@ class StripeService:
         sub.stripe_price_id = price_id
         sub.tier = tier
         sub.status = status
-        sub.current_period_start = datetime.fromtimestamp(
-            stripe_sub.current_period_start, tz=timezone.utc
-        )
-        sub.current_period_end = datetime.fromtimestamp(
-            stripe_sub.current_period_end, tz=timezone.utc
-        )
+        sub.current_period_start = datetime.fromtimestamp(stripe_sub.current_period_start, tz=timezone.utc)
+        sub.current_period_end = datetime.fromtimestamp(stripe_sub.current_period_end, tz=timezone.utc)
         sub.cancel_at_period_end = stripe_sub.cancel_at_period_end
 
         if stripe_sub.trial_end:

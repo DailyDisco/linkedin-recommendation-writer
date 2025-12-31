@@ -828,7 +828,11 @@ class GitHubCommitService:
             )
         )
 
-        return {"skills": sorted_skills, "top_soft_skill": list(sorted_skills.keys())[0] if sorted_skills else None, "inference_method": "pattern_and_pr_based_analysis" if pr_data else "pattern_based_analysis"}
+        return {
+            "skills": sorted_skills,
+            "top_soft_skill": list(sorted_skills.keys())[0] if sorted_skills else None,
+            "inference_method": "pattern_and_pr_based_analysis" if pr_data else "pattern_based_analysis",
+        }
 
     def _analyze_tools_and_features(self, commit_messages: List[str]) -> Dict[str, Any]:
         """Extract tools, libraries, and features mentioned in commits."""
@@ -1585,6 +1589,7 @@ class GitHubCommitService:
         # Check cache first
         if not force_refresh:
             from app.core.redis_client import get_cache
+
             cached_data = await get_cache(cache_key)
             if cached_data:
                 logger.info(f"💨 CACHE HIT for PRs: {repository_full_name}")
@@ -1633,6 +1638,7 @@ class GitHubCommitService:
 
             # Cache the results
             from app.core.redis_client import set_cache
+
             await set_cache(cache_key, prs_data, ttl=self.COMMIT_ANALYSIS_CACHE_TTL)
             logger.info(f"💾 Cached {len(prs_data)} PRs for: {repository_full_name}")
 
@@ -1957,16 +1963,16 @@ class GitHubCommitService:
             title = sanitized_pr.get("title", "")
             for repo_name in repo_names_to_sanitize:
                 # Replace various forms of the repo name
-                title = re.sub(rf'\b{re.escape(repo_name)}\b', 'the project', title, flags=re.IGNORECASE)
-                title = re.sub(rf'\b{re.escape(repo_name.replace("-", " "))}\b', 'the project', title, flags=re.IGNORECASE)
+                title = re.sub(rf"\b{re.escape(repo_name)}\b", "the project", title, flags=re.IGNORECASE)
+                title = re.sub(rf'\b{re.escape(repo_name.replace("-", " "))}\b', "the project", title, flags=re.IGNORECASE)
             sanitized_pr["title"] = title
 
             # Replace repo names in body
             body = sanitized_pr.get("body", "")
             if body:
                 for repo_name in repo_names_to_sanitize:
-                    body = re.sub(rf'\b{re.escape(repo_name)}\b', 'the application', body, flags=re.IGNORECASE)
-                    body = re.sub(rf'\b{re.escape(repo_name.replace("-", " "))}\b', 'the application', body, flags=re.IGNORECASE)
+                    body = re.sub(rf"\b{re.escape(repo_name)}\b", "the application", body, flags=re.IGNORECASE)
+                    body = re.sub(rf'\b{re.escape(repo_name.replace("-", " "))}\b', "the application", body, flags=re.IGNORECASE)
                 sanitized_pr["body"] = body
 
             # Remove repository field (not needed in prompt)
@@ -2040,20 +2046,15 @@ class GitHubCommitService:
                 issues_closed_by_user[:max_issues],
             )
 
-            logger.info(f"✅ Issue analysis complete: {len(issues_opened)} opened, "
-                       f"{len(issues_commented)} commented, {len(issues_closed_by_user)} closed")
+            logger.info(f"✅ Issue analysis complete: {len(issues_opened)} opened, " f"{len(issues_commented)} commented, {len(issues_closed_by_user)} closed")
 
             return {
                 "total_issues_opened": len(issues_opened),
                 "total_issues_commented": len(issues_commented),
                 "total_issues_closed": len(issues_closed_by_user),
                 "issue_patterns": analysis,
-                "communication_quality": self._assess_communication_quality(
-                    issues_opened + issues_commented
-                ),
-                "problem_solving_signals": self._extract_problem_solving_signals(
-                    issues_opened, issues_closed_by_user
-                ),
+                "communication_quality": self._assess_communication_quality(issues_opened + issues_commented),
+                "problem_solving_signals": self._extract_problem_solving_signals(issues_opened, issues_closed_by_user),
             }
 
         except Exception as e:
@@ -2122,12 +2123,14 @@ class GitHubCommitService:
                         comments = issue.get_comments()
                         for comment in comments:
                             if comment.user and comment.user.login == username:
-                                issues_commented.append({
-                                    "issue_number": issue.number,
-                                    "issue_title": issue.title,
-                                    "comment_body": comment.body[:300] if comment.body else "",
-                                    "created_at": comment.created_at.isoformat() if comment.created_at else None,
-                                })
+                                issues_commented.append(
+                                    {
+                                        "issue_number": issue.number,
+                                        "issue_title": issue.title,
+                                        "comment_body": comment.body[:300] if comment.body else "",
+                                        "created_at": comment.created_at.isoformat() if comment.created_at else None,
+                                    }
+                                )
                                 break  # Only count once per issue
             except Exception:
                 pass  # Comments are optional enhancement
@@ -2182,17 +2185,13 @@ class GitHubCommitService:
 
         # Analyze issue resolution
         if len(issues_closed) > 0:
-            patterns["responsiveness_indicators"].append(
-                f"Resolved {len(issues_closed)} issues demonstrating follow-through"
-            )
+            patterns["responsiveness_indicators"].append(f"Resolved {len(issues_closed)} issues demonstrating follow-through")
 
         # Analyze ratio of opened vs closed
         if issues_opened and issues_closed:
             resolve_ratio = len(issues_closed) / len(issues_opened)
             if resolve_ratio > 0.5:
-                patterns["responsiveness_indicators"].append(
-                    "Strong issue resolution rate - follows through on reported problems"
-                )
+                patterns["responsiveness_indicators"].append("Strong issue resolution rate - follows through on reported problems")
 
         return patterns
 
@@ -2269,9 +2268,18 @@ class GitHubCommitService:
         # Analyze complexity of issues tackled
         all_issues = issues_opened + issues_closed
         complex_keywords = [
-            "race condition", "memory leak", "performance", "security",
-            "architecture", "refactor", "migration", "integration",
-            "scalability", "optimization", "deadlock", "concurrency",
+            "race condition",
+            "memory leak",
+            "performance",
+            "security",
+            "architecture",
+            "refactor",
+            "migration",
+            "integration",
+            "scalability",
+            "optimization",
+            "deadlock",
+            "concurrency",
         ]
 
         complex_issues = 0
@@ -2285,10 +2293,7 @@ class GitHubCommitService:
 
         # Check for systematic debugging
         debug_keywords = ["reproduce", "steps", "expected", "actual", "root cause", "investigation"]
-        systematic_issues = sum(
-            1 for issue in all_issues
-            if any(kw in (issue.get("body", "") or "").lower() for kw in debug_keywords)
-        )
+        systematic_issues = sum(1 for issue in all_issues if any(kw in (issue.get("body", "") or "").lower() for kw in debug_keywords))
         if systematic_issues > 2:
             signals.append("Demonstrates systematic debugging approach")
 
@@ -2408,13 +2413,15 @@ class GitHubCommitService:
                     review_comments = pr.get_review_comments()
                     for comment in review_comments:
                         if comment.user and comment.user.login == username:
-                            reviews.append({
-                                "pr_number": pr.number,
-                                "pr_title": pr.title,
-                                "body": comment.body[:500] if comment.body else "",
-                                "path": comment.path,
-                                "created_at": comment.created_at.isoformat() if comment.created_at else None,
-                            })
+                            reviews.append(
+                                {
+                                    "pr_number": pr.number,
+                                    "pr_title": pr.title,
+                                    "body": comment.body[:500] if comment.body else "",
+                                    "path": comment.path,
+                                    "created_at": comment.created_at.isoformat() if comment.created_at else None,
+                                }
+                            )
                 except Exception:
                     continue
 
@@ -2441,8 +2448,15 @@ class GitHubCommitService:
         suggestion_count = 0
 
         constructive_phrases = [
-            "consider", "might want to", "could", "suggestion", "alternatively",
-            "what about", "have you tried", "one approach", "another option",
+            "consider",
+            "might want to",
+            "could",
+            "suggestion",
+            "alternatively",
+            "what about",
+            "have you tried",
+            "one approach",
+            "another option",
         ]
         question_phrases = ["?", "why", "how come", "what if", "did you consider"]
         suggestion_phrases = ["suggest", "recommend", "better to", "prefer", "instead"]
@@ -2490,9 +2504,20 @@ class GitHubCommitService:
             return signals
 
         teaching_phrases = [
-            "here's why", "the reason", "because", "this helps", "this ensures",
-            "best practice", "pattern", "convention", "typically", "usually",
-            "in general", "keep in mind", "remember that", "note that",
+            "here's why",
+            "the reason",
+            "because",
+            "this helps",
+            "this ensures",
+            "best practice",
+            "pattern",
+            "convention",
+            "typically",
+            "usually",
+            "in general",
+            "keep in mind",
+            "remember that",
+            "note that",
         ]
 
         teaching_count = 0

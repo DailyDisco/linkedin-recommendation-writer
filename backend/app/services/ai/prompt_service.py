@@ -117,41 +117,47 @@ class PromptService:
 
         # Add shared work context if provided
         if shared_work_context:
-            prompt_parts.extend([
-                "",
-                "CRITICAL CONTEXT - Our Working Relationship:",
-                f"The recommender and {person_reference} worked together on: {shared_work_context}",
-                f"Ground the entire recommendation in this specific shared experience.",
-                f"Describe concrete examples and situations from this work, not generic statements.",
-                f"Reference specific challenges, achievements, or contributions from this shared context.",
-            ])
+            prompt_parts.extend(
+                [
+                    "",
+                    "CRITICAL CONTEXT - Our Working Relationship:",
+                    f"The recommender and {person_reference} worked together on: {shared_work_context}",
+                    f"Ground the entire recommendation in this specific shared experience.",
+                    f"Describe concrete examples and situations from this work, not generic statements.",
+                    f"Reference specific challenges, achievements, or contributions from this shared context.",
+                ]
+            )
 
         # Add repository name filtering instruction
-        prompt_parts.extend([
-            "",
-            "CRITICAL RULES - Repository Names:",
-            "NEVER mention specific repository names in the recommendation.",
-            "Instead use descriptive phrases: 'a critical backend service', 'an innovative web application', 'a key infrastructure project'",
-            "Refer to work contextually and descriptively, not by repository name.",
-            "Focus on what was accomplished and the skills demonstrated, not where the code lives.",
-        ])
+        prompt_parts.extend(
+            [
+                "",
+                "CRITICAL RULES - Repository Names:",
+                "NEVER mention specific repository names in the recommendation.",
+                "Instead use descriptive phrases: 'a critical backend service', 'an innovative web application', 'a key infrastructure project'",
+                "Refer to work contextually and descriptively, not by repository name.",
+                "Focus on what was accomplished and the skills demonstrated, not where the code lives.",
+            ]
+        )
 
         # Add human-like output instructions
-        prompt_parts.extend([
-            "",
-            "WRITING STYLE - Sound Human, Not AI:",
-            "- Use varied sentence structures (mix short punchy sentences with longer detailed ones)",
-            "- Include specific observations and concrete examples, not generic praise",
-            "- Use natural transitions and avoid formulaic patterns",
-            "- Write from first-person perspective ('I worked with', 'I observed', 'What impressed me')",
-            "- Show, don't just tell (use examples and stories, not just adjectives)",
-            "- Avoid AI patterns like: 'In conclusion', 'Furthermore', 'Moreover', 'It is worth noting', 'Indeed'",
-            "- Use conversational phrases: 'What impressed me most', 'I particularly remember when', 'One thing that stands out'",
-            "- Focus on impact and outcomes, not just tasks completed",
-            "- Be specific about situations and results rather than using vague superlatives",
-            "- Vary your vocabulary and avoid repeating the same descriptive words",
-            "- Make it feel personal and genuine, like you're actually recommending someone you respect",
-        ])
+        prompt_parts.extend(
+            [
+                "",
+                "WRITING STYLE - Sound Human, Not AI:",
+                "- Use varied sentence structures (mix short punchy sentences with longer detailed ones)",
+                "- Include specific observations and concrete examples, not generic praise",
+                "- Use natural transitions and avoid formulaic patterns",
+                "- Write from first-person perspective ('I worked with', 'I observed', 'What impressed me')",
+                "- Show, don't just tell (use examples and stories, not just adjectives)",
+                "- Avoid AI patterns like: 'In conclusion', 'Furthermore', 'Moreover', 'It is worth noting', 'Indeed'",
+                "- Use conversational phrases: 'What impressed me most', 'I particularly remember when', 'One thing that stands out'",
+                "- Focus on impact and outcomes, not just tasks completed",
+                "- Be specific about situations and results rather than using vague superlatives",
+                "- Vary your vocabulary and avoid repeating the same descriptive words",
+                "- Make it feel personal and genuine, like you're actually recommending someone you respect",
+            ]
+        )
 
         if target_role:
             prompt_parts.append(f"\nHighlight why they'd be great for a {target_role} position.")
@@ -749,44 +755,47 @@ class PromptService:
 
         # Add one excellent example
         excellent = FEW_SHOT_EXAMPLES["excellent"][0]
-        section.extend([
-            f"Context: {excellent['context']}",
-            "",
-            excellent["recommendation"],
-            "",
-            "-" * 40,
-            "",
-            "KEY QUALITIES TO EMULATE:",
-            "- Specific incident with concrete details (the Black Friday surge story)",
-            "- Shows impact with measurable outcomes ('under an hour', 'used as training material')",
-            "- Describes character through actions, not adjectives",
-            "- Personal voice throughout ('I had the pleasure', 'What immediately stood out')",
-            "- Natural paragraph flow with varied sentence lengths",
-            "- Ends with genuine, specific endorsement",
-            "",
-            "=" * 60,
-            "WHAT TO AVOID - DO NOT WRITE LIKE THIS:",
-            "=" * 60,
-        ]
+        section.extend(
+            [
+                f"Context: {excellent['context']}",
+                "",
+                excellent["recommendation"],
+                "",
+                "-" * 40,
+                "",
+                "KEY QUALITIES TO EMULATE:",
+                "- Specific incident with concrete details (the Black Friday surge story)",
+                "- Shows impact with measurable outcomes ('under an hour', 'used as training material')",
+                "- Describes character through actions, not adjectives",
+                "- Personal voice throughout ('I had the pleasure', 'What immediately stood out')",
+                "- Natural paragraph flow with varied sentence lengths",
+                "- Ends with genuine, specific endorsement",
+                "",
+                "=" * 60,
+                "WHAT TO AVOID - DO NOT WRITE LIKE THIS:",
+                "=" * 60,
+            ]
         )
 
         # Add one avoid example
         avoid = FEW_SHOT_EXAMPLES["avoid"][0]
-        section.extend([
-            "",
-            f"BAD EXAMPLE (Issues: {', '.join(avoid['issues'])}):",
-            f'"{avoid["example"]}"',
-            "",
-            "WHY THIS IS BAD:",
-            "- No specific examples or incidents",
-            "- Uses buzzwords instead of evidence ('dedicated', 'passionate', 'team player')",
-            "- Could describe literally anyone - nothing unique",
-            "- No personal voice or relationship shown",
-            "- Generic praise without substance",
-            "",
-            "=" * 60,
-            "",
-        ])
+        section.extend(
+            [
+                "",
+                f"BAD EXAMPLE (Issues: {', '.join(avoid['issues'])}):",
+                f'"{avoid["example"]}"',
+                "",
+                "WHY THIS IS BAD:",
+                "- No specific examples or incidents",
+                "- Uses buzzwords instead of evidence ('dedicated', 'passionate', 'team player')",
+                "- Could describe literally anyone - nothing unique",
+                "- No personal voice or relationship shown",
+                "- Generic praise without substance",
+                "",
+                "=" * 60,
+                "",
+            ]
+        )
 
         return section
 
@@ -1446,8 +1455,8 @@ Just give me the updated recommendation text, nothing else.
 
     def _sanitize_github_data_for_prompt(self, github_data: Dict[str, Any]) -> Dict[str, Any]:
         """Remove or replace repository names from github_data to prevent them appearing in recommendations."""
-        import re
         import copy
+        import re
 
         # Create a deep copy to avoid modifying the original data
         sanitized_data = copy.deepcopy(github_data)
@@ -1496,11 +1505,9 @@ Just give me the updated recommendation text, nothing else.
         # Sanitize PR data if present
         if "pull_requests" in sanitized_data:
             from app.services.github.github_commit_service import GitHubCommitService
+
             commit_service = GitHubCommitService()
-            sanitized_data["pull_requests"] = commit_service._sanitize_pr_data_for_prompt(
-                sanitized_data["pull_requests"],
-                list(repo_names_to_remove)
-            )
+            sanitized_data["pull_requests"] = commit_service._sanitize_pr_data_for_prompt(sanitized_data["pull_requests"], list(repo_names_to_remove))
 
         # Sanitize repository_info (keep structure but remove specific names)
         if "repository_info" in sanitized_data:
@@ -1538,11 +1545,7 @@ Just give me the updated recommendation text, nothing else.
         """Post-generation check to detect any repository names that leaked into the output."""
         import re
 
-        validation_result = {
-            "is_valid": True,
-            "detected_repo_names": [],
-            "warnings": []
-        }
+        validation_result = {"is_valid": True, "detected_repo_names": [], "warnings": []}
 
         # Collect repository names to check for
         repo_names_to_check = set()
@@ -1572,8 +1575,6 @@ Just give me the updated recommendation text, nothing else.
                 logger.warning(f"⚠️ Repository name '{repo_name}' detected in recommendation output")
 
         if not validation_result["is_valid"]:
-            validation_result["warnings"].append(
-                f"Found {len(validation_result['detected_repo_names'])} repository name(s) in the output"
-            )
+            validation_result["warnings"].append(f"Found {len(validation_result['detected_repo_names'])} repository name(s) in the output")
 
         return validation_result

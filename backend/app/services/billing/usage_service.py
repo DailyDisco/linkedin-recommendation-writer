@@ -40,7 +40,7 @@ class UsageService:
         # Check if count should be reset (new day)
         if user.last_recommendation_date:
             last_date = user.last_recommendation_date
-            if hasattr(last_date, 'date'):
+            if hasattr(last_date, "date"):
                 last_date = last_date.date()
             if last_date < today:
                 generations_used = 0
@@ -177,10 +177,7 @@ class UsageService:
         )
         records = result.scalars().all()
 
-        return [
-            UsageHistoryItem(date=r.date, count=r.generation_count)
-            for r in records
-        ]
+        return [UsageHistoryItem(date=r.date, count=r.generation_count) for r in records]
 
     async def get_total_usage(
         self,
@@ -196,10 +193,7 @@ class UsageService:
         Returns:
             Total generation count
         """
-        result = await db.execute(
-            select(func.sum(UsageRecord.generation_count))
-            .where(UsageRecord.user_id == user.id)
-        )
+        result = await db.execute(select(func.sum(UsageRecord.generation_count)).where(UsageRecord.user_id == user.id))
         total = result.scalar() or 0
         return total
 

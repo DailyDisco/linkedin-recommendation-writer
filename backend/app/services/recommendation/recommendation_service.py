@@ -54,6 +54,80 @@ class RecommendationService:
         self.ai_service = AIService()
         self.recommendation_engine_service = RecommendationEngineService(self.ai_service)
 
+    async def _fetch_github_data(
+        self,
+        github_username: str,
+        analysis_context_type: str = "profile",
+        repository_url: Optional[str] = None,
+        force_refresh: bool = False,
+    ) -> Dict[str, Any]:
+        """Fetch GitHub data based on analysis context.
+
+        This is the single source of truth for GitHub data fetching logic.
+        Handles three modes:
+        - repo_only: Analyze specific repository contributions only
+        - repository_contributor: Full profile with repository context emphasis
+        - profile (default): Full GitHub profile analysis
+
+        Args:
+            github_username: GitHub username to analyze
+            analysis_context_type: One of 'profile', 'repo_only', 'repository_contributor'
+            repository_url: Repository URL for repo-specific analysis
+            force_refresh: Whether to bypass cache
+
+        Returns:
+            Dictionary containing GitHub analysis data
+
+        Raises:
+            ValueError: If repository URL is invalid or analysis fails
+        """
+        github_data: Optional[Dict[str, Any]] = None
+
+        if analysis_context_type == "repo_only" and repository_url:
+            logger.debug("Fetching repo_only data for %s from %s", github_username, repository_url)
+            repo_path = repository_url.replace("https://github.com/", "").split("?")[0]
+            if "/" not in repo_path:
+                raise ValueError(f"Invalid repository URL format: {repository_url}")
+
+            owner, repo = repo_path.split("/", 1)
+            github_data = await self.repository_service.analyze_repository(f"{owner}/{repo}", force_refresh=force_refresh)
+
+            if github_data:
+                contributor_data = await self.github_service.analyze_github_profile(username=github_username, force_refresh=force_refresh)
+                if contributor_data:
+                    github_data = self._merge_repository_and_contributor_data(github_data, contributor_data, github_username, analysis_context_type)
+                else:
+                    logger.warning(
+                        "Could not fetch contributor data for %s, using repository data only",
+                        github_username,
+                    )
+
+        elif analysis_context_type == "repository_contributor" and repository_url:
+            logger.debug(
+                "Fetching repository_contributor data for %s from %s",
+                github_username,
+                repository_url,
+            )
+            github_data = await self.github_service.analyze_github_profile(username=github_username, force_refresh=force_refresh)
+
+            if github_data:
+                repo_path = repository_url.replace("https://github.com/", "").split("?")[0]
+                if "/" in repo_path:
+                    owner, repo = repo_path.split("/", 1)
+                    repo_data = await self.repository_service.analyze_repository(f"{owner}/{repo}", force_refresh=force_refresh)
+                    if repo_data:
+                        github_data = self._merge_repository_and_contributor_data(repo_data, github_data, github_username, analysis_context_type)
+
+        else:
+            logger.debug("Fetching full profile data for %s", github_username)
+            github_data = await self.github_service.analyze_github_profile(username=github_username, force_refresh=force_refresh)
+
+        if not github_data:
+            context_desc = "repository" if analysis_context_type == "repo_only" else "GitHub profile"
+            raise ValueError(f"Could not analyze {context_desc} for {github_username}")
+
+        return github_data
+
     async def create_recommendation(
         self,
         db: AsyncSession,
@@ -73,105 +147,28 @@ class RecommendationService:
         force_refresh: bool = False,
     ) -> RecommendationResponse:
         """Create a new recommendation."""
-
-        logger.info("🔍 DEBUG: create_recommendation called with:")
-        logger.info(f"   • github_username: {github_username}")
-        logger.info(f"   • analysis_context_type: {analysis_context_type}")
-        logger.info(f"   • repository_url: {repository_url}")
-        logger.info(f"   • force_refresh: {force_refresh}")
-
-        # Log parameter validation for repo_only mode
-        if analysis_context_type == "repo_only":
-            logger.info("🎯 REPO_ONLY MODE DETECTED")
-            if not repository_url:
-                logger.warning("⚠️  REPO_ONLY mode but no repository_url provided!")
-            else:
-                logger.info(f"✅ REPO_ONLY: Will analyze repository: {repository_url}")
-        elif analysis_context_type == "repository_contributor":
-            logger.info("👥 REPOSITORY CONTRIBUTOR MODE DETECTED")
-        else:
-            logger.info("👤 PROFILE MODE (default)")
-
-        import time
+        logger.debug(
+            "create_recommendation called: username=%s, context=%s, repo=%s",
+            github_username,
+            analysis_context_type,
+            repository_url,
+        )
 
         start_time = time.time()
 
         try:
-            logger.info("🔍 STEP 1: GITHUB DATA ANALYSIS")
-            logger.info("-" * 50)
-            logger.info(f"   • Analysis Context: {analysis_context_type}")
-            logger.info(f"   • Repository URL: {repository_url or 'N/A'}")
-            github_start = time.time()
+            # Step 1: Fetch GitHub data
+            github_data = await self._fetch_github_data(
+                github_username=github_username,
+                analysis_context_type=analysis_context_type,
+                repository_url=repository_url,
+                force_refresh=force_refresh,
+            )
 
-            # Conditionally fetch GitHub data based on analysis context
-            if analysis_context_type == "repo_only" and repository_url:
-                logger.info("📦 Analyzing specific repository...")
-                # Extract owner/repo from URL
-                repo_path = repository_url.replace("https://github.com/", "").split("?")[0]
-                if "/" in repo_path:
-                    owner, repo = repo_path.split("/", 1)
-                    github_data = await self.repository_service.analyze_repository(f"{owner}/{repo}", force_refresh=False)
-
-                    if github_data:
-                        # For repo_only, we need to create a minimal profile structure
-                        # Merge repository data with basic contributor info
-                        contributor_data = await self.github_service.analyze_github_profile(username=github_username, force_refresh=False)
-                        if contributor_data:
-                            github_data = self._merge_repository_and_contributor_data(github_data, contributor_data, github_username, analysis_context_type)
-                        else:
-                            logger.warning(f"Could not fetch contributor data for {github_username}, using repository data only")
-
-                else:
-                    raise ValueError(f"Invalid repository URL format: {repository_url}")
-
-            elif analysis_context_type == "repository_contributor" and repository_url:
-                logger.info("👥 Analyzing repository with contributor context...")
-                # Get full profile data but emphasize repository context
-                github_data = await self.github_service.analyze_github_profile(username=github_username, force_refresh=False)
-
-                if github_data and repository_url:
-                    # Extract owner/repo from URL and get repository-specific data
-                    repo_path = repository_url.replace("https://github.com/", "").split("?")[0]
-                    if "/" in repo_path:
-                        owner, repo = repo_path.split("/", 1)
-                        repo_data = await self.repository_service.analyze_repository(f"{owner}/{repo}", force_refresh=False)
-                        if repo_data:
-                            github_data = self._merge_repository_and_contributor_data(repo_data, github_data, github_username, analysis_context_type)
-
-            else:
-                logger.info("👤 Analyzing full GitHub profile...")
-                # Default: analyze full profile
-                github_data = await self.github_service.analyze_github_profile(username=github_username, force_refresh=False)
-
-            github_end = time.time()
-            logger.info(f"⏱️  GitHub analysis completed in {github_end - github_start:.2f} seconds")
-
-            if not github_data:
-                context_desc = "repository" if analysis_context_type == "repo_only" else "GitHub profile"
-                logger.error(f"❌ Failed to analyze {context_desc} for {github_username}")
-                raise ValueError(f"Could not analyze {context_desc} for {github_username}")
-
-            logger.info("✅ GitHub analysis successful:")
-            logger.info(f"   • Analysis Type: {analysis_context_type}")
-            logger.info(f"   • Repositories: {len(github_data.get('repositories', []))}")
-            logger.info(f"   • Languages: {len(github_data.get('languages', []))}")
-            logger.info(f"   • Commits analyzed: {github_data.get('commit_analysis', {}).get('total_commits_analyzed', 0)}")
-            logger.debug(f"➡️ GitHub data used for recommendation: {github_data}")  # Log github_data
-
-            # Get or create GitHub profile record
-            logger.info("💾 STEP 2: DATABASE OPERATIONS")
-            logger.info("-" * 50)
-            db_start = time.time()
-
+            # Step 2: Get or create GitHub profile record
             github_profile = await self._get_or_create_github_profile(db, github_data)
 
-            db_end = time.time()
-            logger.info(f"⏱️  Database operations completed in {db_end - db_start:.2f} seconds")
-            logger.info(f"✅ GitHub profile record: {'Updated' if github_profile else 'Created'}")
-
-            # Generate AI recommendation
-            logger.info("🤖 STEP 3: AI RECOMMENDATION GENERATION")
-            logger.info("-" * 50)
+            # Step 3: Generate AI recommendation
             ai_start = time.time()
 
             ai_result = await self.recommendation_engine_service.generate_recommendation(
@@ -189,20 +186,16 @@ class RecommendationService:
                 force_refresh=force_refresh,
             )
 
-            ai_end = time.time()
-            logger.info(f"⏱️  AI generation completed in {ai_end - ai_start:.2f} seconds")
-            logger.info("✅ AI recommendation generated:")
-            logger.info(f"   • Content length: {len(ai_result['content'])} characters")
-            logger.info(f"   • Word count: {ai_result['word_count']}")
+            logger.debug(
+                "AI generation completed in %.2fs, word_count=%d",
+                time.time() - ai_start,
+                ai_result["word_count"],
+            )
 
-            # Create recommendation record
-            logger.info("💾 STEP 4: SAVING RECOMMENDATION")
-            logger.info("-" * 50)
-            save_start = time.time()
-
+            # Step 4: Save recommendation
             recommendation_data = self.recommendation_engine_service.create_recommendation_data(
                 ai_result=ai_result,
-                github_profile_id=github_profile.id,  # type: ignore
+                github_profile_id=github_profile.id,  # type: ignore[union-attr]
                 recommendation_type=recommendation_type,
                 tone=tone,
                 length=length,
@@ -213,31 +206,24 @@ class RecommendationService:
             await db.commit()
             await db.refresh(recommendation)
 
-            save_end = time.time()
-            logger.info(f"⏱️  Database save completed in {save_end - save_start:.2f} seconds")
-            logger.info(f"✅ Recommendation saved with ID: {recommendation.id}")
-
-            # Convert to response
             response = RecommendationResponse.from_orm(recommendation)
             response.github_username = github_username
 
-            end_time = time.time()
-            total_time = end_time - start_time
-
-            logger.info("🎉 RECOMMENDATION CREATION SUMMARY")
-            logger.info("-" * 50)
-            logger.info(f"⏱️  Total processing time: {total_time:.2f} seconds")
-            logger.info("📊 Breakdown:")
-            logger.info(f"   • GitHub Analysis: {github_end - github_start:.2f}s ({((github_end - github_start)/total_time)*100:.1f}%)")
-            logger.info(f"   • Database Ops: {db_end - db_start:.2f}s ({((db_end - db_start)/total_time)*100:.1f}%)")
-            logger.info(f"   • AI Generation: {ai_end - ai_start:.2f}s ({((ai_end - ai_start)/total_time)*100:.1f}%)")
-            logger.info(f"   • Save Record: {save_end - save_start:.2f}s ({((save_end - save_start)/total_time)*100:.1f}%)")
+            logger.info(
+                "Recommendation created: id=%s, user=%s, duration=%.2fs",
+                recommendation.id,
+                github_username,
+                time.time() - start_time,
+            )
 
             return response
 
         except Exception as e:
-            logger.error(f"💥 ERROR in recommendation creation for {github_username}: {e}")
-            logger.error(f"⏱️  Failed after {time.time() - start_time:.2f} seconds")
+            logger.error(
+                "Recommendation creation failed for %s: %s",
+                github_username,
+                str(e),
+            )
             await db.rollback()
             raise
 
@@ -374,7 +360,7 @@ class RecommendationService:
         self,
         db: AsyncSession,
         github_username: str,
-        user_id: Optional[int] = None,  # Added user_id
+        user_id: Optional[int] = None,
         recommendation_type: str = "professional",
         tone: str = "professional",
         length: str = "medium",
@@ -385,118 +371,30 @@ class RecommendationService:
         exclude_keywords: Optional[List[str]] = None,
         analysis_context_type: str = "profile",
         repository_url: Optional[str] = None,
-    ) -> RecommendationOptionsResponse:
+    ) -> Dict[str, Any]:
         """Create multiple recommendation options."""
-
-        logger.info("🔍 DEBUG: create_recommendation_options called with:")
-        logger.info(f"   • github_username: {github_username}")
-        logger.info(f"   • analysis_context_type: {analysis_context_type}")
-        logger.info(f"   • repository_url: {repository_url}")
-
-        import time
+        logger.debug(
+            "create_recommendation_options called: username=%s, context=%s",
+            github_username,
+            analysis_context_type,
+        )
 
         start_time = time.time()
 
         try:
-            logger.info("🎭 STEP 1: GITHUB DATA ANALYSIS")
-            logger.info("-" * 50)
-            logger.info(f"   • Analysis Context: {analysis_context_type}")
-            logger.info(f"   • Repository URL: {repository_url or 'N/A'}")
-            github_start = time.time()
+            # Step 1: Fetch GitHub data
+            github_data = await self._fetch_github_data(
+                github_username=github_username,
+                analysis_context_type=analysis_context_type,
+                repository_url=repository_url,
+                force_refresh=False,
+            )
 
-            # Conditionally fetch GitHub data based on analysis context
-            logger.info("🔍 DEBUG: Checking repo_only condition in create_recommendation_options:")
-            logger.info(f"   • analysis_context_type: '{analysis_context_type}'")
-            logger.info(f"   • repository_url: '{repository_url}'")
-            logger.info(f"   • condition check: {analysis_context_type == 'repo_only' and repository_url is not None}")
-
-            if analysis_context_type == "repo_only" and repository_url:
-                logger.info("📦 Analyzing specific repository...")
-                # Extract owner/repo from URL
-                repo_path = repository_url.replace("https://github.com/", "").split("?")[0]
-                if "/" in repo_path:
-                    owner, repo = repo_path.split("/", 1)
-                    github_data = await self.repository_service.analyze_repository(f"{owner}/{repo}", force_refresh=False)
-
-                    if github_data:
-                        # For repo_only, we need to create a minimal profile structure
-                        # Merge repository data with basic contributor info
-                        contributor_data = await self.github_service.analyze_github_profile(username=github_username, force_refresh=False)
-                        if contributor_data:
-                            github_data = self._merge_repository_and_contributor_data(github_data, contributor_data, github_username, analysis_context_type)
-                        else:
-                            logger.warning(f"Could not fetch contributor data for {github_username}, using repository data only")
-
-                else:
-                    raise ValueError(f"Invalid repository URL format: {repository_url}")
-
-            elif analysis_context_type == "repository_contributor" and repository_url:
-                logger.info("👥 Analyzing repository with contributor context...")
-                # Get full profile data but emphasize repository context
-                github_data = await self.github_service.analyze_github_profile(username=github_username, force_refresh=False)
-
-                if github_data and repository_url:
-                    # Extract owner/repo from URL and get repository-specific data
-                    repo_path = repository_url.replace("https://github.com/", "").split("?")[0]
-                    if "/" in repo_path:
-                        owner, repo = repo_path.split("/", 1)
-                        repo_data = await self.repository_service.analyze_repository(f"{owner}/{repo}", force_refresh=False)
-                        if repo_data:
-                            github_data = self._merge_repository_and_contributor_data(repo_data, github_data, github_username, analysis_context_type)
-
-            else:
-                logger.info("👤 Analyzing full GitHub profile...")
-                # Default: analyze full profile
-                github_data = await self.github_service.analyze_github_profile(username=github_username, force_refresh=False)
-
-            github_end = time.time()
-            logger.info(f"⏱️  GitHub analysis completed in {github_end - github_start:.2f} seconds")
-
-            if not github_data:
-                if analysis_context_type == "repo_only":
-                    logger.error(f"❌ Failed to analyze GitHub repository: {repository_url}")
-                    raise ValueError(f"Could not analyze GitHub repository: {repository_url}")
-                else:
-                    logger.error(f"❌ Failed to analyze GitHub profile for {github_username}")
-                    raise ValueError(f"Could not analyze GitHub profile for {github_username}")
-
-            if analysis_context_type == "repo_only":
-                logger.info("✅ Repository analysis successful:")
-                logger.info(f"   • Repository: {github_data.get('repository_info', {}).get('name', 'N/A')}")
-                logger.info(f"   • Language: {github_data.get('repository_info', {}).get('language', 'N/A')}")
-                logger.info(f"   • Commits analyzed: {len(github_data.get('commits', []))}")
-            else:
-                logger.info("✅ Profile analysis successful:")
-                logger.info(f"   • Repositories: {len(github_data.get('repositories', []))}")
-                logger.info(f"   • Languages: {len(github_data.get('languages', []))}")
-                logger.info(f"   • Commits analyzed: {github_data.get('commit_analysis', {}).get('total_commits_analyzed', 0)}")
-            logger.debug(f"➡️ GitHub data used for recommendation options: {github_data}")  # Log github_data
-
-            # Get or create GitHub profile record
-            logger.info("💾 STEP 2: DATABASE OPERATIONS")
-            logger.info("-" * 50)
-            db_start = time.time()
-
-            # For repo_only context, we don't need to store/retrieve profile data from database
-            # since we're only using repository-specific data
-            if analysis_context_type == "repo_only":
-                logger.info("🔒 REPO_ONLY: Skipping database profile operations - using repository-only data")
-                github_profile = None
-            else:
-                github_profile = await self._get_or_create_github_profile(db, github_data)
-
-            db_end = time.time()
-            logger.info(f"⏱️  Database operations completed in {db_end - db_start:.2f} seconds")
+            # Step 2: Get or create GitHub profile (skip for repo_only)
             if analysis_context_type != "repo_only":
-                logger.info(f"✅ GitHub profile record: {'Updated' if github_profile else 'Created'}")
-            else:
-                logger.info("✅ REPO_ONLY: Database operations skipped")
+                await self._get_or_create_github_profile(db, github_data)
 
-            # Generate AI recommendation options
-            logger.info("🤖 STEP 3: AI RECOMMENDATION OPTIONS GENERATION")
-            logger.info("-" * 50)
-            ai_start = time.time()
-
+            # Step 3: Generate AI recommendation options
             response = await self.recommendation_engine_service.generate_recommendation_options(
                 github_data=github_data,
                 base_recommendation_type=recommendation_type,
@@ -506,28 +404,21 @@ class RecommendationService:
                 specific_skills=specific_skills,
             )
 
-            ai_end = time.time()
-            logger.info(f"⏱️  AI generation completed in {ai_end - ai_start:.2f} seconds")
-            logger.info("✅ AI recommendation options generated:")
-            logger.info(f"   • Options: {len(response.options)}")
+            logger.info(
+                "Recommendation options created: user=%s, options=%d, duration=%.2fs",
+                github_username,
+                len(response.options),
+                time.time() - start_time,
+            )
 
-            end_time = time.time()
-            total_time = end_time - start_time
-
-            logger.info("🎉 RECOMMENDATION OPTIONS CREATION SUMMARY")
-            logger.info("-" * 50)
-            logger.info(f"⏱️  Total processing time: {total_time:.2f} seconds")
-            logger.info("📊 Breakdown:")
-            logger.info(f"   • GitHub Analysis: {github_end - github_start:.2f}s ({((github_end - github_start)/total_time)*100:.1f}%)")
-            logger.info(f"   • Database Ops: {db_end - db_start:.2f}s ({((db_end - db_start)/total_time)*100:.1f}%)")
-            logger.info(f"   • AI Generation: {ai_end - ai_start:.2f}s ({((ai_end - ai_start)/total_time)*100:.1f}%)")
-
-            # Return both the options response and the filtered GitHub data for streaming
             return {"options_response": response, "github_data": github_data}
 
         except Exception as e:
-            logger.error(f"💥 ERROR in recommendation options creation for {github_username}: {e}")
-            logger.error(f"⏱️  Failed after {time.time() - start_time:.2f} seconds")
+            logger.error(
+                "Recommendation options creation failed for %s: %s",
+                github_username,
+                str(e),
+            )
             await db.rollback()
             raise
 
@@ -537,7 +428,7 @@ class RecommendationService:
         original_content: str,
         refinement_instructions: str,
         github_username: str,
-        user_id: Optional[int] = None,  # Added user_id
+        user_id: Optional[int] = None,
         recommendation_type: str = "professional",
         tone: str = "professional",
         length: str = "medium",
@@ -548,89 +439,34 @@ class RecommendationService:
         display_name: Optional[str] = None,
     ) -> RecommendationResponse:
         """Regenerate a recommendation with refinement instructions."""
-
-        import time
+        logger.debug(
+            "regenerate_recommendation called: username=%s, context=%s",
+            github_username,
+            analysis_context_type,
+        )
 
         start_time = time.time()
 
         try:
-            logger.info("🔄 STEP 1: GITHUB DATA ANALYSIS")
-            logger.info("-" * 50)
-            logger.info(f"   • Analysis Context: {analysis_context_type}")
-            logger.info(f"   • Repository URL: {repository_url or 'N/A'}")
-            github_start = time.time()
+            # Step 1: Fetch GitHub data
+            github_data = await self._fetch_github_data(
+                github_username=github_username,
+                analysis_context_type=analysis_context_type,
+                repository_url=repository_url,
+                force_refresh=force_refresh,
+            )
 
-            # Conditionally fetch GitHub data based on analysis context (same logic as create_recommendation)
-            if analysis_context_type == "repo_only" and repository_url:
-                logger.info("📦 Analyzing specific repository...")
-                # Extract owner/repo from URL
-                repo_path = repository_url.replace("https://github.com/", "").split("?")[0]
-                if "/" in repo_path:
-                    owner, repo = repo_path.split("/", 1)
-                    github_data = await self.repository_service.analyze_repository(f"{owner}/{repo}", force_refresh=False)
-
-                    if github_data:
-                        # For repo_only, we need to create a minimal profile structure
-                        # Merge repository data with basic contributor info
-                        contributor_data = await self.github_service.analyze_github_profile(username=github_username, force_refresh=False)
-                        if contributor_data:
-                            github_data = self._merge_repository_and_contributor_data(github_data, contributor_data, github_username, analysis_context_type)
-                        else:
-                            logger.warning(f"Could not fetch contributor data for {github_username}, using repository data only")
-
-                else:
-                    raise ValueError(f"Invalid repository URL format: {repository_url}")
-
-            elif analysis_context_type == "repository_contributor" and repository_url:
-                logger.info("👥 Analyzing repository with contributor context...")
-                # Get full profile data but emphasize repository context
-                github_data = await self.github_service.analyze_github_profile(username=github_username, force_refresh=False)
-
-                if github_data and repository_url:
-                    # Extract owner/repo from URL and get repository-specific data
-                    repo_path = repository_url.replace("https://github.com/", "").split("?")[0]
-                    if "/" in repo_path:
-                        owner, repo = repo_path.split("/", 1)
-                        repo_data = await self.repository_service.analyze_repository(f"{owner}/{repo}", force_refresh=False)
-                        if repo_data:
-                            github_data = self._merge_repository_and_contributor_data(repo_data, github_data, github_username, analysis_context_type)
-
-            else:
-                logger.info("👤 Analyzing full GitHub profile...")
-                # Default: analyze full profile
-                github_data = await self.github_service.analyze_github_profile(username=github_username, force_refresh=False)
-
-            github_end = time.time()
-            logger.info(f"⏱️  GitHub analysis completed in {github_end - github_start:.2f} seconds")
-
-            if not github_data:
-                context_desc = "repository" if analysis_context_type == "repo_only" else "GitHub profile"
-                logger.error(f"❌ Failed to analyze {context_desc} for {github_username}")
-                raise ValueError(f"Could not analyze {context_desc} for {github_username}")
-            logger.debug(f"➡️ GitHub data used for recommendation regeneration: {github_data}")  # Log github_data
-
-            # Extract display name for consistent naming (prioritizes first name)
+            # Extract display name for consistent naming
             if display_name is None and github_data.get("user_data"):
                 from app.services.ai.prompt_service import PromptService
 
                 prompt_service = PromptService()
                 display_name = prompt_service._extract_display_name(github_data["user_data"])
 
-            # Get or create GitHub profile record
-            logger.info("💾 STEP 2: DATABASE OPERATIONS")
-            logger.info("-" * 50)
-            db_start = time.time()
-
+            # Step 2: Get or create GitHub profile
             github_profile = await self._get_or_create_github_profile(db, github_data)
 
-            db_end = time.time()
-            logger.info(f"⏱️  Database operations completed in {db_end - db_start:.2f} seconds")
-
-            # Generate refined AI recommendation
-            logger.info("🤖 STEP 3: AI RECOMMENDATION REGENERATION")
-            logger.info("-" * 50)
-            ai_start = time.time()
-
+            # Step 3: Generate refined AI recommendation
             ai_result = await self.recommendation_engine_service.regenerate_recommendation(
                 original_content=original_content,
                 refinement_instructions=refinement_instructions,
@@ -645,18 +481,7 @@ class RecommendationService:
                 display_name=display_name,
             )
 
-            ai_end = time.time()
-            logger.info(f"⏱️  AI regeneration completed in {ai_end - ai_start:.2f} seconds")
-            logger.info("✅ AI recommendation regenerated:")
-            logger.info(f"   • Content length: {len(ai_result['content'])} characters")
-            logger.info(f"   • Word count: {ai_result['word_count']}")
-
-            # Create recommendation record
-            logger.info("💾 STEP 4: SAVING RECOMMENDATION")
-            logger.info("-" * 50)
-            save_start = time.time()
-
-            # For repo_only mode, github_profile is None, so we use a placeholder ID
+            # Step 4: Save recommendation
             github_profile_id = github_profile.id if github_profile else None
 
             recommendation_data = self.recommendation_engine_service.create_recommendation_data(
@@ -666,7 +491,6 @@ class RecommendationService:
                 tone=tone,
                 length=length,
             )
-            # Override the generation prompt with refinement instructions
             recommendation_data.generation_prompt = refinement_instructions
 
             recommendation = Recommendation(**recommendation_data.dict())
@@ -674,31 +498,24 @@ class RecommendationService:
             await db.commit()
             await db.refresh(recommendation)
 
-            save_end = time.time()
-            logger.info(f"⏱️  Database save completed in {save_end - save_start:.2f} seconds")
-            logger.info(f"✅ Recommendation saved with ID: {recommendation.id}")
-
-            # Convert to response
             response = RecommendationResponse.from_orm(recommendation)
             response.github_username = github_username
 
-            end_time = time.time()
-            total_time = end_time - start_time
-
-            logger.info("🎉 RECOMMENDATION REGENERATION SUMMARY")
-            logger.info("-" * 50)
-            logger.info(f"⏱️  Total processing time: {total_time:.2f} seconds")
-            logger.info("📊 Breakdown:")
-            logger.info(f"   • GitHub Analysis: {github_end - github_start:.2f}s ({((github_end - github_start)/total_time)*100:.1f}%)")
-            logger.info(f"   • Database Ops: {db_end - db_start:.2f}s ({((db_end - db_start)/total_time)*100:.1f}%)")
-            logger.info(f"   • AI Regeneration: {ai_end - ai_start:.2f}s ({((ai_end - ai_start)/total_time)*100:.1f}%)")
-            logger.info(f"   • Save Record: {save_end - save_start:.2f}s ({((save_end - save_start)/total_time)*100:.1f}%)")
+            logger.info(
+                "Recommendation regenerated: id=%s, user=%s, duration=%.2fs",
+                recommendation.id,
+                github_username,
+                time.time() - start_time,
+            )
 
             return response
 
         except Exception as e:
-            logger.error(f"💥 ERROR in recommendation regeneration for {github_username}: {e}")
-            logger.error(f"⏱️  Failed after {time.time() - start_time:.2f} seconds")
+            logger.error(
+                "Recommendation regeneration failed for %s: %s",
+                github_username,
+                str(e),
+            )
             await db.rollback()
             raise
 
@@ -711,12 +528,14 @@ class RecommendationService:
         refinement_instructions: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Refine an existing recommendation based on keyword constraints."""
+        start_time = time.time()
         try:
-            logger.info("🔧 KEYWORD REFINEMENT STARTED")
-            logger.info("=" * 60)
-            logger.info(f"📝 Recommendation ID: {recommendation_id}")
-            logger.info(f"➕ Include keywords: {include_keywords}")
-            logger.info(f"➖ Exclude keywords: {exclude_keywords}")
+            logger.debug(
+                "refine_recommendation_with_keywords: id=%s, include=%s, exclude=%s",
+                recommendation_id,
+                include_keywords,
+                exclude_keywords,
+            )
 
             # Get the original recommendation
             query = select(Recommendation).where(Recommendation.id == recommendation_id)
@@ -724,7 +543,6 @@ class RecommendationService:
             original_recommendation = result.scalar_one_or_none()
 
             if not original_recommendation:
-                logger.error(f"❌ Recommendation with ID {recommendation_id} not found")
                 raise ValueError(f"Recommendation with ID {recommendation_id} not found")
 
             # Get GitHub profile data for context
@@ -733,7 +551,6 @@ class RecommendationService:
             github_profile = github_profile_result.scalar_one_or_none()
 
             if not github_profile:
-                logger.error(f"❌ GitHub profile not found for recommendation {recommendation_id}")
                 raise ValueError(f"GitHub profile not found for recommendation {recommendation_id}")
 
             # Reconstruct GitHub data for AI processing
@@ -760,18 +577,14 @@ class RecommendationService:
             }
 
             # Extract original parameters
-            original_params: Dict[str, Any] = original_recommendation.generation_parameters or {}  # type: ignore
+            original_params: Dict[str, Any] = original_recommendation.generation_parameters or {}  # type: ignore[assignment]
             recommendation_type = original_params.get("recommendation_type", "professional")
             tone = original_params.get("tone", "professional")
             length = original_params.get("length", "medium")
 
             # Generate refined recommendation
-            logger.info("🤖 STEP 1: AI KEYWORD REFINEMENT")
-            logger.info("-" * 50)
-            ai_start = time.time()
-
             ai_result = await self.ai_service.refine_recommendation_with_keywords(
-                original_content=original_recommendation.content,  # type: ignore
+                original_content=original_recommendation.content,  # type: ignore[arg-type]
                 github_data=github_data,
                 include_keywords=include_keywords,
                 exclude_keywords=exclude_keywords,
@@ -780,16 +593,6 @@ class RecommendationService:
                 tone=tone,
                 length=length,
             )
-
-            ai_end = time.time()
-            logger.info(f"⏱️  AI refinement completed in {ai_end - ai_start:.2f} seconds")
-            logger.info("✅ Keyword refinement successful:")
-            logger.info(f"   • Word count: {ai_result['word_count']}")
-
-            if ai_result.get("include_keywords_used"):
-                logger.info(f"   • Keywords included: {len(ai_result['include_keywords_used'])}")
-            if ai_result.get("exclude_keywords_avoided"):
-                logger.info(f"   • Exclude keywords avoided: {len(ai_result['exclude_keywords_avoided'])}")
 
             # Save the refined recommendation as a new version
             new_recommendation = await self._create_recommendation_version(
@@ -804,9 +607,16 @@ class RecommendationService:
                 exclude_keywords_avoided=ai_result.get("exclude_keywords_avoided"),
             )
 
+            logger.info(
+                "Keyword refinement completed: id=%s, word_count=%d, duration=%.2fs",
+                new_recommendation.id,
+                new_recommendation.word_count or 0,
+                time.time() - start_time,
+            )
+
             return {
                 "id": new_recommendation.id,
-                "original_recommendation_id": original_recommendation.id,  # Added this line
+                "original_recommendation_id": original_recommendation.id,
                 "refined_content": new_recommendation.content,
                 "refined_title": new_recommendation.title,
                 "word_count": new_recommendation.word_count,
@@ -817,8 +627,12 @@ class RecommendationService:
                 "generation_parameters": ai_result["generation_parameters"],
             }
         except Exception as e:
-            logger.error(f"💥 ERROR in keyword refinement for recommendation {recommendation_id}: {e}")
-            raise e
+            logger.error(
+                "Keyword refinement failed for recommendation %s: %s",
+                recommendation_id,
+                str(e),
+            )
+            raise
 
     async def generate_repository_readme(
         self,
@@ -828,39 +642,21 @@ class RecommendationService:
         target_audience: str = "developers",
     ) -> Dict[str, Any]:
         """Generate a README for a GitHub repository."""
-        import time
-
         start_time = time.time()
 
         try:
-            logger.info("📖 README GENERATION STARTED")
-            logger.info("=" * 60)
-            logger.info(f"📁 Repository: {repository_full_name}")
-            logger.info(f"🎨 Style: {style}")
-            logger.info(f"👥 Target Audience: {target_audience}")
+            logger.debug(
+                "generate_repository_readme: repo=%s, style=%s, audience=%s",
+                repository_full_name,
+                style,
+                target_audience,
+            )
 
-            # Analyze the repository using GitHub service
-            logger.info("🔍 STEP 1: REPOSITORY ANALYSIS")
-            logger.info("-" * 50)
-            repo_start = time.time()
-
+            # Analyze the repository
             repository_data = await self.repository_service.analyze_repository(repository_full_name=repository_full_name, force_refresh=False)
 
             if not repository_data:
-                logger.error(f"❌ Failed to analyze repository {repository_full_name}")
                 raise ValueError(f"Could not analyze repository {repository_full_name}")
-
-            repo_end = time.time()
-            logger.info(f"⏱️  Repository analysis completed in {repo_end - repo_start:.2f} seconds")
-            logger.info("✅ Repository analysis successful:")
-            logger.info(f"   • Repository: {repository_data.get('repository_info', {}).get('name', 'N/A')}")
-            logger.info(f"   • Language: {repository_data.get('repository_info', {}).get('language', 'N/A')}")
-            logger.info(f"   • Stars: {repository_data.get('repository_info', {}).get('stars', 0)}")
-
-            # Perform additional README-specific analysis
-            logger.info("🔧 STEP 2: README-SPECIFIC ANALYSIS")
-            logger.info("-" * 50)
-            analysis_start = time.time()
 
             # Get repository object for deeper analysis
             if not self.github_service.github_client:
@@ -880,7 +676,7 @@ class RecommendationService:
                     repository_analysis["api_endpoints"] = api_endpoints
 
             except Exception as e:
-                logger.warning(f"Could not perform deep repository analysis: {e}")
+                logger.warning("Could not perform deep repository analysis: %s", str(e))
                 repository_analysis = {
                     "existing_readme": False,
                     "readme_content": None,
@@ -896,19 +692,7 @@ class RecommendationService:
                     "key_features": [],
                 }
 
-            analysis_end = time.time()
-            logger.info(f"⏱️  README-specific analysis completed in {analysis_end - analysis_start:.2f} seconds")
-            logger.info("✅ README analysis successful:")
-            logger.info(f"   • Existing README: {repository_analysis.get('existing_readme', False)}")
-            logger.info(f"   • Main files: {len(repository_analysis.get('main_files', []))}")
-            logger.info(f"   • Has tests: {repository_analysis.get('has_tests', False)}")
-            logger.info(f"   • Has CI/CD: {repository_analysis.get('has_ci_cd', False)}")
-
             # Generate README content
-            logger.info("🤖 STEP 3: AI README GENERATION")
-            logger.info("-" * 50)
-            ai_start = time.time()
-
             ai_result = self.ai_service._generate_readme_content(
                 repository_data=repository_data,
                 repository_analysis=dict(repository_analysis),
@@ -917,23 +701,13 @@ class RecommendationService:
                 target_audience=target_audience,
             )
 
-            ai_end = time.time()
-            logger.info(f"⏱️  AI README generation completed in {ai_end - ai_start:.2f} seconds")
-            logger.info("✅ README generation successful:")
-            logger.info(f"   • Content length: {ai_result['word_count']} words")
-            logger.info(f"   • Sections: {len(ai_result['sections'])}")
-
-            end_time = time.time()
-            total_time = end_time - start_time
-
-            logger.info("🎉 README GENERATION COMPLETED")
-            logger.info("-" * 50)
-            logger.info(f"⏱️  Total processing time: {total_time:.2f} seconds")
-            logger.info("📊 Final Results:")
-            logger.info(f"   • Repository: {repository_full_name}")
-            logger.info(f"   • Style: {style}")
-
-            logger.info("=" * 60)
+            logger.info(
+                "README generated: repo=%s, words=%d, sections=%d, duration=%.2fs",
+                repository_full_name,
+                ai_result["word_count"],
+                len(ai_result["sections"]),
+                time.time() - start_time,
+            )
 
             return {
                 "repository_name": repository_data.get("repository_info", {}).get("name", ""),
@@ -947,8 +721,11 @@ class RecommendationService:
             }
 
         except Exception as e:
-            logger.error(f"💥 ERROR in README generation for {repository_full_name}: {e}")
-            logger.error(f"⏱️  Failed after {time.time() - start_time:.2f} seconds")
+            logger.error(
+                "README generation failed for %s: %s",
+                repository_full_name,
+                str(e),
+            )
             raise
 
     async def _create_recommendation_version(
@@ -992,7 +769,11 @@ class RecommendationService:
         await db.commit()
         await db.refresh(version)
 
-        logger.info(f"📝 Created version {next_version_number} for recommendation {recommendation.id}")
+        logger.debug(
+            "Created version %d for recommendation %s",
+            next_version_number,
+            recommendation.id,
+        )
         return version
 
     async def get_recommendation_version_history(self, db: AsyncSession, recommendation_id: int) -> RecommendationVersionHistoryResponse:
@@ -1176,7 +957,11 @@ class RecommendationService:
         github_username = github_result.scalar_one_or_none()
         response.github_username = github_username
 
-        logger.info(f"🔄 Successfully reverted recommendation {recommendation_id} to version {target_version.version_number}")
+        logger.info(
+            "Reverted recommendation %s to version %s",
+            recommendation_id,
+            target_version.version_number,
+        )
         return response
 
     def _analyze_contributor_focus(self, contributor_commits: List[Dict[str, Any]], languages: List[str]) -> str:
@@ -1267,101 +1052,55 @@ class RecommendationService:
         analysis_context_type: str = "repository_contributor",
     ) -> Dict[str, Any]:
         """Merge repository analysis data with contributor profile data."""
-        logger.info(f"🔄 Merging repository and contributor data for {contributor_username} with context: {analysis_context_type}")
+        logger.debug(
+            "Merging repository and contributor data: user=%s, context=%s",
+            contributor_username,
+            analysis_context_type,
+        )
 
         if analysis_context_type == "repo_only":
-            # For repo_only context, we want ONLY repository-specific data
+            # For repo_only context, use ONLY repository-specific data
             # Filter out general user profile information to prevent data leakage
-            logger.info("🎯 REPO_ONLY MODE: Filtering out general user data")
-            logger.info(f"🔍 REPO_ONLY: Input contributor_data keys: {list(contributor_data.keys())}")
-            if "user_data" in contributor_data:
-                logger.info(f"🔍 REPO_ONLY: contributor user_data keys: {list(contributor_data['user_data'].keys())}")
-            logger.info(f"🔍 REPO_ONLY: Input repository_data keys: {list(repository_data.keys())}")
-            if "repository_info" in repository_data:
-                logger.info(f"🔍 REPO_ONLY: repository_info: {repository_data['repository_info']}")
-
-            # Start with MINIMAL contributor data - include essential identity info for repo_only
-            logger.info("🔍 REPO_ONLY: Creating MINIMAL contributor data (essential identity + username)")
             user_data_source = contributor_data.get("user_data", {})
             filtered_contributor_data = {
                 "user_data": {
                     "github_username": user_data_source.get("github_username") or contributor_username,
                     "login": user_data_source.get("login") or contributor_username,
-                    # Include essential identity information for natural recommendations
-                    "full_name": user_data_source.get("full_name"),  # Real name is essential for personal recommendations
-                    # EXCLUDE: bio, company, location, followers, etc. (general profile info)
-                    # EXCLUDE: avatar_url, profile_url (not needed for text recommendations)
+                    "full_name": user_data_source.get("full_name"),
                 }
             }
-            logger.info(f"🔍 REPO_ONLY: MINIMAL user_data: {filtered_contributor_data['user_data']}")
 
             merged_data = filtered_contributor_data.copy()
 
-            # Add repository-specific information with explicit overrides
+            # Add repository-specific information
             if repository_data:
                 merged_data["repository_info"] = repository_data.get("repository_info", {})
                 merged_data["repository_languages"] = repository_data.get("languages", [])
                 merged_data["repository_commits"] = repository_data.get("commits", [])
                 merged_data["repository_skills"] = repository_data.get("skills", {})
                 merged_data["repository_commit_analysis"] = repository_data.get("commit_analysis", {})
-
-                # CRITICAL: For repo_only, use ONLY repository-specific data
-                # Do NOT merge with general contributor skills - this prevents data leakage
                 merged_data["languages"] = repository_data.get("languages", [])
                 merged_data["skills"] = repository_data.get("skills", {})
                 merged_data["commit_analysis"] = repository_data.get("commit_analysis", {})
 
-            # Add metadata about the analysis type
+            # Add metadata
             merged_data["analysis_context_type"] = "repo_only"
             merged_data["target_repository"] = repository_data.get("repository_info", {}).get("full_name", "")
             merged_data["contributor_username"] = contributor_username
 
-            logger.info("✅ REPO_ONLY: Filtered merged data created - general profile data excluded")
-            logger.info(f"🔍 REPO_ONLY: Final merged_data keys: {list(merged_data.keys())}")
-            if "user_data" in merged_data:
-                logger.info(f"🔍 REPO_ONLY: Final user_data: {merged_data['user_data']}")
-            if "repo_contributor_stats" in merged_data:
-                logger.info(f"🔍 REPO_ONLY: repo_contributor_stats: {merged_data['repo_contributor_stats']}")
-
-            # CRITICAL DEBUG: Log the complete merged data structure to see what gets passed to AI
-            logger.info("🔍 REPO_ONLY: ======= COMPLETE MERGED DATA STRUCTURE =======")
-            for key, value in merged_data.items():
-                if key == "user_data":
-                    logger.info(f"🔍 REPO_ONLY: user_data = {value}")
-                elif key == "repo_contributor_stats":
-                    logger.info(f"🔍 REPO_ONLY: repo_contributor_stats = {value}")
-                elif key in ["languages", "skills", "commit_analysis", "repository_info"]:
-                    logger.info(f"🔍 REPO_ONLY: {key} = {type(value)} (length: {len(value) if hasattr(value, '__len__') else 'N/A'})")
-                else:
-                    logger.info(f"🔍 REPO_ONLY: {key} = {value}")
-            logger.info("🔍 REPO_ONLY: ===============================================")
-
-            # VALIDATION: Ensure no profile data leaked through
-            logger.info("🔍 REPO_ONLY: Running final validation...")
+            # Validate data isolation
             validation_result = self._validate_repo_only_data_isolation(merged_data)
             if not validation_result["is_valid"]:
-                logger.error("🚨 CRITICAL: Profile data contamination detected in repo_only data!")
-                for issue in validation_result["issues"]:
-                    logger.error(f"   • {issue}")
+                logger.error(
+                    "Profile data contamination in repo_only context: %s",
+                    validation_result["issues"],
+                )
                 raise ValueError(f"Profile data contamination in repo_only context: {validation_result['issues']}")
-            else:
-                logger.info("✅ REPO_ONLY: Validation PASSED - no profile data contamination")
-
-            # FINAL DEBUG: Log what will be sent to AI
-            logger.info("🎯 REPO_ONLY: FINAL DATA SENT TO AI:")
-            logger.info(f"   • Username: {merged_data.get('user_data', {}).get('github_username', 'N/A')}")
-            logger.info(f"   • Repository: {merged_data.get('repository_info', {}).get('full_name', 'N/A')}")
-            logger.info(f"   • Languages: {len(merged_data.get('languages', []))} languages")
-            logger.info(f"   • Skills: {len(merged_data.get('skills', {}).get('technical_skills', []))} technical skills")
-            logger.info(f"   • Commits: {merged_data.get('commit_analysis', {}).get('total_commits', 0)} total commits")
-            logger.info("🎯 REPO_ONLY: Data isolation complete - sending to AI")
 
             if validation_result["warnings"]:
-                logger.warning("⚠️ REPO_ONLY: Validation warnings:")
                 for warning in validation_result["warnings"]:
-                    logger.warning(f"   • {warning}")
+                    logger.warning("repo_only validation warning: %s", warning)
 
-            logger.info("🎉 REPO_ONLY: Data isolation complete and validated")
             return merged_data
 
         else:
@@ -1666,7 +1405,7 @@ class RecommendationService:
         github_username: str,
         selected_option: Dict[str, Any],
         all_options: List[Dict[str, Any]],
-        user_id: Optional[int] = None,  # Added user_id
+        user_id: Optional[int] = None,
         analysis_context_type: str = "profile",
         repository_url: Optional[str] = None,
         recommendation_type: Optional[str] = None,
@@ -1674,87 +1413,27 @@ class RecommendationService:
         length: Optional[str] = None,
     ) -> RecommendationResponse:
         """Create a recommendation from a selected option."""
-
-        import time
+        logger.debug(
+            "create_recommendation_from_option called: username=%s, option=%s",
+            github_username,
+            selected_option.get("name"),
+        )
 
         start_time = time.time()
 
         try:
-            logger.info("🔍 STEP 1: GITHUB DATA ANALYSIS")
-            logger.info("-" * 50)
-            logger.info(f"   • Analysis Context: {analysis_context_type}")
-            logger.info(f"   • Repository URL: {repository_url or 'N/A'}")
-            github_start = time.time()
+            # Step 1: Fetch GitHub data
+            github_data = await self._fetch_github_data(
+                github_username=github_username,
+                analysis_context_type=analysis_context_type,
+                repository_url=repository_url,
+                force_refresh=False,
+            )
 
-            # Conditionally fetch GitHub data based on analysis context
-            if analysis_context_type == "repo_only" and repository_url:
-                logger.info("📦 Analyzing specific repository...")
-                # Extract owner/repo from URL
-                repo_path = repository_url.replace("https://github.com/", "").split("?")[0]
-                if "/" in repo_path:
-                    owner, repo = repo_path.split("/", 1)
-                    github_data = await self.repository_service.analyze_repository(f"{owner}/{repo}", force_refresh=False)
-
-                    if github_data:
-                        # For repo_only, we need to create a minimal profile structure
-                        # Merge repository data with basic contributor info
-                        contributor_data = await self.github_service.analyze_github_profile(username=github_username, force_refresh=False)
-                        if contributor_data:
-                            github_data = self._merge_repository_and_contributor_data(github_data, contributor_data, github_username, analysis_context_type)
-                        else:
-                            logger.warning(f"Could not fetch contributor data for {github_username}, using repository data only")
-
-                else:
-                    raise ValueError(f"Invalid repository URL format: {repository_url}")
-
-            elif analysis_context_type == "repository_contributor" and repository_url:
-                logger.info("👥 Analyzing repository with contributor context...")
-                # Get full profile data but emphasize repository context
-                github_data = await self.github_service.analyze_github_profile(username=github_username, force_refresh=False)
-
-                if github_data and repository_url:
-                    # Extract owner/repo from URL and get repository-specific data
-                    repo_path = repository_url.replace("https://github.com/", "").split("?")[0]
-                    if "/" in repo_path:
-                        owner, repo = repo_path.split("/", 1)
-                        repo_data = await self.repository_service.analyze_repository(f"{owner}/{repo}", force_refresh=False)
-                        if repo_data:
-                            github_data = self._merge_repository_and_contributor_data(repo_data, github_data, github_username, analysis_context_type)
-
-            else:
-                logger.info("👤 Analyzing full GitHub profile...")
-                # Default: analyze full profile
-                github_data = await self.github_service.analyze_github_profile(username=github_username, force_refresh=False)
-
-            github_end = time.time()
-            logger.info(f"⏱️  GitHub analysis completed in {github_end - github_start:.2f} seconds")
-
-            if not github_data:
-                if analysis_context_type == "repo_only":
-                    logger.error(f"❌ Failed to analyze GitHub repository: {repository_url}")
-                    raise ValueError(f"Could not analyze GitHub repository: {repository_url}")
-                else:
-                    logger.error(f"❌ Failed to analyze GitHub profile for {github_username}")
-                    raise ValueError(f"Could not analyze GitHub profile for {github_username}")
-
-            # Get or create GitHub profile record
-            logger.info("💾 STEP 2: DATABASE OPERATIONS")
-            logger.info("-" * 50)
-            db_start = time.time()
-
+            # Step 2: Get or create GitHub profile
             github_profile = await self._get_or_create_github_profile(db, github_data)
-            logger.debug(f"➡️ GitHub Profile ID: {github_profile.id}")
 
-            db_end = time.time()
-            logger.info(f"⏱️  Database operations completed in {db_end - db_start:.2f} seconds")
-            logger.info(f"✅ GitHub profile record: {'Updated' if github_profile else 'Created'}")
-
-            # Create recommendation record with selected option information
-            logger.info("💾 STEP 3: SAVING RECOMMENDATION FROM SELECTED OPTION")
-            logger.info("-" * 50)
-            save_start = time.time()
-
-            # Extract generation parameters from the selected option
+            # Step 3: Build generation parameters and save recommendation
             generation_parameters = {
                 "model": selected_option.get("generation_parameters", {}).get("model", "unknown"),
                 "temperature": selected_option.get("generation_parameters", {}).get("temperature", 0.7),
@@ -1769,8 +1448,6 @@ class RecommendationService:
                 "tone": tone or "professional",
                 "length": length or "medium",
             }
-            logger.debug(f"➡️ Generated Parameters: {generation_parameters}")
-            logger.debug(f"➡️ Selected Option Content Length: {len(selected_option.get('content', ''))}")
 
             recommendation_data = RecommendationCreate(
                 github_profile_id=int(github_profile.id),
@@ -1783,46 +1460,38 @@ class RecommendationService:
                 tone=tone or "professional",
                 length=length or "medium",
                 ai_model=generation_parameters["model"],
-                generation_prompt=None,  # This comes from the options generation
+                generation_prompt=None,
                 generation_parameters=generation_parameters,
                 word_count=selected_option.get("word_count", 0),
                 selected_option_id=selected_option.get("id"),
                 selected_option_name=selected_option.get("name"),
                 selected_option_focus=selected_option.get("focus"),
-                generated_options=all_options,  # Store all options for reference
+                generated_options=all_options,
             )
-            logger.debug(f"➡️ RecommendationCreate data: {recommendation_data.dict()}")
 
             recommendation = Recommendation(**recommendation_data.dict())
             db.add(recommendation)
             await db.commit()
             await db.refresh(recommendation)
-            logger.debug(f"➡️ Recommendation saved to DB with ID: {recommendation.id}")
 
-            save_end = time.time()
-            logger.info(f"⏱️  Database save completed in {save_end - save_start:.2f} seconds")
-            logger.info(f"✅ Recommendation saved with ID: {recommendation.id}")
-            logger.info(f"✅ Selected option: {selected_option.get('name')} (Focus: {selected_option.get('focus')})")
-
-            # Convert to response
             response = RecommendationResponse.from_orm(recommendation)
             response.github_username = github_username
 
-            end_time = time.time()
-            total_time = end_time - start_time
-
-            logger.info("🎉 RECOMMENDATION CREATION FROM OPTION SUMMARY")
-            logger.info("-" * 50)
-            logger.info(f"⏱️  Total processing time: {total_time:.2f} seconds")
-            logger.info("📊 Breakdown:")
-            logger.info(f"   • GitHub Analysis: {github_end - github_start:.2f}s ({((github_end - github_start)/total_time)*100:.1f}%)")
-            logger.info(f"   • Database Ops: {db_end - db_start:.2f}s ({((db_end - db_start)/total_time)*100:.1f}%)")
-            logger.info(f"   • Save Record: {save_end - save_start:.2f}s ({((save_end - save_start)/total_time)*100:.1f}%)")
+            logger.info(
+                "Recommendation created from option: id=%s, user=%s, option=%s, duration=%.2fs",
+                recommendation.id,
+                github_username,
+                selected_option.get("name"),
+                time.time() - start_time,
+            )
 
             return response
 
         except Exception as e:
-            logger.error(f"💥 ERROR in recommendation creation from option for {github_username}: {e}")
-            logger.error(f"⏱️  Failed after {time.time() - start_time:.2f} seconds")
+            logger.error(
+                "Recommendation from option failed for %s: %s",
+                github_username,
+                str(e),
+            )
             await db.rollback()
             raise

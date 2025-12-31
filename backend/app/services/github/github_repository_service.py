@@ -350,12 +350,7 @@ class GitHubRepositoryService:
                 if author_filter:
                     logger.info(f"🔒 REPO_ONLY: Fetching PRs ONLY from user: {author_filter}")
 
-                repo_prs = await self.commit_service.fetch_repository_pull_requests(
-                    repository_full_name,
-                    author_username=author_filter,
-                    max_prs=50,
-                    force_refresh=force_refresh
-                )
+                repo_prs = await self.commit_service.fetch_repository_pull_requests(repository_full_name, author_username=author_filter, max_prs=50, force_refresh=force_refresh)
 
                 if repo_prs:
                     pr_analysis = self.commit_service._perform_pr_analysis(repo_prs, target_username or owner)
@@ -367,6 +362,7 @@ class GitHubRepositoryService:
             except Exception as e:
                 logger.error(f"💥 ERROR in PR analysis: {e}")
                 import traceback
+
                 logger.error(f"Stack trace: {traceback.format_exc()}")
                 pr_analysis = self.commit_service._empty_pr_analysis()["pr_analysis"]
 

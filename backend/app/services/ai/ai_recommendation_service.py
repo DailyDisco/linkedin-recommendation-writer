@@ -583,12 +583,14 @@ class AIRecommendationService:
                 max_option_score = max(option_scores)
 
                 logger.info(f"📊 Attempt {attempt} quality: avg={avg_score:.1f}, max={max_option_score:.1f}")
-                attempts_log.append({
-                    "attempt": attempt,
-                    "avg_score": avg_score,
-                    "max_score": max_option_score,
-                    "option_scores": option_scores,
-                })
+                attempts_log.append(
+                    {
+                        "attempt": attempt,
+                        "avg_score": avg_score,
+                        "max_score": max_option_score,
+                        "option_scores": option_scores,
+                    }
+                )
 
                 # Track best result
                 if max_option_score > best_score:
@@ -749,9 +751,7 @@ class AIRecommendationService:
                     "focus": config["focus"],
                 }
 
-                option_content, validation_results = await self._generate_single_option(
-                    option_prompt, temp_modifier, length, option_gen_params, github_data
-                )
+                option_content, validation_results = await self._generate_single_option(option_prompt, temp_modifier, length, option_gen_params, github_data)
 
                 # Create option object
                 return {
@@ -775,10 +775,7 @@ class AIRecommendationService:
                 }
 
         # Create tasks for all options
-        tasks = [
-            generate_single_option_task(config, i + 1)
-            for i, config in enumerate(option_configs)
-        ]
+        tasks = [generate_single_option_task(config, i + 1) for i, config in enumerate(option_configs)]
 
         # Execute all tasks concurrently
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -840,9 +837,7 @@ class AIRecommendationService:
                 "focus": config["focus"],
             }
 
-            option_content, validation_results = await self._generate_single_option(
-                option_prompt, temp_modifier, length, option_gen_params, github_data
-            )
+            option_content, validation_results = await self._generate_single_option(option_prompt, temp_modifier, length, option_gen_params, github_data)
 
             option_end = time.time()
 
@@ -1491,11 +1486,42 @@ class AIRecommendationService:
 
         # Check for technology/skill mentions (at least 1 specific tech)
         tech_indicators = [
-            "python", "javascript", "typescript", "java", "go", "rust", "c++", "c#",
-            "react", "vue", "angular", "node", "django", "flask", "fastapi", "spring",
-            "docker", "kubernetes", "aws", "gcp", "azure", "postgresql", "mongodb",
-            "redis", "graphql", "rest", "api", "microservices", "machine learning",
-            "tensorflow", "pytorch", "sql", "nosql", "ci/cd", "git", "linux",
+            "python",
+            "javascript",
+            "typescript",
+            "java",
+            "go",
+            "rust",
+            "c++",
+            "c#",
+            "react",
+            "vue",
+            "angular",
+            "node",
+            "django",
+            "flask",
+            "fastapi",
+            "spring",
+            "docker",
+            "kubernetes",
+            "aws",
+            "gcp",
+            "azure",
+            "postgresql",
+            "mongodb",
+            "redis",
+            "graphql",
+            "rest",
+            "api",
+            "microservices",
+            "machine learning",
+            "tensorflow",
+            "pytorch",
+            "sql",
+            "nosql",
+            "ci/cd",
+            "git",
+            "linux",
         ]
         has_tech = any(tech in content_lower for tech in tech_indicators)
         if not has_tech:
@@ -1504,9 +1530,21 @@ class AIRecommendationService:
 
         # Check for specific examples/incidents
         example_indicators = [
-            "when", "during", "there was", "i remember", "one time", "specifically",
-            "for example", "in particular", "instance", "situation", "project",
-            "incident", "challenge", "problem we faced", "deadline",
+            "when",
+            "during",
+            "there was",
+            "i remember",
+            "one time",
+            "specifically",
+            "for example",
+            "in particular",
+            "instance",
+            "situation",
+            "project",
+            "incident",
+            "challenge",
+            "problem we faced",
+            "deadline",
         ]
         has_example = sum(1 for ind in example_indicators if ind in content_lower) >= 2
         if not has_example:
@@ -1515,10 +1553,28 @@ class AIRecommendationService:
 
         # Check for outcome/impact statements
         outcome_indicators = [
-            "resulted in", "led to", "improved", "reduced", "increased", "saved",
-            "achieved", "delivered", "completed", "launched", "shipped", "fixed",
-            "solved", "built", "created", "implemented", "automated", "streamlined",
-            "within an hour", "in record time", "ahead of schedule", "under budget",
+            "resulted in",
+            "led to",
+            "improved",
+            "reduced",
+            "increased",
+            "saved",
+            "achieved",
+            "delivered",
+            "completed",
+            "launched",
+            "shipped",
+            "fixed",
+            "solved",
+            "built",
+            "created",
+            "implemented",
+            "automated",
+            "streamlined",
+            "within an hour",
+            "in record time",
+            "ahead of schedule",
+            "under budget",
         ]
         has_outcome = any(ind in content_lower for ind in outcome_indicators)
         if not has_outcome:
@@ -1526,9 +1582,7 @@ class AIRecommendationService:
             specificity_issues.append("No specific outcomes or impact mentioned")
 
         # Check for first-person perspective (personal voice)
-        first_person = ["i worked", "i saw", "i observed", "i watched", "i noticed",
-                       "impressed me", "what i", "my experience", "i've seen",
-                       "i remember", "i learned", "we worked", "our team"]
+        first_person = ["i worked", "i saw", "i observed", "i watched", "i noticed", "impressed me", "what i", "my experience", "i've seen", "i remember", "i learned", "we worked", "our team"]
         has_personal_voice = sum(1 for fp in first_person if fp in content_lower) >= 2
         if not has_personal_voice:
             specificity_score -= 10
@@ -1536,11 +1590,7 @@ class AIRecommendationService:
 
         # Calculate generic score (higher = more generic)
         base_generic_score = (
-            buzzword_count * 5 +
-            generic_phrase_count * 7 +
-            vague_descriptor_count * 4 +
-            platitude_count * 10 +  # Heavy penalty for platitudes
-            ai_tell_count * 8       # Heavy penalty for AI tells
+            buzzword_count * 5 + generic_phrase_count * 7 + vague_descriptor_count * 4 + platitude_count * 10 + ai_tell_count * 8  # Heavy penalty for platitudes  # Heavy penalty for AI tells
         )
         generic_score = min(100, base_generic_score)
 
@@ -1798,10 +1848,7 @@ class AIRecommendationService:
 
         # Check for language mentions (25 points)
         languages = github_data.get("languages", [])
-        language_names = [
-            lang.get("language", lang) if isinstance(lang, dict) else str(lang)
-            for lang in languages[:5]
-        ]
+        language_names = [lang.get("language", lang) if isinstance(lang, dict) else str(lang) for lang in languages[:5]]
         languages_mentioned = sum(1 for lang in language_names if lang.lower() in recommendation_lower)
         score += min(25, languages_mentioned * 10)
 
@@ -1852,32 +1899,56 @@ class AIRecommendationService:
 
         # Penalize generic buzzwords
         buzzwords = [
-            "passionate", "dedicated", "hardworking", "team player",
-            "innovative", "creative", "proactive", "results-driven",
+            "passionate",
+            "dedicated",
+            "hardworking",
+            "team player",
+            "innovative",
+            "creative",
+            "proactive",
+            "results-driven",
         ]
         buzzword_count = sum(1 for bw in buzzwords if bw in recommendation_lower)
         score -= buzzword_count * 5
 
         # Penalize generic phrases
         generic_phrases = [
-            "asset to any team", "highly recommend", "pleasure to work with",
-            "without hesitation", "would be lucky",
+            "asset to any team",
+            "highly recommend",
+            "pleasure to work with",
+            "without hesitation",
+            "would be lucky",
         ]
         generic_count = sum(1 for phrase in generic_phrases if phrase in recommendation_lower)
         score -= generic_count * 10
 
         # Reward specific indicators
         specific_indicators = [
-            "when", "during", "specifically", "for example", "i remember",
-            "one time", "project", "deadline", "challenge",
+            "when",
+            "during",
+            "specifically",
+            "for example",
+            "i remember",
+            "one time",
+            "project",
+            "deadline",
+            "challenge",
         ]
         specific_count = sum(1 for ind in specific_indicators if ind in recommendation_lower)
         score += min(20, specific_count * 5)
 
         # Reward outcome mentions
         outcome_words = [
-            "resulted", "improved", "reduced", "saved", "achieved",
-            "delivered", "fixed", "solved", "built", "launched",
+            "resulted",
+            "improved",
+            "reduced",
+            "saved",
+            "achieved",
+            "delivered",
+            "fixed",
+            "solved",
+            "built",
+            "launched",
         ]
         outcome_count = sum(1 for word in outcome_words if word in recommendation_lower)
         score += min(15, outcome_count * 5)
@@ -1891,8 +1962,14 @@ class AIRecommendationService:
 
         # Penalize AI tells
         ai_tells = [
-            "it's worth noting", "importantly", "furthermore", "moreover",
-            "additionally", "in conclusion", "notably", "indeed",
+            "it's worth noting",
+            "importantly",
+            "furthermore",
+            "moreover",
+            "additionally",
+            "in conclusion",
+            "notably",
+            "indeed",
         ]
         ai_tell_count = sum(1 for tell in ai_tells if tell in recommendation_lower)
         score -= ai_tell_count * 10
@@ -1915,8 +1992,16 @@ class AIRecommendationService:
 
         # Reward emotional language
         emotion_words = [
-            "impressed", "amazed", "appreciate", "admire", "respect",
-            "enjoy", "love", "proud", "grateful", "pleasure",
+            "impressed",
+            "amazed",
+            "appreciate",
+            "admire",
+            "respect",
+            "enjoy",
+            "love",
+            "proud",
+            "grateful",
+            "pleasure",
         ]
         emotion_count = sum(1 for word in emotion_words if word in recommendation_lower)
         score += min(10, emotion_count * 3)

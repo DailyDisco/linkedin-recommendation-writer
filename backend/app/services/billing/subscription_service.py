@@ -68,9 +68,7 @@ class SubscriptionService:
             SubscriptionResponse with current subscription details
         """
         # Check for subscription record
-        result = await db.execute(
-            select(Subscription).where(Subscription.user_id == user.id)
-        )
+        result = await db.execute(select(Subscription).where(Subscription.user_id == user.id))
         subscription = result.scalar_one_or_none()
 
         if subscription:
