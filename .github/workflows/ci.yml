@@ -215,6 +215,38 @@ jobs:
         run: npm run build
         working-directory: ${{ env.FRONTEND_DIR }}
 
+      - name: Analyze bundle size
+        run: |
+          echo "## 📦 Frontend Bundle Size Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Directory | Size |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|------|" >> $GITHUB_STEP_SUMMARY
+
+          # Total build size
+          TOTAL_SIZE=$(du -sh build/ | cut -f1)
+          echo "| **Total Build** | $TOTAL_SIZE |" >> $GITHUB_STEP_SUMMARY
+
+          # Client bundle size
+          if [ -d "build/client" ]; then
+            CLIENT_SIZE=$(du -sh build/client/ | cut -f1)
+            echo "| Client Assets | $CLIENT_SIZE |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Server bundle size
+          if [ -d "build/server" ]; then
+            SERVER_SIZE=$(du -sh build/server/ | cut -f1)
+            echo "| Server Bundle | $SERVER_SIZE |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # List largest JS files
+          echo "### Largest JavaScript Files" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          find build/ -name "*.js" -type f -exec du -h {} \; | sort -rh | head -10 >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        working-directory: ${{ env.FRONTEND_DIR }}
+
       - name: Upload frontend build
         uses: actions/upload-artifact@v4
         with:

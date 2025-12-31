@@ -49,12 +49,23 @@ services:
       - linkedin-recommender-network
     # In development, we run two commands: the backend server and frontend dev server
     command: >
-      sh -c "cd /app/backend && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload & \
+      sh -c "echo '' && \
+             echo '═══════════════════════════════════════════════════════' && \
+             echo '  LinkedIn Recommendation Writer - Development Server' && \
+             echo '═══════════════════════════════════════════════════════' && \
+             echo '' && \
+             echo '  Frontend:  http://localhost:5174' && \
+             echo '  Backend:   http://localhost:8002' && \
+             echo '  API Docs:  http://localhost:8002/docs' && \
+             echo '' && \
+             echo '═══════════════════════════════════════════════════════' && \
+             echo '' && \
+             cd /app/backend && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload & \
              cd /app/frontend && npm run dev"
 
   # PostgreSQL Database
   postgres:
-    image: postgres:15-alpine
+    image: postgres:17-alpine
     container_name: linkedin-recommender-postgres
     environment:
       - POSTGRES_DB=${POSTGRES_DB}
@@ -73,19 +84,21 @@ services:
       timeout: 5s
       retries: 5
 
-  # Redis Cache
+  # Redis-compatible Cache (Dragonfly)
   redis:
-    image: redis:7-alpine
+    image: docker.dragonflydb.io/dragonflydb/dragonfly
     container_name: linkedin-recommender-redis
     ports:
-      - "6380:6379"  # Host 6380 to avoid conflicts with other Redis instances
+      - "6380:6379" # Host 6380 to avoid conflicts with other Redis instances
     volumes:
       - redis_data:/data
     networks:
       - linkedin-recommender-network
     restart: unless-stopped
+    ulimits:
+      memlock: -1
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-p", "6379", "ping"]
       interval: 10s
       timeout: 5s
       retries: 3

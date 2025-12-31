@@ -11,7 +11,7 @@
 # BASE STAGE
 # Common dependencies for both backend and frontend.
 # =================================================================================================
-FROM python:3.11-slim as base
+FROM python:3.13-slim as base
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
@@ -42,7 +42,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 FROM base as frontend-deps
 WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json* ./
-RUN npm ci --only=production
+RUN npm ci --omit=dev
 
 # =================================================================================================
 # FRONTEND BUILDER STAGE
