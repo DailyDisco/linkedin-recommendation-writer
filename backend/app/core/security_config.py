@@ -6,7 +6,7 @@ from typing import List, Optional
 
 def validate_github_username(username: str) -> bool:
     """Validate GitHub username format.
-    
+
     GitHub username rules:
     - 1-39 characters
     - Alphanumeric and hyphens only
@@ -70,11 +70,11 @@ def validate_url(url: str, allowed_domains: Optional[List[str]] = None) -> bool:
 
 def sanitize_text(text: str, max_length: int = 10000) -> str:
     """Sanitize text input to remove dangerous content.
-    
+
     Args:
         text: Input text to sanitize
         max_length: Maximum allowed length
-        
+
     Returns:
         Sanitized text
     """
@@ -94,7 +94,7 @@ def sanitize_text(text: str, max_length: int = 10000) -> str:
 
 def filter_pii_for_logging(text: str) -> str:
     """Remove potentially sensitive information from text for safe logging.
-    
+
     Filters common PII patterns:
     - Email addresses
     - JWT tokens

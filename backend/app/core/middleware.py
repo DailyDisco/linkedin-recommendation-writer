@@ -3,7 +3,7 @@
 import logging
 import time
 import uuid
-from typing import Any, Awaitable, Callable, Dict
+from typing import Any, Awaitable, Callable
 
 from fastapi import Request, Response
 from starlette import status
@@ -90,36 +90,49 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 
 class RateLimitingMiddleware(BaseHTTPMiddleware):
-    """Simple in-memory rate limiting middleware."""
+    """Redis-based rate limiting middleware with sliding window algorithm."""
 
     def __init__(self, app: Any, requests_per_minute: int = 60) -> None:
         super().__init__(app)
         self.requests_per_minute = requests_per_minute
-        self.requests: Dict[str, int] = {}  # In production, use Redis
 
     async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
         if not settings.ENABLE_RATE_LIMITING:
             return await call_next(request)
 
         client_ip = request.client.host if request.client else "unknown"
-        current_time = int(time.time() / 60)  # Current minute
 
-        # Clean old entries
-        self.requests = {k: v for k, v in self.requests.items() if int(k.split(":")[1]) >= current_time - 1}
+        # Use Redis-based rate limiting
+        from app.core.redis_client import check_rate_limit, get_rate_limit_remaining
 
-        # Count requests for this client in current minute
-        key = f"{client_ip}:{current_time}"
-        count = self.requests.get(key, 0)
+        is_allowed, current_count = await check_rate_limit(client_ip, self.requests_per_minute)
 
-        if count >= self.requests_per_minute:
+        if not is_allowed:
+            remaining = await get_rate_limit_remaining(client_ip, self.requests_per_minute)
             return JSONResponse(
                 status_code=429,
-                content={"detail": "Rate limit exceeded. Please try again later."},
-                headers={"Retry-After": "60"},
+                content={
+                    "error": "RATE_LIMIT_EXCEEDED",
+                    "message": "Rate limit exceeded. Please try again later.",
+                    "type": "rate_limit_error",
+                },
+                headers={
+                    "Retry-After": "60",
+                    "X-RateLimit-Limit": str(self.requests_per_minute),
+                    "X-RateLimit-Remaining": str(remaining),
+                    "X-RateLimit-Reset": str(int(time.time()) + 60),
+                },
             )
 
-        self.requests[key] = count + 1
-        return await call_next(request)
+        response = await call_next(request)
+
+        # Add rate limit headers to response
+        remaining = await get_rate_limit_remaining(client_ip, self.requests_per_minute)
+        response.headers["X-RateLimit-Limit"] = str(self.requests_per_minute)
+        response.headers["X-RateLimit-Remaining"] = str(remaining)
+        response.headers["X-RateLimit-Reset"] = str(int(time.time()) + 60)
+
+        return response
 
 
 class ErrorHandlingMiddleware(BaseHTTPMiddleware):
@@ -249,7 +262,7 @@ class ErrorHandlingMiddleware(BaseHTTPMiddleware):
 
 def setup_middleware(app: Any) -> None:
     """Configure essential middleware only.
-    
+
     Middleware execution order (reverse of addition):
     1. RequestIDMiddleware - Generate request IDs
     2. LoggingMiddleware - Log requests/responses
@@ -259,7 +272,7 @@ def setup_middleware(app: Any) -> None:
     6. CORSMiddleware - CORS handling
     """
     from fastapi.middleware.cors import CORSMiddleware
-    
+
     # CORS middleware (must be added first to execute last)
     app.add_middleware(
         CORSMiddleware,

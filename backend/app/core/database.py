@@ -63,22 +63,22 @@ async def init_database() -> None:
 
 async def run_migrations() -> None:
     """Run database migrations using Alembic with automatic state recovery.
-    
+
     This function runs Alembic migrations automatically on application startup.
     It includes retry logic for database connection issues, detailed logging,
     and automatic recovery from migration state mismatches.
     """
     import asyncio
-    
+
     max_retries = 3
     retry_delay = 2  # seconds
-    
+
     for attempt in range(1, max_retries + 1):
         try:
             from alembic import command
             from alembic.config import Config
-            from alembic.script import ScriptDirectory
             from alembic.runtime.migration import MigrationContext
+            from alembic.script import ScriptDirectory
 
             # Get the directory containing this file
             current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -90,32 +90,32 @@ async def run_migrations() -> None:
                 return
 
             logger.info("🔄 Starting database migration process (attempt %d/%d)...", attempt, max_retries)
-            
+
             # Load Alembic configuration
             alembic_cfg = Config(alembic_cfg_path)
             script = ScriptDirectory.from_config(alembic_cfg)
-            
+
             # Helper function to get current revision (must be called via run_sync)
             def get_current_revision(connection):
                 context = MigrationContext.configure(connection)
                 return context.get_current_revision()
-            
+
             # Helper function to check if tables exist
             def check_tables_exist(connection):
                 inspector = sa.inspect(connection)
                 existing_tables = inspector.get_table_names()
-                return 'users' in existing_tables
-            
+                return "users" in existing_tables
+
             # Helper function to stamp database to a specific revision
             def stamp_database(revision: str):
                 command.stamp(alembic_cfg, revision)
-            
+
             # Check current database version using run_sync to avoid greenlet issues
             async with engine.begin() as conn:
                 current_rev = await conn.run_sync(get_current_revision)
                 tables_exist = await conn.run_sync(check_tables_exist)
                 head_rev = script.get_current_head()
-                
+
                 # Handle migration state mismatch: tables exist but Alembic shows no migrations
                 if current_rev is None and tables_exist:
                     logger.warning("⚠️ Tables exist but Alembic shows no migrations applied (state mismatch)")
@@ -125,40 +125,40 @@ async def run_migrations() -> None:
                     logger.info("✅ Database stamped successfully to revision: %s", head_rev)
                     logger.info("✅ Migration state recovery completed")
                     return
-                
+
                 if current_rev == head_rev:
                     logger.info("✅ Database is already at the latest version: %s", current_rev or "base")
                     return
-                
+
                 logger.info("📊 Current database version: %s", current_rev or "base")
                 logger.info("📊 Target database version: %s", head_rev)
-            
+
             # Run migrations in a thread pool to avoid event loop conflicts
             # command.upgrade loads env.py which calls asyncio.run(), which conflicts with the running loop
             logger.info("⚙️ Applying database migrations...")
             loop = asyncio.get_event_loop()
             await loop.run_in_executor(None, command.upgrade, alembic_cfg, "head")
-            
+
             # Verify migration success using run_sync
             async with engine.begin() as conn:
                 new_rev = await conn.run_sync(get_current_revision)
-                
+
                 if new_rev == head_rev:
                     logger.info("✅ Database migrations completed successfully! Current version: %s", new_rev)
                 else:
                     logger.error("❌ Migration verification failed. Expected: %s, Got: %s", head_rev, new_rev)
                     raise RuntimeError(f"Migration verification failed: expected {head_rev}, got {new_rev}")
-            
+
             return  # Success, exit retry loop
 
         except ImportError as e:
             logger.warning("⚠️ Alembic not available: %s. Skipping migrations.", str(e))
             return
-            
+
         except Exception as e:
             error_msg = str(e)
             logger.error("❌ Migration attempt %d/%d failed: %s", attempt, max_retries, error_msg)
-            
+
             if attempt < max_retries:
                 logger.info("⏳ Retrying in %d seconds...", retry_delay)
                 await asyncio.sleep(retry_delay)

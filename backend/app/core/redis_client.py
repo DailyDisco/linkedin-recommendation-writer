@@ -111,3 +111,80 @@ async def check_redis_health() -> str:
     except Exception as e:
         logger.error(f"Redis health check failed: {e}")
         return "error"
+
+
+async def check_rate_limit(client_ip: str, requests_per_minute: int) -> tuple[bool, int]:
+    """
+    Check if a client has exceeded the rate limit using Redis sliding window.
+
+    Args:
+        client_ip: The client's IP address
+        requests_per_minute: Maximum allowed requests per minute
+
+    Returns:
+        Tuple of (is_allowed, current_count)
+    """
+    try:
+        client = await get_redis()
+        if client is None:
+            # If Redis is unavailable, allow the request (fail open)
+            logger.warning("Redis not available for rate limiting, allowing request")
+            return True, 0
+
+        import time
+
+        key = f"rate_limit:{client_ip}"
+        current_time = int(time.time())
+        window_start = current_time - 60  # 1-minute sliding window
+
+        # Use Redis pipeline for atomic operations
+        pipe = client.pipeline()
+
+        # Remove old entries outside the window
+        pipe.zremrangebyscore(key, 0, window_start)
+
+        # Add current request with timestamp as score
+        pipe.zadd(key, {str(current_time): current_time})
+
+        # Count requests in the current window
+        pipe.zcard(key)
+
+        # Set expiry on the key (auto-cleanup)
+        pipe.expire(key, 120)  # 2 minutes to account for window
+
+        results = await pipe.execute()
+        current_count = results[2]  # zcard result
+
+        is_allowed = current_count <= requests_per_minute
+
+        if not is_allowed:
+            logger.warning(f"Rate limit exceeded for {client_ip}: {current_count}/{requests_per_minute}")
+
+        return is_allowed, current_count
+
+    except Exception as e:
+        logger.error(f"Rate limit check failed for {client_ip}: {e}")
+        # Fail open - allow request if Redis has issues
+        return True, 0
+
+
+async def get_rate_limit_remaining(client_ip: str, requests_per_minute: int) -> int:
+    """Get the number of remaining requests for a client."""
+    try:
+        client = await get_redis()
+        if client is None:
+            return requests_per_minute
+
+        import time
+
+        key = f"rate_limit:{client_ip}"
+        window_start = int(time.time()) - 60
+
+        # Count current requests in window
+        current_count = await client.zcount(key, window_start, "+inf")
+
+        return max(0, requests_per_minute - current_count)
+
+    except Exception as e:
+        logger.error(f"Failed to get rate limit remaining for {client_ip}: {e}")
+        return requests_per_minute

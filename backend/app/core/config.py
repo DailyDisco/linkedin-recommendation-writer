@@ -52,29 +52,12 @@ class Settings(BaseSettings):
 
     # AI Quality Settings
     AI_QUALITY_TIER: Literal["fast", "balanced", "quality"] = Field(
-        default="balanced",
-        description="AI quality tier: fast (gemini-2.5-flash-lite), balanced (gemini-2.0-flash), quality (gemini-1.5-pro)"
+        default="balanced", description="AI quality tier: fast (gemini-2.5-flash-lite), balanced (gemini-2.0-flash), quality (gemini-1.5-pro)"
     )
-    AI_ENABLE_QUALITY_GATE: bool = Field(
-        default=True,
-        description="Enable quality gate with automatic retry for low-quality outputs"
-    )
-    AI_QUALITY_GATE_MIN_SCORE: int = Field(
-        default=65,
-        ge=0,
-        le=100,
-        description="Minimum quality score required (0-100)"
-    )
-    AI_QUALITY_GATE_MAX_RETRIES: int = Field(
-        default=3,
-        ge=1,
-        le=5,
-        description="Maximum retry attempts for quality gate"
-    )
-    AI_PARALLEL_GENERATION: bool = Field(
-        default=True,
-        description="Enable parallel option generation for faster response"
-    )
+    AI_ENABLE_QUALITY_GATE: bool = Field(default=True, description="Enable quality gate with automatic retry for low-quality outputs")
+    AI_QUALITY_GATE_MIN_SCORE: int = Field(default=65, ge=0, le=100, description="Minimum quality score required (0-100)")
+    AI_QUALITY_GATE_MAX_RETRIES: int = Field(default=3, ge=1, le=5, description="Maximum retry attempts for quality gate")
+    AI_PARALLEL_GENERATION: bool = Field(default=True, description="Enable parallel option generation for faster response")
 
     # Logging
     LOG_LEVEL: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(default="DEBUG", description="Logging level")
@@ -182,9 +165,9 @@ class Settings(BaseSettings):
         Higher quality tiers use slightly lower temperature for more consistency.
         """
         tier_temps = {
-            "fast": 0.8,      # More creative, faster iteration
+            "fast": 0.8,  # More creative, faster iteration
             "balanced": 0.7,  # Good balance
-            "quality": 0.6,   # More consistent, higher quality
+            "quality": 0.6,  # More consistent, higher quality
         }
         return tier_temps.get(self.AI_QUALITY_TIER, self.GEMINI_TEMPERATURE)
 
@@ -203,18 +186,18 @@ class Settings(BaseSettings):
         # Tone adjustments
         tone_adjustments = {
             "professional": -0.1,  # More consistent
-            "formal": -0.15,       # Very consistent
-            "casual": +0.15,       # More creative
-            "friendly": +0.1,      # Slightly more creative
+            "formal": -0.15,  # Very consistent
+            "casual": +0.15,  # More creative
+            "friendly": +0.1,  # Slightly more creative
         }
 
         # Type adjustments
         type_adjustments = {
-            "technical": -0.1,     # More precise
+            "technical": -0.1,  # More precise
             "professional": -0.05,
-            "leadership": +0.05,   # More inspiring
-            "academic": -0.1,      # More formal
-            "personal": +0.1,      # More creative
+            "leadership": +0.05,  # More inspiring
+            "academic": -0.1,  # More formal
+            "personal": +0.1,  # More creative
         }
 
         temp = base_temp
