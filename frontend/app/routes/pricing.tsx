@@ -49,7 +49,11 @@ function CreditPackCard({
             isPro ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
           }`}
         >
-          {isPro ? <Zap className='h-6 w-6' /> : <Sparkles className='h-6 w-6' />}
+          {isPro ? (
+            <Zap className='h-6 w-6' />
+          ) : (
+            <Sparkles className='h-6 w-6' />
+          )}
         </div>
         <CardTitle className='text-2xl'>{pack.name}</CardTitle>
         <CardDescription className='text-sm mt-1'>
@@ -64,7 +68,8 @@ function CreditPackCard({
           </span>
         </div>
         <p className='text-sm text-muted-foreground mt-1'>
-          ${((pack.price_cents / 100) / pack.credits).toFixed(2)} per recommendation
+          ${(pack.price_cents / 100 / pack.credits).toFixed(2)} per
+          recommendation
         </p>
       </CardHeader>
 
@@ -77,7 +82,8 @@ function CreditPackCard({
           <li className='flex items-start gap-2'>
             <Check className='h-5 w-5 text-green-500 shrink-0 mt-0.5' />
             <span className='text-sm'>
-              {pack.options_per_generation} option{pack.options_per_generation > 1 ? 's' : ''} per generation
+              {pack.options_per_generation} option
+              {pack.options_per_generation > 1 ? 's' : ''} per generation
             </span>
           </li>
           <li className='flex items-start gap-2'>
@@ -198,7 +204,9 @@ export default function PricingPage() {
 
   const [creditPacks, setCreditPacks] = useState<CreditPack[]>([]);
   const [unlimitedPlan, setUnlimitedPlan] = useState<Plan | null>(null);
-  const [creditBalance, setCreditBalance] = useState<CreditBalance | null>(null);
+  const [creditBalance, setCreditBalance] = useState<CreditBalance | null>(
+    null
+  );
   const [loadingPack, setLoadingPack] = useState<string | null>(null);
   const [isLoadingSubscription, setIsLoadingSubscription] = useState(false);
 
@@ -276,8 +284,8 @@ export default function PricingPage() {
       <div className='text-center mb-12'>
         <h1 className='text-4xl font-bold mb-4'>Pay As You Go</h1>
         <p className='text-xl text-muted-foreground max-w-2xl mx-auto'>
-          Buy credits when you need them. No subscription required.
-          Credits never expire.
+          Buy credits when you need them. No subscription required. Credits
+          never expire.
         </p>
         {isAuthenticated && creditBalance && (
           <div className='mt-4 inline-flex items-center gap-2 bg-primary/10 px-4 py-2 rounded-full'>
@@ -297,7 +305,9 @@ export default function PricingPage() {
           <CardContent className='pt-6'>
             <div className='flex items-center justify-center gap-2 mb-2'>
               <Sparkles className='h-5 w-5 text-green-600' />
-              <span className='font-semibold text-green-800'>Free to Start</span>
+              <span className='font-semibold text-green-800'>
+                Free to Start
+              </span>
             </div>
             <p className='text-green-700'>
               New users get <strong>3 free credits</strong> to try out the app.
@@ -362,8 +372,8 @@ export default function PricingPage() {
             </h3>
             <p className='text-muted-foreground'>
               Pro packs give you 3 options per generation instead of 1, plus
-              access to all tones and keyword refinement. The cost per credit
-              is also lower.
+              access to all tones and keyword refinement. The cost per credit is
+              also lower.
             </p>
           </div>
 
@@ -378,7 +388,9 @@ export default function PricingPage() {
           </div>
 
           <div>
-            <h3 className='font-semibold mb-2'>Can I cancel the subscription?</h3>
+            <h3 className='font-semibold mb-2'>
+              Can I cancel the subscription?
+            </h3>
             <p className='text-muted-foreground'>
               Yes! You can cancel anytime. You&apos;ll keep access until the end
               of your billing period.

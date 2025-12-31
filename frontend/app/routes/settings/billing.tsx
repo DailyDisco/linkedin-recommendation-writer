@@ -30,7 +30,9 @@ export default function BillingSettingsPage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuthStore();
 
-  const [creditBalance, setCreditBalance] = useState<CreditBalance | null>(null);
+  const [creditBalance, setCreditBalance] = useState<CreditBalance | null>(
+    null
+  );
   const [purchaseHistory, setPurchaseHistory] = useState<CreditPurchase[]>([]);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -111,7 +113,9 @@ export default function BillingSettingsPage() {
               {hasUnlimited ? (
                 <div className='space-y-2'>
                   <Crown className='h-12 w-12 mx-auto text-purple-500' />
-                  <p className='text-3xl font-bold text-purple-600'>Unlimited</p>
+                  <p className='text-3xl font-bold text-purple-600'>
+                    Unlimited
+                  </p>
                   <p className='text-sm text-muted-foreground'>
                     Active subscription - no credit limits
                   </p>
@@ -130,12 +134,17 @@ export default function BillingSettingsPage() {
               <div className='text-center text-sm text-muted-foreground'>
                 <p>
                   Lifetime credits purchased:{' '}
-                  <strong>{creditBalance?.lifetime_credits_purchased || 0}</strong>
+                  <strong>
+                    {creditBalance?.lifetime_credits_purchased || 0}
+                  </strong>
                 </p>
                 {creditBalance?.last_pack_purchased && (
                   <p className='mt-1'>
-                    Last pack: <Badge variant='outline' className='ml-1'>
-                      {creditBalance.last_pack_purchased === 'pro' ? 'Pro Pack' : 'Starter Pack'}
+                    Last pack:{' '}
+                    <Badge variant='outline' className='ml-1'>
+                      {creditBalance.last_pack_purchased === 'pro'
+                        ? 'Pro Pack'
+                        : 'Starter Pack'}
                     </Badge>
                   </p>
                 )}
@@ -183,7 +192,10 @@ export default function BillingSettingsPage() {
                     <Clock className='h-4 w-4' />
                     <span>
                       {subscription.cancel_at_period_end ? 'Ends' : 'Renews'}:{' '}
-                      {format(new Date(subscription.current_period_end), 'MMM d, yyyy')}
+                      {format(
+                        new Date(subscription.current_period_end),
+                        'MMM d, yyyy'
+                      )}
                     </span>
                   </div>
                 )}
@@ -233,7 +245,11 @@ export default function BillingSettingsPage() {
           <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3'>
             <FeatureItem
               name='Recommendations'
-              value={hasUnlimited ? 'Unlimited' : `${creditBalance?.credits || 0} credits`}
+              value={
+                hasUnlimited
+                  ? 'Unlimited'
+                  : `${creditBalance?.credits || 0} credits`
+              }
             />
             <FeatureItem
               name='Options per Generation'
@@ -245,18 +261,38 @@ export default function BillingSettingsPage() {
             />
             <FeatureItem
               name='All Tones'
-              value={hasUnlimited || creditBalance?.last_pack_purchased === 'pro' ? 'Yes' : 'No'}
-              isEnabled={hasUnlimited || creditBalance?.last_pack_purchased === 'pro'}
+              value={
+                hasUnlimited || creditBalance?.last_pack_purchased === 'pro'
+                  ? 'Yes'
+                  : 'No'
+              }
+              isEnabled={
+                hasUnlimited || creditBalance?.last_pack_purchased === 'pro'
+              }
             />
             <FeatureItem
               name='Keyword Refinement'
-              value={hasUnlimited || creditBalance?.last_pack_purchased === 'pro' ? 'Yes' : 'No'}
-              isEnabled={hasUnlimited || creditBalance?.last_pack_purchased === 'pro'}
+              value={
+                hasUnlimited || creditBalance?.last_pack_purchased === 'pro'
+                  ? 'Yes'
+                  : 'No'
+              }
+              isEnabled={
+                hasUnlimited || creditBalance?.last_pack_purchased === 'pro'
+              }
             />
             <FeatureItem
               name='API Access'
-              value={hasUnlimited || (creditBalance?.lifetime_credits_purchased || 0) >= 50 ? 'Yes' : 'No'}
-              isEnabled={hasUnlimited || (creditBalance?.lifetime_credits_purchased || 0) >= 50}
+              value={
+                hasUnlimited ||
+                (creditBalance?.lifetime_credits_purchased || 0) >= 50
+                  ? 'Yes'
+                  : 'No'
+              }
+              isEnabled={
+                hasUnlimited ||
+                (creditBalance?.lifetime_credits_purchased || 0) >= 50
+              }
             />
             <FeatureItem
               name='Priority Support'
@@ -285,7 +321,9 @@ export default function BillingSettingsPage() {
                     <Package className='h-5 w-5 text-muted-foreground' />
                     <div>
                       <p className='font-medium'>
-                        {purchase.pack_type === 'pro' ? 'Pro Pack' : 'Starter Pack'}
+                        {purchase.pack_type === 'pro'
+                          ? 'Pro Pack'
+                          : 'Starter Pack'}
                       </p>
                       <p className='text-sm text-muted-foreground'>
                         {purchase.credits_amount} credits
@@ -303,7 +341,9 @@ export default function BillingSettingsPage() {
                     </p>
                   </div>
                   <Badge
-                    variant={purchase.status === 'completed' ? 'default' : 'secondary'}
+                    variant={
+                      purchase.status === 'completed' ? 'default' : 'secondary'
+                    }
                   >
                     {purchase.status}
                   </Badge>
