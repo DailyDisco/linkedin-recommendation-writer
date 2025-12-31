@@ -3,7 +3,7 @@ from datetime import timedelta
 from typing import Optional
 
 import bcrypt
-from fastapi import APIRouter, Body, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,7 +12,7 @@ from app.core.config import settings
 from app.core.dependencies import get_database_session
 from app.core.token import token_helper
 from app.models.user import User
-from app.schemas.user import Token, UserCreate
+from app.schemas.user import PasswordChange, Token, UserCreate, UserLogin
 
 logger = logging.getLogger(__name__)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/login")
@@ -150,25 +150,15 @@ async def logout() -> dict:
 
 @router.post("/login", response_model=Token)
 async def login(
-    credentials: dict = Body(...),  # Accept raw JSON instead of form data
+    credentials: UserLogin,
     db: AsyncSession = Depends(get_database_session),
 ) -> Token:
     """Alternative login endpoint that accepts JSON credentials."""
     logger.info("Attempting to log in user via /login endpoint")
 
-    # Extract username and password from the request body
-    username = credentials.get("username")
-    password = credentials.get("password")
-
-    if not username or not password:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username and password are required",
-        )
-
-    user = await authenticate_user(username, password, db)
+    user = await authenticate_user(credentials.username, credentials.password, db)
     if not user:
-        logger.warning(f"Login failed for user {username}: Invalid credentials.")
+        logger.warning(f"Login failed for user {credentials.username}: Invalid credentials.")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -238,23 +228,17 @@ async def get_current_active_user(current_user: User = Depends(get_current_user)
 
 @router.put("/change-password", response_model=dict)
 async def change_password(
-    password_data: dict = Body(...),
+    password_data: PasswordChange,
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_database_session),
 ) -> dict:
     """Change user's password."""
-    current_password = password_data.get("current_password")
-    new_password = password_data.get("new_password")
-
-    if not current_password or not new_password:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Both current_password and new_password are required")
-
     # Verify current password
-    if not verify_password(current_password, current_user.hashed_password):
+    if not verify_password(password_data.current_password, current_user.hashed_password):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
 
     # Hash new password
-    hashed_new_password = hash_password(new_password)
+    hashed_new_password = hash_password(password_data.new_password)
 
     # Update password in database
     current_user.hashed_password = hashed_new_password

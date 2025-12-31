@@ -41,7 +41,9 @@ async def _process_github_analysis_background(task_id: str, username: str, force
 
         # Update task status to processing
         await set_cache(
-            f"task_status:{task_id}", {"status": "processing", "username": username, "started_at": datetime.now(timezone.utc).isoformat(), "message": "Initializing GitHub analysis...", "progress": 5}, ttl=3600
+            f"task_status:{task_id}",
+            {"status": "processing", "username": username, "started_at": datetime.now(timezone.utc).isoformat(), "message": "Initializing GitHub analysis...", "progress": 5},
+            ttl=3600,
         )
 
         # Perform the analysis
@@ -68,7 +70,9 @@ async def _process_github_analysis_background(task_id: str, username: str, force
     except Exception as e:
         logger.error(f"💥 Background analysis error for {username}: {e}")
         await set_cache(
-            f"task_status:{task_id}", {"status": "failed", "username": username, "completed_at": datetime.now(timezone.utc).isoformat(), "message": f"Analysis failed: {str(e)}", "progress": 0}, ttl=3600
+            f"task_status:{task_id}",
+            {"status": "failed", "username": username, "completed_at": datetime.now(timezone.utc).isoformat(), "message": f"Analysis failed: {str(e)}", "progress": 0},
+            ttl=3600,
         )
 
 

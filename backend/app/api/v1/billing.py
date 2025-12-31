@@ -15,8 +15,8 @@ from app.models.api_key import ApiKey
 from app.models.credit_purchase import CreditPurchase
 from app.models.user import CREDIT_PACKS, User
 from app.schemas.billing import (
-    ApiKeyCreateRequest,
     ApiKeyCreatedResponse,
+    ApiKeyCreateRequest,
     ApiKeyListResponse,
     ApiKeyResponse,
     CheckoutRequest,
@@ -41,10 +41,21 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 
-# Service instances
-stripe_service = StripeService()
-subscription_service = SubscriptionService()
-usage_service = UsageService()
+
+# Dependency injection for services
+def get_stripe_service() -> StripeService:
+    """Get Stripe service instance."""
+    return StripeService()
+
+
+def get_subscription_service() -> SubscriptionService:
+    """Get subscription service instance."""
+    return SubscriptionService()
+
+
+def get_usage_service() -> UsageService:
+    """Get usage service instance."""
+    return UsageService()
 
 
 @router.get("/plans", response_model=PlansResponse)
@@ -96,6 +107,7 @@ async def purchase_credit_pack(
     http_request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_database_session),
+    stripe_service: StripeService = Depends(get_stripe_service),
 ) -> CheckoutResponse:
     """Purchase a credit pack (one-time payment).
 
@@ -137,11 +149,7 @@ async def get_credit_purchase_history(
     db: AsyncSession = Depends(get_database_session),
 ) -> List[CreditPurchaseResponse]:
     """Get the user's credit purchase history."""
-    result = await db.execute(
-        select(CreditPurchase)
-        .where(CreditPurchase.user_id == current_user.id)
-        .order_by(CreditPurchase.created_at.desc())
-    )
+    result = await db.execute(select(CreditPurchase).where(CreditPurchase.user_id == current_user.id).order_by(CreditPurchase.created_at.desc()))
     purchases = result.scalars().all()
 
     return [
@@ -163,6 +171,8 @@ async def create_checkout_session(
     request: CheckoutRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_database_session),
+    stripe_service: StripeService = Depends(get_stripe_service),
+    subscription_service: SubscriptionService = Depends(get_subscription_service),
 ) -> CheckoutResponse:
     """Create a Stripe Checkout session for upgrading subscription.
 
@@ -209,6 +219,7 @@ async def create_portal_session(
     request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_database_session),
+    stripe_service: StripeService = Depends(get_stripe_service),
 ) -> PortalResponse:
     """Create a Stripe Customer Portal session for managing subscription.
 
@@ -218,10 +229,7 @@ async def create_portal_session(
         raise HTTPException(status_code=503, detail="Billing is not enabled")
 
     if not current_user.stripe_customer_id:
-        raise HTTPException(
-            status_code=400,
-            detail="No subscription found. Please upgrade first."
-        )
+        raise HTTPException(status_code=400, detail="No subscription found. Please upgrade first.")
 
     # Get return URL from referer or default
     referer = request.headers.get("referer", "http://localhost:5173")
@@ -243,6 +251,7 @@ async def create_portal_session(
 async def get_subscription(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_database_session),
+    subscription_service: SubscriptionService = Depends(get_subscription_service),
 ) -> SubscriptionResponse:
     """Get current subscription details for the authenticated user."""
     return await subscription_service.get_user_subscription(current_user, db)
@@ -252,6 +261,7 @@ async def get_subscription(
 async def get_usage(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_database_session),
+    usage_service: UsageService = Depends(get_usage_service),
 ) -> UsageResponse:
     """Get usage statistics for the authenticated user."""
     return await usage_service.get_usage(current_user, db)
@@ -261,6 +271,7 @@ async def get_usage(
 async def handle_webhook(
     request: Request,
     db: AsyncSession = Depends(get_database_session),
+    stripe_service: StripeService = Depends(get_stripe_service),
 ):
     """Handle Stripe webhook events.
 
@@ -358,11 +369,7 @@ async def list_api_keys(
             detail="API access requires Team tier or higher",
         )
 
-    result = await db.execute(
-        select(ApiKey)
-        .where(ApiKey.user_id == current_user.id)
-        .order_by(ApiKey.created_at.desc())
-    )
+    result = await db.execute(select(ApiKey).where(ApiKey.user_id == current_user.id).order_by(ApiKey.created_at.desc()))
     keys = result.scalars().all()
 
     return ApiKeyListResponse(
