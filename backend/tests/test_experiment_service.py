@@ -1,14 +1,15 @@
 """Tests for the A/B testing experiment service."""
 
-import pytest
 from datetime import datetime
+
+import pytest
 
 # Import test - this will be tested when pytest runs
 from app.services.ai.experiment_service import (
-    ExperimentService,
-    ExperimentVariant,
     ExperimentConfig,
     ExperimentResult,
+    ExperimentService,
+    ExperimentVariant,
 )
 
 

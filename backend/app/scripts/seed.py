@@ -28,27 +28,27 @@ from pathlib import Path
 backend_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(backend_dir))
 
-from sqlalchemy import select, delete
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import AsyncSessionLocal, engine, Base
+from app.core.database import AsyncSessionLocal, Base, engine
 from app.models import (
-    User,
-    Subscription,
-    UsageRecord,
+    ApiKey,
     GitHubProfile,
     Recommendation,
-    ApiKey,
+    Subscription,
+    UsageRecord,
+    User,
 )
 from app.scripts.factories import (
-    create_user_data,
-    create_subscription_data,
+    SEED_GITHUB_PROFILES,
+    SEED_USERS,
+    create_api_key_data,
     create_github_profile_data,
     create_recommendation_data,
+    create_subscription_data,
     create_usage_record_data,
-    create_api_key_data,
-    SEED_USERS,
-    SEED_GITHUB_PROFILES,
+    create_user_data,
 )
 
 # Configure logging
@@ -90,9 +90,7 @@ class DatabaseSeeder:
             config = user_config.copy()
 
             # Check if user exists
-            result = await self.session.execute(
-                select(User).where(User.email == config["email"])
-            )
+            result = await self.session.execute(select(User).where(User.email == config["email"]))
             existing = result.scalar_one_or_none()
 
             if existing:
@@ -158,9 +156,7 @@ class DatabaseSeeder:
         self.stats["api_keys_created"] += 1
         self.log(f"  Created API key: {key_data['key_prefix']}... (raw: {raw_key})")
 
-    async def seed_github_profiles(
-        self, users: dict[str, User]
-    ) -> dict[str, GitHubProfile]:
+    async def seed_github_profiles(self, users: dict[str, User]) -> dict[str, GitHubProfile]:
         """Seed GitHub profiles and return mapping of username to profile."""
         profiles = {}
 
@@ -168,11 +164,7 @@ class DatabaseSeeder:
             github_username = profile_config["github_username"]
 
             # Check if profile exists
-            result = await self.session.execute(
-                select(GitHubProfile).where(
-                    GitHubProfile.github_username == github_username
-                )
-            )
+            result = await self.session.execute(select(GitHubProfile).where(GitHubProfile.github_username == github_username))
             existing = result.scalar_one_or_none()
 
             if existing:
@@ -192,9 +184,7 @@ class DatabaseSeeder:
 
         return profiles
 
-    async def seed_recommendations(
-        self, users: dict[str, User], profiles: dict[str, GitHubProfile]
-    ) -> None:
+    async def seed_recommendations(self, users: dict[str, User], profiles: dict[str, GitHubProfile]) -> None:
         """Seed recommendations linking users to GitHub profiles."""
         # Create recommendations for different combinations
         recommendation_configs = [
@@ -251,9 +241,7 @@ class DatabaseSeeder:
             recommendation = Recommendation(**rec_data)
             self.session.add(recommendation)
             self.stats["recommendations_created"] += 1
-            self.log(
-                f"Created recommendation: {user.username} -> {profile.github_username}"
-            )
+            self.log(f"Created recommendation: {user.username} -> {profile.github_username}")
 
     async def seed_usage_records(self, users: dict[str, User]) -> None:
         """Seed usage records for the past 7 days."""

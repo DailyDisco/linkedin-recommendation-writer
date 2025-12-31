@@ -294,17 +294,26 @@ def create_api_key_data(
 def _generate_sample_recommendation(recommendation_type: str, tone: str) -> str:
     """Generate sample recommendation content based on type and tone."""
     templates = {
-        ("professional", "professional"): """I had the pleasure of working alongside this talented developer for over two years, and I can confidently say they are one of the most dedicated professionals I've encountered. Their technical expertise in Python and cloud architecture consistently delivered results that exceeded expectations.
+        (
+            "professional",
+            "professional",
+        ): """I had the pleasure of working alongside this talented developer for over two years, and I can confidently say they are one of the most dedicated professionals I've encountered. Their technical expertise in Python and cloud architecture consistently delivered results that exceeded expectations.
 
 What truly sets them apart is their ability to translate complex technical concepts into actionable solutions. They led the migration of our legacy systems to a modern microservices architecture, reducing deployment time by 60% and improving system reliability significantly.
 
 Beyond technical skills, they demonstrated exceptional leadership qualities, mentoring junior developers and fostering a collaborative team environment. I wholeheartedly recommend them for any senior engineering role.""",
-        ("technical", "professional"): """As a fellow engineer, I've been consistently impressed by their deep technical knowledge and problem-solving abilities. Their contributions to our open-source projects showcase a rare combination of algorithmic thinking and practical engineering.
+        (
+            "technical",
+            "professional",
+        ): """As a fellow engineer, I've been consistently impressed by their deep technical knowledge and problem-solving abilities. Their contributions to our open-source projects showcase a rare combination of algorithmic thinking and practical engineering.
 
 They architected our real-time data processing pipeline using Apache Kafka and Python, handling millions of events daily with sub-second latency. Their code reviews were invaluable, always providing constructive feedback that elevated the entire team's capabilities.
 
 Their expertise in distributed systems, combined with a pragmatic approach to software design, makes them an exceptional asset to any engineering organization.""",
-        ("leadership", "friendly"): """Working with this person was an absolute joy! Not only are they technically brilliant, but they have this amazing ability to bring out the best in everyone around them.
+        (
+            "leadership",
+            "friendly",
+        ): """Working with this person was an absolute joy! Not only are they technically brilliant, but they have this amazing ability to bring out the best in everyone around them.
 
 I watched them transform our team's culture from siloed individual work to true collaboration. They introduced pair programming sessions, created learning opportunities, and always made time to help others grow.
 
