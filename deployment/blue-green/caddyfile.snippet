@@ -1,0 +1,85 @@
+# =============================================================================
+# LinkedIn Recommendation Writer - Add to /srv/vault/appstack/caddy/Caddyfile
+# =============================================================================
+# Prerequisites:
+# 1. Create active deployment directory: sudo mkdir -p /etc/caddy/active-deployment
+# 2. Set initial marker: sudo touch /etc/caddy/active-deployment/linkedin-blue
+# 3. Restart Caddy after adding this config
+# =============================================================================
+
+# ---------- LINKEDIN RECOMMENDER - Blue-Green Deployment ----------
+
+# Local development/testing
+linkedin.local {
+	import common_security
+	tls internal
+	@health {
+		path /health
+	}
+	handle @health {
+		reverse_proxy linkedin-recommender-app-blue:8000
+	}
+	# File-based blue-green routing
+	@blue_active {
+		file /etc/caddy/active-deployment/linkedin-blue
+	}
+	@green_active {
+		file /etc/caddy/active-deployment/linkedin-green
+	}
+	handle @blue_active {
+		reverse_proxy linkedin-recommender-app-blue:8000
+	}
+	handle @green_active {
+		reverse_proxy linkedin-recommender-app-green:8000
+	}
+	# Default fallback to blue
+	handle {
+		reverse_proxy linkedin-recommender-app-blue:8000
+	}
+}
+
+# Production (behind Cloudflare)
+linkedin.greenlightbase.com {
+	import api_security
+	tls /etc/caddy/certs/greenlightbase.com.pem /etc/caddy/certs/greenlightbase.com.key
+	@health {
+		path /health
+	}
+	handle @health {
+		reverse_proxy linkedin-recommender-app-blue:8000
+	}
+	# File-based blue-green routing
+	@blue_active {
+		file /etc/caddy/active-deployment/linkedin-blue
+	}
+	@green_active {
+		file /etc/caddy/active-deployment/linkedin-green
+	}
+	handle @blue_active {
+		reverse_proxy linkedin-recommender-app-blue:8000
+	}
+	handle @green_active {
+		reverse_proxy linkedin-recommender-app-green:8000
+	}
+	# Default fallback to blue
+	handle {
+		reverse_proxy linkedin-recommender-app-blue:8000
+	}
+}
+
+# =============================================================================
+# IMPORTANT: Update Caddy volume mount to include active-deployment directory
+# =============================================================================
+# In your appstack docker-compose.yml, add this volume to the caddy service:
+#
+#   caddy:
+#     volumes:
+#       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+#       - ./caddy/data:/data
+#       - ./caddy/config:/config
+#       - ./caddy/certs:/etc/caddy/certs:ro
+#       - ./caddy/active-deployment:/etc/caddy/active-deployment  # ADD THIS
+#
+# Then create the directory:
+#   mkdir -p /srv/vault/appstack/caddy/active-deployment
+#   touch /srv/vault/appstack/caddy/active-deployment/linkedin-blue

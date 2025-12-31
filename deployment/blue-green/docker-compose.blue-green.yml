@@ -1,0 +1,188 @@
+# =============================================================================
+# Blue-Green Docker Compose for LinkedIn Recommendation Writer
+# =============================================================================
+# Integrates with existing appstack at /srv/vault/appstack/
+#
+# Usage:
+#   Initial setup: docker compose -f docker-compose.blue-green.yml up -d postgres redis app-blue
+#   Deploy green:  docker compose -f docker-compose.blue-green.yml --profile green up -d app-green
+#   Deploy blue:   docker compose -f docker-compose.blue-green.yml up -d app-blue
+#
+# Copy this file to /srv/linkedin-recommender/ on your production server
+
+# Inherit security defaults from appstack
+x-default-security: &default-security
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - NET_RAW
+  pids_limit: 200
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  # =============================================================================
+  # SHARED INFRASTRUCTURE (Always Running)
+  # =============================================================================
+
+  postgres:
+    <<: *default-security
+    image: postgres:15-alpine
+    container_name: linkedin-recommender-postgres
+    stop_grace_period: 60s
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backups:/backups
+    networks:
+      - linkedin-internal
+    restart: always
+    command: >
+      postgres
+      -c max_connections=200
+      -c shared_buffers=512MB
+      -c effective_cache_size=2GB
+      -c maintenance_work_mem=128MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    cpus: "1.0"
+    mem_limit: 1024m
+    mem_reservation: 256m
+    labels:
+      - "deployment.role=infrastructure"
+
+  redis:
+    <<: *default-security
+    image: redis:7-alpine
+    container_name: linkedin-recommender-redis
+    stop_grace_period: 30s
+    volumes:
+      - redis_data:/data
+    networks:
+      - linkedin-internal
+    restart: always
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    cpus: "0.5"
+    mem_limit: 512m
+    mem_reservation: 128m
+    labels:
+      - "deployment.role=infrastructure"
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # =============================================================================
+  # BLUE DEPLOYMENT (Default/Primary)
+  # =============================================================================
+
+  app-blue:
+    <<: *default-security
+    build:
+      context: ${REPO_PATH:-.}
+      dockerfile: Dockerfile
+      target: production
+    container_name: linkedin-recommender-app-blue
+    env_file:
+      - .env.production
+    environment:
+      DEPLOYMENT_COLOR: blue
+    expose:
+      - "8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - linkedin-internal
+      - appstack_web  # Connect to Caddy's network
+    restart: unless-stopped
+    cpus: "2.0"
+    mem_limit: 2048m
+    mem_reservation: 512m
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    labels:
+      - "deployment.color=blue"
+      - "deployment.role=application"
+      - "com.centurylinklabs.watchtower.enable=false"
+
+  # =============================================================================
+  # GREEN DEPLOYMENT (Secondary - uses profile)
+  # =============================================================================
+
+  app-green:
+    <<: *default-security
+    build:
+      context: ${REPO_PATH:-.}
+      dockerfile: Dockerfile
+      target: production
+    container_name: linkedin-recommender-app-green
+    env_file:
+      - .env.production
+    environment:
+      DEPLOYMENT_COLOR: green
+    expose:
+      - "8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - linkedin-internal
+      - appstack_web  # Connect to Caddy's network
+    restart: unless-stopped
+    cpus: "2.0"
+    mem_limit: 2048m
+    mem_reservation: 512m
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    labels:
+      - "deployment.color=green"
+      - "deployment.role=application"
+      - "com.centurylinklabs.watchtower.enable=false"
+    profiles:
+      - green
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  # Internal network for postgres/redis (not exposed to Caddy)
+  linkedin-internal:
+    driver: bridge
+    internal: true
+  # Connect to existing appstack web network where Caddy lives
+  appstack_web:
+    external: true
