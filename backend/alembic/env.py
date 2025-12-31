@@ -14,7 +14,7 @@ from app.core.config import settings
 
 def get_sync_url(async_url: str) -> str:
     """Convert async database URL to sync URL for migrations.
-    
+
     Alembic migrations need to run with a synchronous driver (psycopg2)
     because they execute in a thread pool context via run_in_executor.
     The asyncpg driver cannot work in this context due to greenlet requirements.
@@ -62,7 +62,7 @@ def run_migrations_offline() -> None:
     # from environment variables, converting async URL to sync URL for migrations
     sync_url = get_sync_url(settings.DATABASE_URL)
     config.set_main_option("sqlalchemy.url", sync_url)
-    
+
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
@@ -89,10 +89,7 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection, 
-            target_metadata=target_metadata
-        )
+        context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():
             context.run_migrations()
