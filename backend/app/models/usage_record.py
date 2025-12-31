@@ -29,16 +29,13 @@ class UsageRecord(Base):
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc),
-                       onupdate=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     # Relationships
     user = relationship("User", back_populates="usage_records")
 
     # Unique constraint on user_id + date
-    __table_args__ = (
-        UniqueConstraint("user_id", "date", name="uq_usage_records_user_date"),
-    )
+    __table_args__ = (UniqueConstraint("user_id", "date", name="uq_usage_records_user_date"),)
 
     def __repr__(self) -> str:
         return f"<UsageRecord(id={self.id}, user_id={self.user_id}, date={self.date}, count={self.generation_count})>"

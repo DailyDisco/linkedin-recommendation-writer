@@ -5,7 +5,6 @@ from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
-
 # Tier types (credit-based system)
 TierType = Literal["free", "pro", "unlimited", "admin"]
 PackType = Literal["starter", "pro"]
@@ -294,3 +293,25 @@ def get_unlimited_plan(stripe_price_id: Optional[str] = None) -> Plan:
     plan = UNLIMITED_PLAN.model_copy()
     plan.stripe_price_id = stripe_price_id
     return plan
+
+
+def get_plans(
+    stripe_price_id_pro: Optional[str] = None,
+    stripe_price_id_team: Optional[str] = None,
+) -> List[Plan]:
+    """Get all subscription plans.
+
+    Note: This function is for backwards compatibility. The billing model
+    now uses credit packs for pay-per-use and unlimited plan for subscription.
+
+    Args:
+        stripe_price_id_pro: Deprecated, maps to unlimited plan
+        stripe_price_id_team: Deprecated, ignored
+
+    Returns:
+        List containing the unlimited plan
+    """
+    # Return unlimited plan as the only subscription option
+    unlimited = UNLIMITED_PLAN.model_copy()
+    unlimited.stripe_price_id = stripe_price_id_pro or stripe_price_id_team
+    return [unlimited]

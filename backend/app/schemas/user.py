@@ -60,6 +60,13 @@ class UserResponse(UserBase):
     language: Optional[str] = None
 
 
+class PasswordChange(BaseModel):
+    """Password change schema."""
+
+    current_password: str
+    new_password: str
+
+
 class Token(BaseModel):
     """Token schema."""
 

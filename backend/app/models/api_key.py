@@ -68,6 +68,7 @@ class ApiKey(Base):
 
         # Hash the key for storage
         import hashlib
+
         key_hash = hashlib.sha256(full_key.encode()).hexdigest()
 
         return full_key, key_hash, key_prefix
@@ -76,6 +77,7 @@ class ApiKey(Base):
     def hash_key(key: str) -> str:
         """Hash an API key for comparison."""
         import hashlib
+
         return hashlib.sha256(key.encode()).hexdigest()
 
     def record_usage(self) -> None:
