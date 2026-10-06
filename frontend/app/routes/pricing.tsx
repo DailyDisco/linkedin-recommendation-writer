@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router';
 import { Check, Sparkles, Zap, Crown, Loader2, CreditCard } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { Button } from '~/components/ui/button';
+import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
@@ -11,12 +11,12 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from '~/components/ui/card';
-import { Badge } from '~/components/ui/badge';
-import { Separator } from '~/components/ui/separator';
-import { useAuthStore } from '~/hooks/useAuthStore';
-import { billingApi } from '~/services/api';
-import type { CreditPack, Plan, CreditBalance } from '~/types';
+} from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { useAuthStore } from '@/hooks/useAuthStore';
+import { billingApi } from '@/services/api';
+import type { CreditPack, Plan, CreditBalance } from '@/types';
 
 function CreditPackCard({
   pack,

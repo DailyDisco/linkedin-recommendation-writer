@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 
 from app.schemas.recommendation import RecommendationCreate, RecommendationOption, RecommendationOptionsResponse
-from app.services.recommendation_engine_service import RecommendationEngineService
+from app.services.recommendation.recommendation_engine_service import RecommendationEngineService
 
 
 class TestRecommendationEngineService:
@@ -287,13 +287,13 @@ class TestRecommendationEngineService:
         mock_db.refresh = AsyncMock()
 
         # Mock the Recommendation class
-        with patch("app.services.recommendation_engine_service.Recommendation") as mock_recommendation_class:
+        with patch("app.services.recommendation.recommendation_engine_service.Recommendation") as mock_recommendation_class:
             mock_recommendation = Mock()
             mock_recommendation.id = 456
             mock_recommendation_class.return_value = mock_recommendation
 
             # Mock RecommendationResponse
-            with patch("app.services.recommendation_engine_service.RecommendationResponse") as mock_response_class:
+            with patch("app.services.recommendation.recommendation_engine_service.RecommendationResponse") as mock_response_class:
                 mock_response = Mock()
                 mock_response_class.from_orm.return_value = mock_response
 

@@ -5,7 +5,7 @@
  * Import from here instead of defining schemas inline in components.
  *
  * @example
- * import { loginSchema, type LoginFormValues } from '~/lib/zod/schemas';
+ * import { loginSchema, type LoginFormValues } from '@/lib/zod/schemas';
  */
 
 import { z } from 'zod';

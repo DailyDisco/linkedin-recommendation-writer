@@ -1,14 +1,14 @@
 import { useNavigate } from 'react-router';
 import { XCircle, ArrowLeft } from 'lucide-react';
 
-import { Button } from '~/components/ui/button';
+import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '~/components/ui/card';
+} from '@/components/ui/card';
 
 export default function CheckoutCancelPage() {
   const navigate = useNavigate();
