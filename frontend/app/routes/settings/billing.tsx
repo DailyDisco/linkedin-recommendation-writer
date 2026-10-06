@@ -13,18 +13,18 @@ import {
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 
-import { Button } from '~/components/ui/button';
+import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '~/components/ui/card';
-import { Badge } from '~/components/ui/badge';
-import { useAuthStore } from '~/hooks/useAuthStore';
-import { billingApi } from '~/services/api';
-import type { CreditBalance, CreditPurchase, Subscription } from '~/types';
+} from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { useAuthStore } from '@/hooks/useAuthStore';
+import { billingApi } from '@/services/api';
+import type { CreditBalance, CreditPurchase, Subscription } from '@/types';
 
 export default function BillingSettingsPage() {
   const navigate = useNavigate();

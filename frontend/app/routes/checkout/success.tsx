@@ -3,15 +3,15 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { CheckCircle, Sparkles } from 'lucide-react';
 import { motion } from 'motion/react';
 
-import { Button } from '~/components/ui/button';
+import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '~/components/ui/card';
-import { useSubscriptionStore } from '~/hooks/useSubscriptionStore';
+} from '@/components/ui/card';
+import { useSubscriptionStore } from '@/hooks/useSubscriptionStore';
 
 export default function CheckoutSuccessPage() {
   const navigate = useNavigate();

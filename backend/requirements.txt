@@ -41,6 +41,7 @@ python-multipart==0.0.20  # Required for FastAPI form data handling (OAuth2 pass
 # Testing (development)
 pytest==8.4.1  # Framework for writing tests
 pytest-asyncio==1.1.0  # Pytest plugin for testing asyncio code
+pytest-cov==7.1.0  # Coverage plugin; the CI test command passes --cov
 
 # Code formatting (development)
 black==25.1.0  # Uncompromising Python code formatter

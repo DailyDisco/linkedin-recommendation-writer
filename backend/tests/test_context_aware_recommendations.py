@@ -4,8 +4,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.services.prompt_service import PromptService
-from app.services.recommendation_service import RecommendationService
+from app.services.ai.prompt_service import PromptService
+from app.services.recommendation.recommendation_service import RecommendationService
 
 
 class TestContextAwareRecommendations:

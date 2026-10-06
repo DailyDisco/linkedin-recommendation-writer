@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router';
 import { Zap, Check, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { Button } from '~/components/ui/button';
+import { Button } from '@/components/ui/button';
 import {
   Sheet,
   SheetContent,
@@ -11,7 +11,7 @@ import {
   SheetFooter,
   SheetHeader,
   SheetTitle,
-} from '~/components/ui/sheet';
+} from '@/components/ui/sheet';
 import {
   Dialog,
   DialogContent,
@@ -19,9 +19,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '~/components/ui/dialog';
-import { useSubscriptionStore } from '~/hooks/useSubscriptionStore';
-import { useAuthStore } from '~/hooks/useAuthStore';
+} from '@/components/ui/dialog';
+import { useSubscriptionStore } from '@/hooks/useSubscriptionStore';
+import { useAuthStore } from '@/hooks/useAuthStore';
 
 interface UpgradePromptProps {
   open: boolean;
