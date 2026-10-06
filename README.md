@@ -2,14 +2,8 @@
 
 # LinkedIn Recommendation Writer
 
-_(Your Logo Here)_
-
 </div>
 
-[![Live Demo](https://img.shields.io/badge/Live_Demo-View_App-brightgreen?style=flat&logo=vercel)](https://linkedin-recommendation-writer-production.up.railway.app/)
-[![CI/CD Pipeline](https://github.com/day0009/linkedin-recommendation-writer-app/actions/workflows/ci.yml/badge.svg)](https://github.com/day0009/linkedin-recommendation-writer-app/actions/workflows/ci.yml)
-[![Python CI](https://github.com/day0009/linkedin-recommendation-writer-app/actions/workflows/python-ci.yml/badge.svg)](https://github.com/day0009/linkedin-recommendation-writer-app/actions/workflows/python-ci.yml)
-[![React CI](https://github.com/day0009/linkedin-recommendation-writer-app/actions/workflows/react-ci.yml/badge.svg)](https://github.com/day0009/linkedin-recommendation-writer-app/actions/workflows/react-ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=flat&logo=docker&logoColor=white)](https://docker.com)
 
@@ -17,7 +11,6 @@ Generate professional LinkedIn recommendations using GitHub data and AI.
 
 ## Table of Contents
 
-- [🌐 Live Demo](#-live-demo)
 - [✨ Features](#-features)
 - [🏗️ Project Architecture](#️-project-architecture)
 - [💻 Technology Stack](#-technology-stack)
@@ -27,14 +20,6 @@ Generate professional LinkedIn recommendations using GitHub data and AI.
 - [🤝 Contributing](#-contributing)
 - [📄 License](#-license)
 - [📞 Support](#-support)
-
-## 🌐 Live Demo
-
-Try the live application: **[linkedin-recommendation-writer-production.up.railway.app](https://linkedin-recommendation-writer-production.up.railway.app/)**
-
-## 🖼️ Screenshots / Demos
-
-_(Add your application screenshots or GIFs here to showcase key features.)_
 
 ## ✨ Features
 
@@ -49,7 +34,7 @@ _(Add your application screenshots or GIFs here to showcase key features.)_
 The project is organized into a monorepo structure with distinct frontend and backend directories, promoting a clean separation of concerns.
 
 ```
-linkedin-recommendation-writer-app/
+linkedin-recommendation-writer/
 ├── .github/          # GitHub Actions workflows for CI/CD
 ├── backend/          # FastAPI application
 │   ├── app/          # Core application code
@@ -152,8 +137,8 @@ For self-hosted deployments, use `docker-compose -f docker-compose.prod.yml up -
 Clone the repository and set up your local environment:
 
 ```bash
-git clone https://github.com/day0009/linkedin-recommendation-writer-app
-cd linkedin-recommendation-writer-app
+git clone https://github.com/DailyDisco/linkedin-recommendation-writer
+cd linkedin-recommendation-writer
 cp .env.example .env
 # Edit .env with your GITHUB_TOKEN and GEMINI_API_KEY
 make build
@@ -279,8 +264,8 @@ We welcome contributions to the LinkedIn Recommendation Writer! To ensure a smoo
 1.  **Fork the repository** on GitHub.
 2.  **Clone your forked repository** to your local machine:
     ```bash
-    git clone https://github.com/day0009/linkedin-recommendation-writer-app
-    cd linkedin-recommendation-writer-app
+    git clone https://github.com/DailyDisco/linkedin-recommendation-writer
+    cd linkedin-recommendation-writer
     ```
 3.  **Set up your development environment** by following the [Installation & Local Development](#️-installation--local-development) instructions.
 4.  **Create a new feature branch** for your changes:
@@ -327,8 +312,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 ## 📞 Support
 
 - 📖 **API Docs**: `/docs` (when running locally or deployed)
-- 🐛 **Bug Reports**: [Create GitHub issues](https://github.com/day0009/linkedin-recommendation-writer-app/issues)
-- 💬 **Discussions**: [Start GitHub discussions](https://github.com/day0009/linkedin-recommendation-writer-app/discussions)
+- 🐛 **Bug Reports**: [Create GitHub issues](https://github.com/DailyDisco/linkedin-recommendation-writer/issues)
 
 ---
 
