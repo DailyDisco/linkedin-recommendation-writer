@@ -83,7 +83,7 @@ class DatabaseSeeder:
 
     async def seed_users(self) -> dict[str, User]:
         """Seed users and return mapping of username to User object."""
-        users = {}
+        users: dict[str, User] = {}
 
         for user_config in SEED_USERS:
             # Make a copy to avoid modifying the original

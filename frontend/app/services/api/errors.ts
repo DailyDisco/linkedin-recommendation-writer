@@ -258,6 +258,7 @@ export function handleApiError(
     console.error('Status:', status);
     console.error('Message:', httpError?.message || 'Unknown error');
     console.error('Data:', errorData);
+    console.error('Timestamp:', new Date().toISOString());
     console.groupEnd();
   }
 

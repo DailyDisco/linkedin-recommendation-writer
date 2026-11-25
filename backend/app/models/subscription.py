@@ -1,10 +1,10 @@
 """Subscription model for billing and subscription management."""
 
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 
@@ -17,36 +17,36 @@ class Subscription(Base):
 
     __tablename__ = "subscriptions"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)
 
     # Stripe IDs
-    stripe_customer_id = Column(String(255), nullable=False, unique=True, index=True)
-    stripe_subscription_id = Column(String(255), nullable=True, unique=True, index=True)
-    stripe_price_id = Column(String(255), nullable=True)
+    stripe_customer_id: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
+    stripe_subscription_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, unique=True, index=True)
+    stripe_price_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     # Status
-    tier = Column(String(50), default="free", nullable=False, index=True)  # free, pro, team
-    status = Column(String(50), default="active", nullable=False, index=True)  # active, past_due, cancelled, trialing
+    tier: Mapped[str] = mapped_column(String(50), default="free", nullable=False, index=True)  # free, pro, team
+    status: Mapped[str] = mapped_column(String(50), default="active", nullable=False, index=True)  # active, past_due, cancelled, trialing
 
     # Billing period
-    current_period_start = Column(DateTime(timezone=True), nullable=True)
-    current_period_end = Column(DateTime(timezone=True), nullable=True)
+    current_period_start: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    current_period_end: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Trial
-    trial_start = Column(DateTime(timezone=True), nullable=True)
-    trial_end = Column(DateTime(timezone=True), nullable=True)
+    trial_start: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    trial_end: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Cancellation
-    cancel_at_period_end = Column(Boolean, default=False)
-    cancelled_at = Column(DateTime(timezone=True), nullable=True)
+    cancel_at_period_end: Mapped[bool] = mapped_column(Boolean, default=False)
+    cancelled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Timestamps
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     # Relationships
-    user = relationship("User", back_populates="subscription")
+    user: Mapped["User"] = relationship("User", back_populates="subscription")
 
     @property
     def is_active(self) -> bool:

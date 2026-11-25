@@ -173,6 +173,8 @@ jobs:
         run: |
           echo "🔍 Validating Python app can start..."
           python -c "import app.main; print('✅ App imports successfully')"
+        env:
+          SECRET_KEY: ci-import-check-secret-key-not-for-production
         shell: bash
         working-directory: ${{ env.WORKING_DIR }}
 
@@ -216,6 +218,7 @@ jobs:
           # Example: python -m pytest tests/integration/ -v
           python -c "import app.main; print('✅ Python app integration test passed')"
           echo "✅ Integration tests completed"
+        env:
+          SECRET_KEY: ci-import-check-secret-key-not-for-production
         shell: bash
         working-directory: ${{ env.WORKING_DIR }}
-        continue-on-error: true

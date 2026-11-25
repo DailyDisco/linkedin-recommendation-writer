@@ -71,7 +71,10 @@ class KeywordRefinementService:
             )
 
             response = self.client.models.generate_content(model=settings.GEMINI_MODEL, contents=refinement_prompt, config=config)
-            refined_content = response.candidates[0].content.parts[0].text
+            candidates = response.candidates or []
+            if not candidates or not candidates[0].content or not candidates[0].content.parts:
+                raise ValueError("AI response contained no usable text")
+            refined_content = candidates[0].content.parts[0].text or ""
 
             # Apply formatting
             formatted_content = self._format_refined_content(refined_content, length, {"tone": tone, "length": length})

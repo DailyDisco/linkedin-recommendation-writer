@@ -8,7 +8,7 @@ from app.services.ai.human_story_generator import HumanStoryGenerator
 logger = logging.getLogger(__name__)
 
 # Few-shot examples for high-quality recommendations
-FEW_SHOT_EXAMPLES = {
+FEW_SHOT_EXAMPLES: dict = {
     "excellent": [
         {
             "context": "Senior backend developer, 3 years working together",
@@ -923,6 +923,7 @@ Create a recommendation that really highlights their {focus_formatted} skills wh
         repository_url: Optional[str] = None,
         exclude_keywords: Optional[list] = None,
         display_name: Optional[str] = None,
+        shared_work_context: Optional[str] = None,
     ) -> str:
         """Build prompt for regenerating a recommendation."""
         user_data = github_data.get("user_data", {})
@@ -943,6 +944,14 @@ Do NOT mention any of these terms or concepts: {', '.join(exclude_keywords)}
 If any of these terms would naturally appear, rephrase to avoid them entirely.
 """
 
+        shared_context_section = ""
+        if shared_work_context:
+            shared_context_section = f"""
+
+SHARED WORK CONTEXT:
+The recommender and {person_reference} worked together on: {shared_work_context}
+"""
+
         return f"""
 I have this LinkedIn recommendation that needs some changes:
 
@@ -956,7 +965,7 @@ DETAILS:
 - Person: {person_reference}
 - Type: {recommendation_type}
 - Tone: {tone}
-- Target Length: {target_length} words{exclude_section}
+- Target Length: {target_length} words{exclude_section}{shared_context_section}
 
 **CRITICAL FORMATTING REQUIREMENTS:**
 - **MANDATORY**: Structure your response with clear paragraph breaks using DOUBLE NEWLINES
@@ -1135,7 +1144,7 @@ Just give me the updated recommendation text, nothing else.
 
     def _validate_prompt_for_profile_data(self, prompt: str) -> Dict[str, Any]:
         """Validate that the final prompt doesn't contain profile data (but allows profile keywords in instructions)."""
-        validation_result = {"is_valid": True, "issues": [], "warnings": []}
+        validation_result: Dict[str, Any] = {"is_valid": True, "issues": [], "warnings": []}
 
         prompt_lower = prompt.lower()
 
@@ -1545,7 +1554,7 @@ Just give me the updated recommendation text, nothing else.
         """Post-generation check to detect any repository names that leaked into the output."""
         import re
 
-        validation_result = {"is_valid": True, "detected_repo_names": [], "warnings": []}
+        validation_result: Dict[str, Any] = {"is_valid": True, "detected_repo_names": [], "warnings": []}
 
         # Collect repository names to check for
         repo_names_to_check = set()

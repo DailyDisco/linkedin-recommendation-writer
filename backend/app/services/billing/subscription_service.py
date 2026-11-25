@@ -2,7 +2,7 @@
 
 import logging
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List, Optional, cast
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +14,8 @@ from app.schemas.billing import (
     Plan,
     PlansResponse,
     SubscriptionResponse,
+    SubscriptionStatus,
+    TierType,
     get_plans,
 )
 
@@ -74,8 +76,9 @@ class SubscriptionService:
         if subscription:
             return SubscriptionResponse(
                 id=subscription.id,
-                tier=subscription.tier,
-                status=subscription.status,
+                # DB stores free-form strings; app logic only writes schema-valid values.
+                tier=cast(TierType, subscription.tier),
+                status=cast(SubscriptionStatus, subscription.status),
                 stripe_subscription_id=subscription.stripe_subscription_id,
                 stripe_customer_id=subscription.stripe_customer_id,
                 current_period_start=subscription.current_period_start,
@@ -87,8 +90,8 @@ class SubscriptionService:
         # Return free tier status
         return SubscriptionResponse(
             id=None,
-            tier=user.subscription_tier or "free",
-            status=user.subscription_status or "active",
+            tier=cast(TierType, user.subscription_tier or "free"),
+            status=cast(SubscriptionStatus, user.subscription_status or "active"),
             stripe_subscription_id=None,
             stripe_customer_id=user.stripe_customer_id,
             current_period_start=None,

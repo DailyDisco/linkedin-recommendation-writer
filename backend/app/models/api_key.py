@@ -2,10 +2,10 @@
 
 import secrets
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, List, Optional
 
 from sqlalchemy import ARRAY, Boolean, Column, DateTime, ForeignKey, Integer, String, Text
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 
@@ -18,30 +18,30 @@ class ApiKey(Base):
 
     __tablename__ = "api_keys"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
 
     # Key data
-    name = Column(String(255), nullable=False)  # User-provided name for the key
-    key_hash = Column(String(255), nullable=False, unique=True, index=True)  # Hashed API key
-    key_prefix = Column(String(10), nullable=False, index=True)  # First 8 chars for identification
+    name: Mapped[str] = mapped_column(String(255), nullable=False)  # User-provided name for the key
+    key_hash: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)  # Hashed API key
+    key_prefix: Mapped[str] = mapped_column(String(10), nullable=False, index=True)  # First 8 chars for identification
 
     # Permissions
-    scopes = Column(ARRAY(Text), default=[])  # e.g., ['recommendations:read', 'recommendations:write']
+    scopes: Mapped[list[str]] = mapped_column(ARRAY(Text), default=[])  # e.g., ['recommendations:read', 'recommendations:write']
 
     # Usage tracking
-    last_used_at = Column(DateTime(timezone=True), nullable=True)
-    usage_count = Column(Integer, default=0)
+    last_used_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    usage_count: Mapped[int] = mapped_column(Integer, default=0)
 
     # Status
-    is_active = Column(Boolean, default=True)
-    expires_at = Column(DateTime(timezone=True), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Timestamps
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     # Relationships
-    user = relationship("User", back_populates="api_keys")
+    user: Mapped["User"] = relationship("User", back_populates="api_keys")
 
     @property
     def is_expired(self) -> bool:

@@ -1,11 +1,16 @@
 """Recommendation model."""
 
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING, Any, Optional
 
 from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String, Text
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+
+if TYPE_CHECKING:
+    from app.models.github_profile import GitHubProfile
+    from app.models.user import User
 
 
 class Recommendation(Base):
@@ -13,43 +18,43 @@ class Recommendation(Base):
 
     __tablename__ = "recommendations"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    github_profile_id = Column(Integer, ForeignKey("github_profiles.id"), nullable=False)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    github_profile_id: Mapped[int] = mapped_column(Integer, ForeignKey("github_profiles.id"), nullable=False)
 
     # Recommendation content
-    title = Column(String, nullable=False)
-    content = Column(Text, nullable=False)
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
 
     # Generation parameters
     # professional, technical, leadership, etc.
-    recommendation_type = Column(String, default="professional", index=True)
+    recommendation_type: Mapped[str] = mapped_column(String, default="professional", index=True)
     # professional, friendly, formal, casual
-    tone = Column(String, default="professional", index=True)
-    length = Column(String, default="medium", index=True)  # short, medium, long
+    tone: Mapped[str] = mapped_column(String, default="professional", index=True)
+    length: Mapped[str] = mapped_column(String, default="medium", index=True)  # short, medium, long
 
     # AI generation metadata
-    ai_model = Column(String, nullable=False)  # gemini-2.5-flash-lite, etc.
-    generation_prompt = Column(Text, nullable=True)
-    generation_parameters = Column(JSON, nullable=True)
+    ai_model: Mapped[str] = mapped_column(String, nullable=False)  # gemini-2.5-flash-lite, etc.
+    generation_prompt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    generation_parameters: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
 
     # Quality metrics
-    word_count = Column(Integer, default=0)
+    word_count: Mapped[int] = mapped_column(Integer, default=0)
 
     # Selected option information (for when created from multiple options)
-    selected_option_id = Column(Integer, nullable=True)
-    selected_option_name = Column(String, nullable=True)
-    selected_option_focus = Column(String, nullable=True)
-    generated_options = Column(JSON, nullable=True)  # Store all generated options for reference
+    selected_option_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    selected_option_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    selected_option_focus: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    generated_options: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)  # Store all generated options for reference
 
     # Metadata
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     # Relationships
-    user = relationship("User", back_populates="recommendations")
-    github_profile = relationship("GitHubProfile", back_populates="recommendations")
-    versions = relationship("RecommendationVersion", back_populates="recommendation", cascade="all, delete-orphan")
+    user: Mapped["User"] = relationship("User", back_populates="recommendations")
+    github_profile: Mapped["GitHubProfile"] = relationship("GitHubProfile", back_populates="recommendations")
+    versions: Mapped[list["RecommendationVersion"]] = relationship("RecommendationVersion", back_populates="recommendation", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<Recommendation(id={self.id}, title={self.title[:50]}...)>"
@@ -60,34 +65,34 @@ class RecommendationVersion(Base):
 
     __tablename__ = "recommendation_versions"
 
-    id = Column(Integer, primary_key=True, index=True)
-    recommendation_id = Column(Integer, ForeignKey("recommendations.id"), nullable=False)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    recommendation_id: Mapped[int] = mapped_column(Integer, ForeignKey("recommendations.id"), nullable=False)
 
     # Version information
-    version_number = Column(Integer, nullable=False, index=True)  # 1, 2, 3, etc.
-    change_type = Column(String, nullable=False, index=True)  # 'created', 'refined', 'keyword_refinement', 'manual_edit'
-    change_description = Column(Text, nullable=True)  # Description of what changed
+    version_number: Mapped[int] = mapped_column(Integer, nullable=False, index=True)  # 1, 2, 3, etc.
+    change_type: Mapped[str] = mapped_column(String, nullable=False, index=True)  # 'created', 'refined', 'keyword_refinement', 'manual_edit'
+    change_description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # Description of what changed
 
     # Keyword refinement specific metadata
-    include_keywords_used = Column(JSON, nullable=True)  # List of keywords successfully included
-    exclude_keywords_avoided = Column(JSON, nullable=True)  # List of keywords successfully avoided
+    include_keywords_used: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)  # List of keywords successfully included
+    exclude_keywords_avoided: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)  # List of keywords successfully avoided
 
     # Content at this version
-    title = Column(String, nullable=False)
-    content = Column(Text, nullable=False)
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
 
     # Generation parameters at this version
-    generation_parameters = Column(JSON, nullable=True)
+    generation_parameters: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
 
     # Quality metrics at this version
-    word_count = Column(Integer, default=0)
+    word_count: Mapped[int] = mapped_column(Integer, default=0)
 
     # Metadata
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
-    created_by = Column(String, nullable=True)  # 'system', 'user', etc.
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    created_by: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # 'system', 'user', etc.
 
     # Relationships
-    recommendation = relationship("Recommendation", back_populates="versions")
+    recommendation: Mapped["Recommendation"] = relationship("Recommendation", back_populates="versions")
 
     def __repr__(self) -> str:
         return f"<RecommendationVersion(id={self.id}, recommendation_id={self.recommendation_id}, version={self.version_number})>"

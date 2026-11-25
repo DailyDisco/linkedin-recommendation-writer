@@ -766,7 +766,7 @@ class GitHubCommitService:
             },
         }
 
-        inferred_skills = {}
+        inferred_skills: Dict[str, Any] = {}
         pattern_names = set(excellence_patterns.keys())
 
         for soft_skill, config in soft_skills_map.items():
@@ -1194,9 +1194,10 @@ class GitHubCommitService:
             user = self.github_client.get_user(username)
 
             # Get contributor's commits
-            contributor_commits = []
+            contributor_commits: List[Dict[str, Any]] = []
             try:
-                commits = repo.get_commits(author=user, since=None)
+                commits = repo.get_commits(author=user)
+                commit: Any
                 for commit in commits[:max_commits]:
                     commit_data = {
                         "sha": commit.sha,
@@ -1252,7 +1253,7 @@ class GitHubCommitService:
 
     def _analyze_contributor_activity(self, commits: List[Dict[str, Any]], prs: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Analyze contributor's commits and PRs to generate insights for recommendations."""
-        insights = {
+        insights: Dict[str, Any] = {
             "technical_focus": [],
             "collaboration_patterns": [],
             "problem_solving_approaches": [],
@@ -1345,7 +1346,7 @@ class GitHubCommitService:
 
     def _analyze_pr_patterns(self, prs: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Analyze pull request patterns for collaboration insights."""
-        patterns = {"collaboration_patterns": [], "code_quality_indicators": [], "impact_areas": []}
+        patterns: Dict[str, Any] = {"collaboration_patterns": [], "code_quality_indicators": [], "impact_areas": []}
 
         # Analyze PR sizes and complexity
         for pr in prs:
@@ -1754,7 +1755,7 @@ class GitHubCommitService:
 
     def _analyze_pr_collaboration_patterns(self, prs: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Extract collaboration insights from PRs."""
-        patterns = {
+        patterns: Dict[str, Any] = {
             "review_participation": 0,
             "discussion_quality": "unknown",
             "responsiveness": "unknown",
@@ -1795,7 +1796,7 @@ class GitHubCommitService:
 
     def _analyze_pr_problem_solving(self, prs: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Extract problem-solving approaches from PRs."""
-        problem_patterns = {
+        problem_patterns: Dict[str, Any] = {
             "architectural_decisions": 0,
             "trade_offs_discussed": 0,
             "problem_types": [],
@@ -1834,7 +1835,7 @@ class GitHubCommitService:
 
     def _analyze_pr_code_quality_focus(self, prs: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Identify code quality indicators from PRs."""
-        quality_indicators = {
+        quality_indicators: Dict[str, Any] = {
             "test_focus": 0,
             "refactoring_focus": 0,
             "documentation_focus": 0,
@@ -1879,7 +1880,7 @@ class GitHubCommitService:
 
     def _calculate_pr_metrics(self, prs: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Calculate various PR metrics."""
-        metrics = {
+        metrics: Dict[str, Any] = {
             "total_prs": len(prs),
             "merged_prs": 0,
             "open_prs": 0,
@@ -2007,9 +2008,9 @@ class GitHubCommitService:
 
             logger.info(f"🔍 ISSUE ANALYSIS: Analyzing issues for {username}")
 
-            issues_opened = []
-            issues_commented = []
-            issues_closed_by_user = []
+            issues_opened: List[Dict[str, Any]] = []
+            issues_commented: List[Dict[str, Any]] = []
+            issues_closed_by_user: List[Dict[str, Any]] = []
 
             semaphore = asyncio.Semaphore(self.MAX_CONCURRENT_REQUESTS)
 
@@ -2075,14 +2076,15 @@ class GitHubCommitService:
             repo_name = repo_data.get("full_name") or f"{username}/{repo_data['name']}"
             repo = self.github_client.get_repo(repo_name)
 
-            issues_opened = []
-            issues_commented = []
-            issues_closed_by_user = []
+            issues_opened: List[Dict[str, Any]] = []
+            issues_commented: List[Dict[str, Any]] = []
+            issues_closed_by_user: List[Dict[str, Any]] = []
 
             # Get all issues (open and closed)
             all_issues = repo.get_issues(state="all", sort="created", direction="desc")
 
             count = 0
+            issue: Any
             for issue in all_issues:
                 if count >= max_per_repo:
                     break
@@ -2152,7 +2154,7 @@ class GitHubCommitService:
         issues_closed: List[Dict[str, Any]],
     ) -> Dict[str, Any]:
         """Analyze patterns in issue activity."""
-        patterns = {
+        patterns: Dict[str, Any] = {
             "issue_types": {},
             "collaboration_indicators": [],
             "technical_depth_signals": [],
@@ -2203,8 +2205,8 @@ class GitHubCommitService:
         if not issues:
             return {"score": 0, "indicators": []}
 
-        indicators = []
-        scores = []
+        indicators: List[str] = []
+        scores: List[float] = []
 
         for issue in issues[:20]:  # Sample first 20
             body = issue.get("body", "") or ""
@@ -2260,7 +2262,7 @@ class GitHubCommitService:
         issues_closed: List[Dict[str, Any]],
     ) -> List[str]:
         """Extract problem-solving signals from issue activity."""
-        signals = []
+        signals: List[str] = []
 
         if not issues_opened and not issues_closed:
             return signals
@@ -2498,7 +2500,7 @@ class GitHubCommitService:
 
     def _extract_mentorship_signals(self, reviews: List[Dict[str, Any]]) -> List[str]:
         """Extract mentorship and teaching signals from reviews."""
-        signals = []
+        signals: List[str] = []
 
         if not reviews:
             return signals
@@ -2535,7 +2537,7 @@ class GitHubCommitService:
 
     def _extract_review_focus_areas(self, reviews: List[Dict[str, Any]]) -> List[str]:
         """Extract technical focus areas from review content."""
-        focus_areas = []
+        focus_areas: List[str] = []
 
         if not reviews:
             return focus_areas

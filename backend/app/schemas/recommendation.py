@@ -27,14 +27,14 @@ class RecommendationRequest(BaseModel):
         description="Length of the recommendation",
         pattern="^(short|medium|long)$",
     )
-    custom_prompt: Optional[str] = Field(None, description="Custom prompt additions for personalization", max_length=1000)
-    shared_work_context: Optional[str] = Field(None, description="What the recommender worked on with this person (specific projects, features, etc.)", max_length=500)
-    include_specific_skills: Optional[List[str]] = Field(None, description="Specific skills to highlight", max_items=20)
-    target_role: Optional[str] = Field(None, description="Target role or industry for the recommendation", max_length=200)
-    include_keywords: Optional[List[str]] = Field(None, description="Keywords/phrases that must be included", max_items=10)
-    exclude_keywords: Optional[List[str]] = Field(None, description="Keywords/phrases that must NOT be included", max_items=10)
-    analysis_context_type: Optional[str] = Field("profile", description="Type of analysis performed: 'profile' or 'repo_only'")
-    repository_url: Optional[str] = Field(None, description="Repository URL if repo-specific analysis", max_length=500)
+    custom_prompt: Optional[str] = Field(default=None, description="Custom prompt additions for personalization", max_length=1000)
+    shared_work_context: Optional[str] = Field(default=None, description="What the recommender worked on with this person (specific projects, features, etc.)", max_length=500)
+    include_specific_skills: Optional[List[str]] = Field(default=None, description="Specific skills to highlight", max_length=20)
+    target_role: Optional[str] = Field(default=None, description="Target role or industry for the recommendation", max_length=200)
+    include_keywords: Optional[List[str]] = Field(default=None, description="Keywords/phrases that must be included", max_length=10)
+    exclude_keywords: Optional[List[str]] = Field(default=None, description="Keywords/phrases that must NOT be included", max_length=10)
+    analysis_context_type: Optional[str] = Field(default="profile", description="Type of analysis performed: 'profile' or 'repo_only'")
+    repository_url: Optional[str] = Field(default=None, description="Repository URL if repo-specific analysis", max_length=500)
 
     @field_validator("github_username")
     @classmethod
@@ -92,9 +92,9 @@ class KeywordRefinementRequest(BaseModel):
     """Schema for keyword refinement requests."""
 
     recommendation_id: int = Field(..., description="ID of the existing recommendation to refine")
-    include_keywords: Optional[List[str]] = Field(None, description="Keywords/phrases that must be included")
-    exclude_keywords: Optional[List[str]] = Field(None, description="Keywords/phrases that must NOT be included")
-    refinement_instructions: Optional[str] = Field(None, description="Additional instructions for the refinement")
+    include_keywords: Optional[List[str]] = Field(default=None, description="Keywords/phrases that must be included")
+    exclude_keywords: Optional[List[str]] = Field(default=None, description="Keywords/phrases that must NOT be included")
+    refinement_instructions: Optional[str] = Field(default=None, description="Additional instructions for the refinement")
 
 
 class KeywordRefinementResponse(BaseModel):
@@ -137,11 +137,11 @@ class RecommendationFromOptionRequest(BaseModel):
     github_username: str = Field(..., description="GitHub username")
     selected_option: RecommendationOption = Field(..., description="The selected recommendation option")
     all_options: List[RecommendationOption] = Field(..., description="All generated options for reference")
-    analysis_context_type: Optional[str] = Field("profile", description="Type of analysis performed")
-    repository_url: Optional[str] = Field(None, description="Repository URL if repo-specific analysis")
-    recommendation_type: Optional[str] = Field(None, description="Type of recommendation")
-    tone: Optional[str] = Field(None, description="Tone of the recommendation")
-    length: Optional[str] = Field(None, description="Length of the recommendation")
+    analysis_context_type: Optional[str] = Field(default="profile", description="Type of analysis performed")
+    repository_url: Optional[str] = Field(default=None, description="Repository URL if repo-specific analysis")
+    recommendation_type: Optional[str] = Field(default=None, description="Type of recommendation")
+    tone: Optional[str] = Field(default=None, description="Tone of the recommendation")
+    length: Optional[str] = Field(default=None, description="Length of the recommendation")
 
 
 class RecommendationResponse(BaseModel):
@@ -235,7 +235,7 @@ class RevertToVersionRequest(BaseModel):
     """Schema for reverting to a specific version."""
 
     version_id: int = Field(..., description="ID of the version to revert to")
-    revert_reason: Optional[str] = Field(None, description="Reason for reverting to this version")
+    revert_reason: Optional[str] = Field(default=None, description="Reason for reverting to this version")
 
 
 class RecommendationOptionsResponse(BaseModel):
@@ -255,13 +255,13 @@ class DynamicRefinementRequest(BaseModel):
     recommendation_type: Optional[str] = Field("professional", description="Type of recommendation")
     tone: Optional[str] = Field("professional", description="Tone of the recommendation")
     length: Optional[str] = Field("medium", description="Length of the recommendation")
-    shared_work_context: Optional[str] = Field(None, description="What the recommender worked on with this person", max_length=500)
-    analysis_context_type: Optional[str] = Field("profile", description="Type of analysis performed")
-    repository_url: Optional[str] = Field(None, description="Repository URL if repo-specific analysis")
-    dynamic_tone: Optional[str] = Field(None, description="Dynamic tone override")
-    dynamic_length: Optional[str] = Field(None, description="Dynamic length override")
-    include_keywords: Optional[List[str]] = Field(None, description="Keywords to include")
-    exclude_keywords: Optional[List[str]] = Field(None, description="Keywords to exclude")
+    shared_work_context: Optional[str] = Field(default=None, description="What the recommender worked on with this person", max_length=500)
+    analysis_context_type: Optional[str] = Field(default="profile", description="Type of analysis performed")
+    repository_url: Optional[str] = Field(default=None, description="Repository URL if repo-specific analysis")
+    dynamic_tone: Optional[str] = Field(default=None, description="Dynamic tone override")
+    dynamic_length: Optional[str] = Field(default=None, description="Dynamic length override")
+    include_keywords: Optional[List[str]] = Field(default=None, description="Keywords to include")
+    exclude_keywords: Optional[List[str]] = Field(default=None, description="Keywords to exclude")
     force_refresh: Optional[bool] = Field(False, description="Bypass cache and force fresh generation")
 
 
@@ -271,8 +271,8 @@ class StreamProgressResponse(BaseModel):
     stage: str = Field(..., description="Current processing stage")
     progress: int = Field(..., ge=0, le=100, description="Progress percentage")
     status: str = Field(..., description="Current status: preparing, analyzing, processing, generating, finalizing, complete, error")
-    result: Optional[Dict[str, Any]] = Field(None, description="Final result when complete")
-    error: Optional[str] = Field(None, description="Error message if status is error")
+    result: Optional[Dict[str, Any]] = Field(default=None, description="Final result when complete")
+    error: Optional[str] = Field(default=None, description="Error message if status is error")
 
 
 class RecommendationListResponse(BaseModel):

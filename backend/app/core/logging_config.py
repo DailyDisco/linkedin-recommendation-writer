@@ -16,7 +16,7 @@ def setup_logging() -> None:
     log_dir.mkdir(exist_ok=True, parents=True)
 
     # Configure root logger
-    handlers = [logging.StreamHandler(sys.stdout)]
+    handlers: list[logging.Handler] = [logging.StreamHandler(sys.stdout)]
 
     # Add file handler for detailed logs
     if not is_production:

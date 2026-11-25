@@ -1,15 +1,17 @@
 """User model."""
 
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 
 if TYPE_CHECKING:
     from app.models.api_key import ApiKey
+    from app.models.github_profile import GitHubProfile
+    from app.models.recommendation import Recommendation
     from app.models.subscription import Subscription
     from app.models.usage_record import UsageRecord
 
@@ -40,41 +42,41 @@ class User(Base):
 
     __tablename__ = "users"
 
-    id = Column(Integer, primary_key=True, index=True)
-    email = Column(String, unique=True, index=True, nullable=True)
-    username = Column(String, unique=True, index=True, nullable=True)
-    full_name = Column(String, nullable=True)
-    hashed_password = Column(String, nullable=False)
-    is_active = Column(Boolean, default=True, index=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    email: Mapped[Optional[str]] = mapped_column(String, unique=True, index=True, nullable=True)
+    username: Mapped[Optional[str]] = mapped_column(String, unique=True, index=True, nullable=True)
+    full_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    hashed_password: Mapped[str] = mapped_column(String, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     # Recommendation limits
-    recommendation_count = Column(Integer, default=0)  # Number of recommendations created today
-    last_recommendation_date = Column(DateTime, nullable=True)  # Last date a recommendation was created
-    daily_limit = Column(Integer, default=5)  # Daily recommendation limit (5 for registered users)
-    role = Column(String, default="free", index=True)  # User role: admin, premium, or free
-    bio = Column(Text, nullable=True)  # Add bio field
-    email_notifications_enabled = Column(Boolean, default=True)  # New field for email notifications
-    default_tone = Column(String, default="professional")  # New field for default recommendation tone
-    language = Column(String, default="en")  # New field for user language preference (e.g., "en", "es")
+    recommendation_count: Mapped[int] = mapped_column(Integer, default=0)  # Number of recommendations created today
+    last_recommendation_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)  # Last date a recommendation was created
+    daily_limit: Mapped[int] = mapped_column(Integer, default=5)  # Daily recommendation limit (5 for registered users)
+    role: Mapped[str] = mapped_column(String, default="free", index=True)  # User role: admin, premium, or free
+    bio: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # Add bio field
+    email_notifications_enabled: Mapped[bool] = mapped_column(Boolean, default=True)  # New field for email notifications
+    default_tone: Mapped[str] = mapped_column(String, default="professional")  # New field for default recommendation tone
+    language: Mapped[str] = mapped_column(String, default="en")  # New field for user language preference (e.g., "en", "es")
 
     # Credits system (pay-as-you-go)
-    credits = Column(Integer, default=DEFAULT_FREE_CREDITS, nullable=False)  # Current credit balance
-    lifetime_credits_purchased = Column(Integer, default=0, nullable=False)  # Track total purchases
-    last_credit_pack = Column(String(50), nullable=True)  # Last pack purchased: starter, pro
+    credits: Mapped[int] = mapped_column(Integer, default=DEFAULT_FREE_CREDITS, nullable=False)  # Current credit balance
+    lifetime_credits_purchased: Mapped[int] = mapped_column(Integer, default=0, nullable=False)  # Track total purchases
+    last_credit_pack: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # Last pack purchased: starter, pro
 
     # Stripe / Subscription fields
-    stripe_customer_id = Column(String(255), unique=True, nullable=True, index=True)
-    subscription_tier = Column(String(50), default="free", nullable=False, index=True)  # free, unlimited
-    subscription_status = Column(String(50), default="active", nullable=False)  # active, past_due, cancelled, trialing
+    stripe_customer_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, nullable=True, index=True)
+    subscription_tier: Mapped[str] = mapped_column(String(50), default="free", nullable=False, index=True)  # free, unlimited
+    subscription_status: Mapped[str] = mapped_column(String(50), default="active", nullable=False)  # active, past_due, cancelled, trialing
 
     # Relationships
-    github_profiles = relationship("GitHubProfile", back_populates="user")
-    recommendations = relationship("Recommendation", back_populates="user")
-    subscription = relationship("Subscription", back_populates="user", uselist=False)
-    usage_records = relationship("UsageRecord", back_populates="user")
-    api_keys = relationship("ApiKey", back_populates="user")
+    github_profiles: Mapped[list["GitHubProfile"]] = relationship("GitHubProfile", back_populates="user")
+    recommendations: Mapped[list["Recommendation"]] = relationship("Recommendation", back_populates="user")
+    subscription: Mapped["Subscription"] = relationship("Subscription", back_populates="user", uselist=False)
+    usage_records: Mapped[list["UsageRecord"]] = relationship("UsageRecord", back_populates="user")
+    api_keys: Mapped[list["ApiKey"]] = relationship("ApiKey", back_populates="user")
 
     @property
     def effective_tier(self) -> str:
@@ -103,6 +105,13 @@ class User(Base):
     def has_unlimited_generations(self) -> bool:
         """Check if user has unlimited generations (subscription)."""
         return self.subscription_tier == "unlimited" and self.subscription_status == "active"
+
+    @property
+    def effective_daily_limit(self) -> int:
+        """Daily generation limit: unlimited subscriptions report -1."""
+        if self.has_unlimited_generations or self.role == "admin":
+            return -1
+        return self.daily_limit or 0
 
     @property
     def has_credits(self) -> bool:

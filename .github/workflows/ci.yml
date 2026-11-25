@@ -153,7 +153,7 @@ jobs:
         working-directory: ${{ env.BACKEND_DIR }}
 
       - name: Run safety (vulnerability scanning)
-        run: safety check
+        run: safety check -r requirements.txt
         working-directory: ${{ env.BACKEND_DIR }}
 
       - name: Run bandit (security linting)
@@ -278,6 +278,8 @@ jobs:
         run: |
           echo "🔍 Validating Python app can start..."
           python -c "import app.main; print('✅ App imports successfully')"
+        env:
+          SECRET_KEY: ci-import-check-secret-key-not-for-production
         working-directory: ${{ env.BACKEND_DIR }}
 
       - name: Create Python package (optional)

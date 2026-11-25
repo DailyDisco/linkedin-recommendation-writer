@@ -43,3 +43,9 @@ markers = [
     "integration: marks tests as integration tests",
     "unit: marks tests as unit tests",
 ]
+
+[tool.mypy]
+# Infer Python types from SQLAlchemy Column declarations so models typed with
+# Column(...) check without scattering annotations across the codebase.
+plugins = ["sqlalchemy.ext.mypy.plugin"]
+ignore_missing_imports = true

@@ -3,8 +3,9 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import HTTPException, status
-from jose import jwt
-from jose.exceptions import JWTError
+from jwt import ExpiredSignatureError, PyJWTError
+from jwt import decode as jwt_decode
+from jwt import encode as jwt_encode
 from pydantic import ValidationError
 
 from app.core.config import settings
@@ -31,7 +32,7 @@ class TokenHelper:
 
         # Debugging: Log SECRET_KEY type before encoding
         logger.debug(f"SECRET_KEY used for encoding type: {type(self.secret_key_bytes)}, length: {len(self.secret_key_bytes)}")
-        encoded_jwt: str = jwt.encode(to_encode, self.secret_key_bytes, algorithm=settings.JWT_ALGORITHM)  # Use pre-encoded secret key
+        encoded_jwt: str = jwt_encode(to_encode, self.secret_key_bytes, algorithm=settings.JWT_ALGORITHM)  # Use pre-encoded secret key
         logger.debug(f"Encoded JWT (from create_access_token): {encoded_jwt[:50]}...")
         return encoded_jwt
 
@@ -49,7 +50,7 @@ class TokenHelper:
             logger.debug(f"Token type (before decode): {type(token)}, length: {len(token)}")
             logger.debug(f"SECRET_KEY used for decoding type: {type(self.secret_key_bytes)}, length: {len(self.secret_key_bytes)}")
 
-            payload = jwt.decode(token, self.secret_key_bytes, algorithms=[settings.JWT_ALGORITHM])  # Use pre-encoded secret key
+            payload = jwt_decode(token, self.secret_key_bytes, algorithms=[settings.JWT_ALGORITHM])  # Use pre-encoded secret key
             logger.debug(f"Decoded payload: {payload}")
 
             username: Optional[str] = payload.get("sub")
@@ -61,10 +62,10 @@ class TokenHelper:
                 logger.warning("Token verification failed: 'sub' claim missing from payload")
                 return None
             return TokenData(username=username, id=user_id)
-        except jwt.ExpiredSignatureError:
+        except ExpiredSignatureError:
             logger.warning("Token verification failed: Token has expired")
             return None
-        except (JWTError, ValidationError) as e:
+        except (PyJWTError, ValidationError) as e:
             logger.error(f"JWTError or ValidationError during token verification: {str(e)}")
             logger.debug(f"Token being verified: {token[:50]}..." if len(token) > 50 else f"Token: {token}")
             logger.debug(f"SECRET_KEY type (in exception): {type(self.secret_key_bytes)}, length: {len(self.secret_key_bytes)}")

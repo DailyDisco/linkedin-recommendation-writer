@@ -1,8 +1,8 @@
 # FastAPI and server
-fastapi==0.116.1  # Web framework for building APIs
-starlette>=0.47.2  # ASGI framework, used by FastAPI, with security fix for CVE-2025-54121
+fastapi==0.165.0  # Web framework for building APIs
+starlette==1.10.0  # ASGI framework, used by FastAPI
 uvicorn[standard]==0.35.0  # ASGI server for running FastAPI applications
-python-jose[cryptography]>=3.3.0  # JWT (JSON Web Token) implementation for Python
+PyJWT>=2.10.1  # JWT (JSON Web Token) implementation for Python (HS256 only; replaces python-jose, whose ecdsa dependency is unpatched)
 
 # Security enhancements
 cryptography>=44.0.1  # Updated for security fixes
@@ -20,7 +20,7 @@ redis==6.4.0  # Python client for Redis key-value store
 
 # HTTP requests
 httpx==0.28.1  # Synchronous and asynchronous HTTP client library for API requests
-anyio==4.10.0  # Cross-platform async I/O library providing unified async/await interface for asyncio and trio
+anyio==4.14.2  # Cross-platform async I/O library providing unified async/await interface for asyncio and trio
 
 # AI/ML
 
@@ -34,17 +34,17 @@ pydantic-settings==2.10.1  # Pydantic extension for settings management
 # Authentication and security
 bcrypt==4.3.0  # Hashing library for passwords
 email-validator==2.3.0  # Email address validation library
-python-multipart==0.0.20  # Required for FastAPI form data handling (OAuth2 password flow)
+python-multipart==0.0.31  # Required for FastAPI form data handling (OAuth2 password flow)
 
 
 
 # Testing (development)
-pytest==8.4.1  # Framework for writing tests
-pytest-asyncio==1.1.0  # Pytest plugin for testing asyncio code
+pytest==9.0.3  # Framework for writing tests
+pytest-asyncio==1.3.0  # Pytest plugin for testing asyncio code
 pytest-cov==7.1.0  # Coverage plugin; the CI test command passes --cov
 
 # Code formatting (development)
-black==25.1.0  # Uncompromising Python code formatter
+black==26.10.1  # Uncompromising Python code formatter
 isort==6.0.1  # Sorts Python imports alphabetically and separates into sections
 flake8==7.3.0  # Wrapper around PyFlakes, pycodestyle, and McCabe
 mypy==1.17.1  # Optional static type checker for Python

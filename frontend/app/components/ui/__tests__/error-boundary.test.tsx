@@ -52,11 +52,12 @@ vi.mock('../card', () => ({
       { className, 'data-testid': 'card-content' },
       children
     ),
-  CardDescription: ({ className }: MockProps) =>
-    React.createElement('div', {
-      className,
-      'data-testid': 'card-description',
-    }),
+  CardDescription: ({ children, className }: MockProps) =>
+    React.createElement(
+      'div',
+      { className, 'data-testid': 'card-description' },
+      children
+    ),
   CardHeader: ({ children, className }: MockProps) =>
     React.createElement(
       'div',
@@ -89,6 +90,15 @@ Object.defineProperty(navigator, 'clipboard', {
   },
   writable: true,
 });
+
+// happy-dom does not always expose window.alert; provide one so vi.spyOn works.
+if (typeof window.alert !== 'function') {
+  Object.defineProperty(window, 'alert', {
+    value: () => {},
+    writable: true,
+    configurable: true,
+  });
+}
 
 // Test component that throws an error
 const ErrorComponent = ({ shouldThrow = true }: { shouldThrow?: boolean }) => {
@@ -148,7 +158,13 @@ describe('ErrorBoundary', () => {
     expect(
       screen.getByText('Something Unexpected Happened')
     ).toBeInTheDocument();
-    expect(screen.getByText(/Test error message/)).toBeInTheDocument();
+    // The fallback deliberately shows the friendly message; the raw error text
+    // is only rendered in development ("Technical Details").
+    expect(
+      screen.getByText(
+        'We encountered an unexpected error. Our team has been notified.'
+      )
+    ).toBeInTheDocument();
 
     consoleSpy.mockRestore();
     consoleGroupSpy.mockRestore();
@@ -259,11 +275,10 @@ describe('ErrorBoundary', () => {
       screen.getByText('Something Unexpected Happened')
     ).toBeInTheDocument();
 
-    // Click Try Again
-    const tryAgainButton = screen.getByRole('button', { name: /Try Again/i });
-    fireEvent.click(tryAgainButton);
-
-    // Rerender with shouldThrow: false
+    // Fix the child first: while the boundary is in its error state the child
+    // is not rendered, so rerendering is safe. Clicking Try Again while the
+    // child still throws would immediately re-trigger the boundary, so the
+    // recovery click has to come after the rerender.
     rerender(
       React.createElement(
         ErrorBoundary,
@@ -271,6 +286,10 @@ describe('ErrorBoundary', () => {
         React.createElement(ErrorComponent, { shouldThrow: false })
       )
     );
+
+    // Click Try Again
+    const tryAgainButton = screen.getByRole('button', { name: /Try Again/i });
+    fireEvent.click(tryAgainButton);
 
     // Should now show normal content
     expect(screen.getByText('No error')).toBeInTheDocument();
@@ -354,8 +373,12 @@ describe('ErrorBoundary', () => {
     fireEvent.click(reportButton);
 
     expect(navigator.clipboard.writeText).toHaveBeenCalled();
-    expect(alertSpy).toHaveBeenCalledWith(
-      'Error details copied to clipboard. Please include this in your bug report.'
+    // The success alert fires from the clipboard promise's then(), so wait for
+    // the microtask to settle before asserting on it.
+    await vi.waitFor(() =>
+      expect(alertSpy).toHaveBeenCalledWith(
+        'Error details copied to clipboard. Please include this in your bug report.'
+      )
     );
 
     consoleSpy.mockRestore();

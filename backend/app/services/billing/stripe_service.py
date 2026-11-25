@@ -39,11 +39,11 @@ class StripeService:
         """
         try:
             customer = stripe.Customer.create(
-                email=user.email,
-                name=user.full_name or user.username,
+                email=user.email or "",
+                name=user.full_name or user.username or "Unknown",
                 metadata={
                     "user_id": str(user.id),
-                    "username": user.username,
+                    "username": user.username or "",
                 },
             )
             logger.info(f"Created Stripe customer {customer.id} for user {user.id}")
@@ -102,7 +102,7 @@ class StripeService:
             trial_days = settings.STRIPE_TRIAL_DAYS if not await self._has_had_trial(user, db) else 0
 
         try:
-            session_params = {
+            session_params: dict[str, Any] = {
                 "customer": customer_id,
                 "mode": "subscription",
                 "line_items": [{"price": price_id, "quantity": 1}],

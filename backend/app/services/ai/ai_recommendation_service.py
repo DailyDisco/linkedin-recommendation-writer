@@ -41,7 +41,7 @@ class AIRecommendationService:
                 top_k=40,
             )
         self.rate_limit_requests_per_minute = 15
-        self.request_timestamps = []
+        self.request_timestamps: list = []
 
     async def generate_recommendation_stream(
         self,
@@ -1043,7 +1043,10 @@ class AIRecommendationService:
             raise e
 
         # Get the raw content
-        raw_content = response.candidates[0].content.parts[0].text
+        candidates = response.candidates or []
+        if not candidates or not candidates[0].content or not candidates[0].content.parts:
+            raise ValueError("AI response contained no usable text")
+        raw_content = candidates[0].content.parts[0].text or ""
 
         # Debug: Log raw AI output to see what we're working with
         logger.info(f"🔍 RAW AI OUTPUT (length: {len(raw_content)} chars):")
@@ -1185,7 +1188,7 @@ class AIRecommendationService:
         # Dynamic adjustment of paragraphs
         # If we have too few, try to split longer ones
         while len(paragraphs) < target_paragraphs and any(len(p.split()) > 70 for p in paragraphs):
-            new_paragraphs = []
+            new_paragraphs: list = []
             made_split = False
             for para in paragraphs:
                 if len(para.split()) > 70 and len(new_paragraphs) < target_paragraphs - 1:  # Prevent endless splitting
@@ -1206,7 +1209,7 @@ class AIRecommendationService:
 
         # If we have too many, try to merge shorter ones
         while len(paragraphs) > target_paragraphs and any(len(p.split()) < 40 for p in paragraphs):
-            merged_paragraphs = []
+            merged_paragraphs: list = []
             made_merge = False
             i = 0
             while i < len(paragraphs):
@@ -1264,7 +1267,7 @@ class AIRecommendationService:
 
     def _validate_semantic_alignment(self, content: str, github_data: Dict[str, Any], generation_params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Validate that the generated content semantically aligns with the input GitHub data."""
-        validation_results = {"is_aligned": True, "alignment_score": 100, "issues": [], "suggestions": [], "data_coverage": {}}
+        validation_results: Dict[str, Any] = {"is_aligned": True, "alignment_score": 100, "issues": [], "suggestions": [], "data_coverage": {}}
 
         content_lower = content.lower()
 
@@ -1283,7 +1286,7 @@ class AIRecommendationService:
             validation_results["alignment_score"] -= 20
 
         # Check for technical skills coverage
-        mentioned_skills = []
+        mentioned_skills: list = []
         for skill in technical_skills[:5]:  # Check top 5 skills
             if skill in content_lower:
                 mentioned_skills.append(skill)
@@ -1296,7 +1299,7 @@ class AIRecommendationService:
             validation_results["alignment_score"] -= 15
 
         # Check for programming languages
-        mentioned_languages = []
+        mentioned_languages: list = []
         for lang in languages_lower[:3]:  # Check top 3 languages
             if lang in content_lower:
                 mentioned_languages.append(lang)
@@ -2046,6 +2049,7 @@ class AIRecommendationService:
         repository_url: Optional[str] = None,
         force_refresh: bool = False,
         display_name: Optional[str] = None,
+        shared_work_context: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Regenerate a recommendation with refinement instructions."""
 
@@ -2070,6 +2074,7 @@ class AIRecommendationService:
                 length=length,
                 exclude_keywords=exclude_keywords,
                 display_name=display_name,
+                shared_work_context=shared_work_context,
             )
 
             # Create regeneration parameters
@@ -2138,7 +2143,10 @@ class AIRecommendationService:
             raise e
 
         # Get the raw content
-        raw_content = response.candidates[0].content.parts[0].text
+        candidates = response.candidates or []
+        if not candidates or not candidates[0].content or not candidates[0].content.parts:
+            raise ValueError("AI response contained no usable text")
+        raw_content = candidates[0].content.parts[0].text or ""
 
         # Debug: Log raw AI output to see what we're working with
         logger.info(f"🔄 RAW REGENERATION AI OUTPUT (length: {len(raw_content)} chars):")
