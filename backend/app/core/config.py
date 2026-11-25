@@ -114,6 +114,7 @@ class Settings(BaseSettings):
     STRIPE_PRICE_ID_PRO: str = Field(default="", description="[Deprecated] Use STRIPE_PRICE_ID_PRO_PACK")
     STRIPE_PRICE_ID_TEAM: str = Field(default="", description="[Deprecated] Use STRIPE_PRICE_ID_UNLIMITED")
     STRIPE_TRIAL_DAYS: int = Field(default=7, ge=0, le=30, description="Trial period in days")
+    TRIALS_ENABLED: bool = Field(default=False, description="Allow first-time subscribers a free trial period")
 
     # Billing Feature Flags
     BILLING_ENABLED: bool = Field(default=True, description="Enable billing features")
@@ -125,12 +126,16 @@ class Settings(BaseSettings):
             return []
         return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",")]
 
-    @computed_field
-    def admin_emails(self) -> List[str]:
-        """Get admin emails as a list."""
+    def get_admin_email_list(self) -> List[str]:
+        """Admin emails as a normalized list."""
         if not self.ADMIN_EMAILS.strip():
             return []
         return [email.strip().lower() for email in self.ADMIN_EMAILS.split(",")]
+
+    @computed_field
+    def admin_emails(self) -> List[str]:
+        """Get admin emails as a list."""
+        return self.get_admin_email_list()
 
     @computed_field
     def is_development(self) -> bool:
@@ -158,8 +163,7 @@ class Settings(BaseSettings):
         }
         return tier_models.get(self.AI_QUALITY_TIER, self.GEMINI_MODEL)
 
-    @computed_field
-    def recommended_temperature(self) -> float:
+    def _recommended_temperature(self) -> float:
         """Get recommended temperature based on quality tier.
 
         Higher quality tiers use slightly lower temperature for more consistency.
@@ -171,6 +175,11 @@ class Settings(BaseSettings):
         }
         return tier_temps.get(self.AI_QUALITY_TIER, self.GEMINI_TEMPERATURE)
 
+    @computed_field
+    def recommended_temperature(self) -> float:
+        """Recommended temperature, serialized into model dumps."""
+        return self._recommended_temperature()
+
     def get_dynamic_temperature(self, recommendation_type: str, tone: str) -> float:
         """Get dynamic temperature based on recommendation type and tone.
 
@@ -181,7 +190,7 @@ class Settings(BaseSettings):
         Returns:
             Adjusted temperature value
         """
-        base_temp = self.recommended_temperature
+        base_temp = self._recommended_temperature()
 
         # Tone adjustments
         tone_adjustments = {
@@ -256,7 +265,8 @@ class Settings(BaseSettings):
 @lru_cache()
 def get_settings() -> Settings:
     """Get cached settings instance."""
-    return Settings()
+    # SECRET_KEY is required from the environment; Settings() raises if it is missing.
+    return Settings()  # type: ignore[call-arg]
 
 
 # Global settings instance

@@ -4,7 +4,7 @@ from datetime import date, datetime, timezone
 from typing import TYPE_CHECKING
 
 from sqlalchemy import Column, Date, DateTime, ForeignKey, Integer, String, UniqueConstraint
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 
@@ -17,24 +17,22 @@ class UsageRecord(Base):
 
     __tablename__ = "usage_records"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
 
     # Usage data
-    date = Column(Date, nullable=False)
-    generation_count = Column(Integer, default=0)
+    date: Mapped[date] = mapped_column(Date, nullable=False)
+    generation_count: Mapped[int] = mapped_column(Integer, default=0)
 
     # Metadata
-    tier = Column(String(50), nullable=False)  # Tier at time of usage
+    tier: Mapped[str] = mapped_column(String(50), nullable=False)  # Tier at time of usage
 
     # Timestamps
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     # Relationships
-    user = relationship("User", back_populates="usage_records")
-
-    # Unique constraint on user_id + date
+    user: Mapped["User"] = relationship("User", back_populates="usage_records")
     __table_args__ = (UniqueConstraint("user_id", "date", name="uq_usage_records_user_date"),)
 
     def __repr__(self) -> str:

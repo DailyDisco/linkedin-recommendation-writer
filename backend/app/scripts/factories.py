@@ -74,7 +74,7 @@ def create_user_data(
 
 def create_subscription_data(
     user_id: int,
-    stripe_customer_id: str,
+    stripe_customer_id: str | None,
     tier: str = "free",
     status: str = "active",
     stripe_subscription_id: str | None = None,
@@ -329,7 +329,7 @@ If you're looking for someone who can both ship great code and build great teams
 
 
 # Pre-defined seed data for common scenarios
-SEED_USERS = [
+SEED_USERS: list[dict[str, Any]] = [
     {
         "email": "admin@example.com",
         "username": "admin",
@@ -384,7 +384,7 @@ SEED_USERS = [
     },
 ]
 
-SEED_GITHUB_PROFILES = [
+SEED_GITHUB_PROFILES: list[dict[str, Any]] = [
     {"github_username": "octocat", "full_name": "The Octocat"},
     {"github_username": "torvalds", "full_name": "Linus Torvalds"},
     {"github_username": "gaearon", "full_name": "Dan Abramov"},

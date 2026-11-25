@@ -3,7 +3,7 @@
 import logging
 import re
 from datetime import date
-from typing import Any, AsyncGenerator, TypeVar, Union, cast
+from typing import Any, AsyncGenerator, Optional, TypeVar, Union, cast
 
 from fastapi import Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -44,6 +44,13 @@ async def get_database_session() -> AsyncGenerator[AsyncSession, None]:
 
         if isinstance(e, HTTPException):
             logger.warning(f"HTTP exception in database session: {e.status_code}: {e.detail}")
+            raise e
+
+        # Request validation failures surface through this generator too; keep
+        # them as 422 instead of masking them as database errors.
+        from fastapi.exceptions import RequestValidationError
+
+        if isinstance(e, RequestValidationError):
             raise e
 
         logger.error(f"Database session error: {type(e).__name__}: {e}")
@@ -215,8 +222,8 @@ class AnonymousUser:
         self.username = f"anonymous_{ip_address}"
         self.role = "anonymous"
         self.daily_limit = 3  # Anonymous users get 3 generations per day
-        self.recommendation_count = 0
-        self.last_recommendation_date = None
+        self.recommendation_count: int = 0
+        self.last_recommendation_date: Optional[date] = None
         self.is_active = True
 
     def __repr__(self) -> str:
@@ -237,13 +244,15 @@ async def get_anonymous_user_data(request: Request) -> AnonymousUser:
     user = AnonymousUser(client_ip)
 
     # Try to get data from Redis
-    redis = await get_redis()
+    # redis-py unions pipeline/sync overloads in its stubs; this client is redis.asyncio.
+    redis: Any = await get_redis()
     if redis:
         try:
             today = date.today().isoformat()
             redis_key = f"anonymous:{client_ip}:recommendations"
 
             # Get current count and date
+            # redis-py overloads include the non-awaitable pipeline variant; this client is async.
             stored_data = await redis.hgetall(redis_key)
 
             if stored_data:
@@ -302,7 +311,8 @@ async def increment_anonymous_user_count(request: Request) -> None:
     if client_ip in ["127.0.0.1", "localhost", "::1"]:
         client_ip = "localhost"
 
-    redis = await get_redis()
+    # redis-py unions pipeline/sync overloads in its stubs; this client is redis.asyncio.
+    redis: Any = await get_redis()
     if redis:
         try:
             today = date.today().isoformat()

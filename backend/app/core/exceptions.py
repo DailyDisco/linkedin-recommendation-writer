@@ -47,14 +47,14 @@ class BaseApplicationError(Exception):
 
     def to_dict(self, include_details: bool = False) -> Dict[str, Any]:
         """Convert error to dictionary format for API responses."""
-        result = {
+        result: Dict[str, Any] = {
             "error": self.error_code,
             "message": self.get_user_friendly_message(),
         }
 
         if include_details and self.details:
             # Sanitize details before including
-            safe_details = {}
+            safe_details: dict = {}
             for key, value in self.details.items():
                 if isinstance(value, str):
                     safe_details[key] = filter_pii_for_logging(value)

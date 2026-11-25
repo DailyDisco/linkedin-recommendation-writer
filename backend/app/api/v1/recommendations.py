@@ -118,7 +118,7 @@ async def generate_recommendation(
             specific_skills=request.include_specific_skills,
             include_keywords=request.include_keywords,
             exclude_keywords=request.exclude_keywords,
-            analysis_context_type=request.analysis_context_type,
+            analysis_context_type=request.analysis_context_type or "profile",
             repository_url=request.repository_url,
         )
 
@@ -190,7 +190,7 @@ async def generate_recommendation_options(
         )
 
         # Extract the options response from the result
-        options_response = result.get("options_response")
+        options_response: RecommendationOptionsResponse = result["options_response"]
 
         # Only increment after successful generation
         await increment_recommendation_count(db, current_user, req)
@@ -517,7 +517,7 @@ async def generate_recommendation_options_stream(
     analysis_context_type: str = Query("profile", pattern="^(profile|repo_only)$"),
     repository_url: Optional[str] = Query(None, max_length=500),
     force_refresh: bool = Query(False),  # New parameter
-    req: Request = None,
+    req: Request = None,  # type: ignore[assignment]  # FastAPI injects the Request; the default is never used
     db: AsyncSession = Depends(get_database_session),
     recommendation_service: RecommendationService = Depends(get_recommendation_service),
     current_user: Union[User, AnonymousUser] = Depends(get_current_user_optional),
@@ -536,7 +536,6 @@ async def generate_recommendation_options_stream(
         exclude_keywords=exclude_keywords.split(",") if exclude_keywords else None,
         analysis_context_type=analysis_context_type,
         repository_url=repository_url,
-        force_refresh=force_refresh,  # Pass force_refresh
     )
 
     # Check limit but don't increment yet

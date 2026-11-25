@@ -482,11 +482,9 @@ class RecommendationService:
             )
 
             # Step 4: Save recommendation
-            github_profile_id = github_profile.id if github_profile else None
-
             recommendation_data = self.recommendation_engine_service.create_recommendation_data(
                 ai_result=ai_result,
-                github_profile_id=github_profile_id,
+                github_profile_id=github_profile.id,
                 recommendation_type=recommendation_type,
                 tone=tone,
                 length=length,
@@ -630,100 +628,6 @@ class RecommendationService:
             logger.error(
                 "Keyword refinement failed for recommendation %s: %s",
                 recommendation_id,
-                str(e),
-            )
-            raise
-
-    async def generate_repository_readme(
-        self,
-        repository_full_name: str,
-        style: str = "comprehensive",
-        include_sections: Optional[List[str]] = None,
-        target_audience: str = "developers",
-    ) -> Dict[str, Any]:
-        """Generate a README for a GitHub repository."""
-        start_time = time.time()
-
-        try:
-            logger.debug(
-                "generate_repository_readme: repo=%s, style=%s, audience=%s",
-                repository_full_name,
-                style,
-                target_audience,
-            )
-
-            # Analyze the repository
-            repository_data = await self.repository_service.analyze_repository(repository_full_name=repository_full_name, force_refresh=False)
-
-            if not repository_data:
-                raise ValueError(f"Could not analyze repository {repository_full_name}")
-
-            # Get repository object for deeper analysis
-            if not self.github_service.github_client:
-                raise ValueError("GitHub client not configured")
-
-            try:
-                owner, repo_name = repository_full_name.split("/", 1)
-                repo = self.github_service.github_client.get_repo(repository_full_name)
-
-                # Perform README-specific analysis
-                repository_analysis = self.github_service._analyze_repository_content_for_readme(repository_data.get("repository_info", {}), repo)
-
-                # Extract API endpoints if applicable
-                main_files = repository_analysis.get("main_files", [])
-                if main_files:
-                    api_endpoints = self.github_service._extract_api_endpoints_from_code(repo, main_files)
-                    repository_analysis["api_endpoints"] = api_endpoints
-
-            except Exception as e:
-                logger.warning("Could not perform deep repository analysis: %s", str(e))
-                repository_analysis = {
-                    "existing_readme": False,
-                    "readme_content": None,
-                    "main_files": [],
-                    "documentation_files": [],
-                    "configuration_files": [],
-                    "source_directories": [],
-                    "license_info": None,
-                    "has_tests": False,
-                    "has_ci_cd": False,
-                    "has_docker": False,
-                    "api_endpoints": [],
-                    "key_features": [],
-                }
-
-            # Generate README content
-            ai_result = self.ai_service._generate_readme_content(
-                repository_data=repository_data,
-                repository_analysis=dict(repository_analysis),
-                style=style,
-                include_sections=include_sections,
-                target_audience=target_audience,
-            )
-
-            logger.info(
-                "README generated: repo=%s, words=%d, sections=%d, duration=%.2fs",
-                repository_full_name,
-                ai_result["word_count"],
-                len(ai_result["sections"]),
-                time.time() - start_time,
-            )
-
-            return {
-                "repository_name": repository_data.get("repository_info", {}).get("name", ""),
-                "repository_full_name": repository_full_name,
-                "generated_content": ai_result["generated_content"],
-                "sections": ai_result["sections"],
-                "word_count": ai_result["word_count"],
-                "generation_parameters": ai_result["generation_parameters"],
-                "analysis_summary": ai_result["analysis_summary"],
-                "repository_analysis": repository_analysis,
-            }
-
-        except Exception as e:
-            logger.error(
-                "README generation failed for %s: %s",
-                repository_full_name,
                 str(e),
             )
             raise
@@ -1052,6 +956,7 @@ class RecommendationService:
         analysis_context_type: str = "repository_contributor",
     ) -> Dict[str, Any]:
         """Merge repository analysis data with contributor profile data."""
+        merged_data: Dict[str, Any]
         logger.debug(
             "Merging repository and contributor data: user=%s, context=%s",
             contributor_username,
@@ -1062,7 +967,7 @@ class RecommendationService:
             # For repo_only context, use ONLY repository-specific data
             # Filter out general user profile information to prevent data leakage
             user_data_source = contributor_data.get("user_data", {})
-            filtered_contributor_data = {
+            filtered_contributor_data: Dict[str, Any] = {
                 "user_data": {
                     "github_username": user_data_source.get("github_username") or contributor_username,
                     "login": user_data_source.get("login") or contributor_username,
@@ -1228,7 +1133,7 @@ class RecommendationService:
                     # ABSOLUTELY NO general profile data allowed - ONLY repository-specific data
                     logger.info("🔒 REPO_ONLY: Constructing ultra-filtered data structure - NO profile data allowed")
 
-                    github_data: Dict[str, Any] = {
+                    github_data: Optional[Dict[str, Any]] = {
                         "user_data": {
                             "github_username": github_username,
                             "login": github_username,
@@ -1332,7 +1237,7 @@ class RecommendationService:
 
     def _validate_repo_only_data_isolation(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Validate that repo_only data contains no general profile information."""
-        validation_result = {"is_valid": True, "issues": [], "warnings": []}
+        validation_result: Dict[str, Any] = {"is_valid": True, "issues": [], "warnings": []}
 
         # Define profile data fields that should NEVER appear in repo_only context
         # Note: full_name is allowed as it's essential for personalized recommendations

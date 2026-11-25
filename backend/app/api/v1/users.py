@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.auth import get_current_active_user
@@ -37,6 +37,8 @@ async def update_users_me(
 
     try:
         updated_user = await user_service.update_user_profile(db, current_user.id, user_update.model_dump(exclude_unset=True))
+        if updated_user is None:
+            raise HTTPException(status_code=404, detail="User not found")
         logger.info(f"✅ PROFILE UPDATE SUCCESS: User {updated_user.username} updated")
         return UserResponse.model_validate(updated_user)
     except Exception as e:

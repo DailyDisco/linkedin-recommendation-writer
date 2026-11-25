@@ -312,7 +312,7 @@ class HumanStoryGenerator:
 
     def infer_personality_traits(self, commit_analysis: Dict[str, Any], pr_data: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """Infer personality traits from technical contribution patterns."""
-        traits = []
+        traits: List[Dict[str, Any]] = []
 
         if not commit_analysis:
             return traits
@@ -363,7 +363,7 @@ class HumanStoryGenerator:
 
     def convert_technical_to_story(self, technical_data: Dict[str, Any], context_type: str = "profile") -> Dict[str, Any]:
         """Convert technical metrics into human stories and anecdotes."""
-        stories = {"achievements": [], "personality_insights": [], "collaboration_examples": [], "technical_examples": []}
+        stories: Dict[str, Any] = {"achievements": [], "personality_insights": [], "collaboration_examples": [], "technical_examples": []}
 
         commit_analysis = technical_data.get("commit_analysis", {})
         languages = technical_data.get("languages", [])
@@ -396,7 +396,9 @@ class HumanStoryGenerator:
 
         # Convert languages to natural descriptions
         if languages:
-            top_languages = [getattr(lang, "language", lang) if hasattr(lang, "language") else str(lang) for lang in languages[:3]]
+            # Language entries arrive as {"language": ..., "percentage": ...} dicts (or, rarely,
+            # objects exposing .language); plain str(dict) would leak raw dicts into the prompt.
+            top_languages = [lang.get("language", str(lang)) if isinstance(lang, dict) else getattr(lang, "language", str(lang)) for lang in languages[:3]]
             if context_type == "repo_only" and repository_info:
                 stories["technical_examples"].append(f"They work effectively with {', '.join(top_languages)} in this project")
             else:
@@ -445,7 +447,7 @@ class HumanStoryGenerator:
         strength_phrase = " and ".join(key_strengths) if key_strengths else "strong technical skills and reliability"
         return f"{closing_template} {strength_phrase}."
 
-    def build_human_prompt_sections(self, github_data: Dict[str, Any], context_type: str = "profile", display_name: str = None) -> Dict[str, List[str]]:
+    def build_human_prompt_sections(self, github_data: Dict[str, Any], context_type: str = "profile", display_name: Optional[str] = None) -> Dict[str, List[str]]:
         """Build human-like prompt sections from technical data."""
         user_data = github_data.get("user_data", {})
         repository_info = github_data.get("repository_info", {})

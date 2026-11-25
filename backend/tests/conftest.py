@@ -20,6 +20,18 @@ def mock_redis():
     mock_client.set = AsyncMock(return_value=True)
     mock_client.delete = AsyncMock(return_value=1)
     mock_client.exists = AsyncMock(return_value=0)
+    mock_client.zcount = AsyncMock(return_value=0)
+
+    # client.pipeline() is synchronous and returns the pipeline object itself,
+    # whose commands are queued and flushed by the awaited execute(). A plain
+    # AsyncMock would make pipeline() return a coroutine, so the rate limiter's
+    # pipe.zremrangebyscore(...) fails with
+    # "'coroutine' object has no attribute 'zremrangebyscore'".
+    mock_pipeline = MagicMock()
+    for command in ("zremrangebyscore", "zadd", "zcard", "expire"):
+        setattr(mock_pipeline, command, MagicMock(return_value=mock_pipeline))
+    mock_pipeline.execute = AsyncMock(return_value=[0, True, 1, True])
+    mock_client.pipeline = MagicMock(return_value=mock_pipeline)
     return mock_client
 
 

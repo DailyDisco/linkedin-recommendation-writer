@@ -2,14 +2,14 @@
 
 import logging
 from datetime import date, datetime, timedelta, timezone
-from typing import List
+from typing import List, cast
 
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.usage_record import UsageRecord
 from app.models.user import User
-from app.schemas.billing import UsageHistoryItem, UsageResponse
+from app.schemas.billing import TierType, UsageHistoryItem, UsageResponse
 
 logger = logging.getLogger(__name__)
 
@@ -39,10 +39,8 @@ class UsageService:
 
         # Check if count should be reset (new day)
         if user.last_recommendation_date:
-            last_date = user.last_recommendation_date
-            if hasattr(last_date, "date"):
-                last_date = last_date.date()
-            if last_date < today:
+            last_seen = user.last_recommendation_date.date() if hasattr(user.last_recommendation_date, "date") else user.last_recommendation_date
+            if last_seen < today:
                 generations_used = 0
 
         # Get limits
@@ -70,7 +68,8 @@ class UsageService:
         period_end = tomorrow
 
         return UsageResponse(
-            tier=tier,
+            # effective_tier only ever returns TierType values; it is annotated str.
+            tier=cast(TierType, tier),
             period_start=period_start,
             period_end=period_end,
             generations_used=generations_used,
@@ -175,7 +174,7 @@ class UsageService:
             )
             .order_by(UsageRecord.date.desc())
         )
-        records = result.scalars().all()
+        records: List[UsageRecord] = list(result.scalars().all())
 
         return [UsageHistoryItem(date=r.date, count=r.generation_count) for r in records]
 

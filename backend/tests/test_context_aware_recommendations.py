@@ -197,10 +197,14 @@ class TestPromptServiceContextAwareness:
             analysis_context_type="profile",
         )
 
-        assert "testuser" in prompt
+        # The storytelling prompt addresses the person by display name extracted
+        # from user_data rather than embedding the raw GitHub username.
         assert "Here's what I know about them:" in prompt
         assert "Name: Test User" in prompt  # Should include user name
-        assert "Programming languages they work with: Python" in prompt  # Should include languages
+        # Language entries are dicts; the prompt must render the language name,
+        # not the stringified dict.
+        assert "They're really skilled with Python" in prompt
+        assert "{'language': 'Python'}" not in prompt
 
     def test_build_prompt_repo_only_context(self, prompt_service):
         """Test prompt building for repo_only context."""

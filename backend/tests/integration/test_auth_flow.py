@@ -1,11 +1,11 @@
 """Integration tests for authentication flow."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
 
-from app.core.config import Settings
+from app.core.dependencies import get_database_session
 from app.main import app
 from app.models.user import User
 
@@ -28,6 +28,20 @@ def mock_db_session():
 
 
 @pytest.fixture
+def override_db(mock_db_session):
+    """Route the real get_database_session dependency to the mock session.
+
+    The routes captured the dependency function at import time, so patching the
+    module attribute leaves Depends() pointing at the real session factory and
+    the request opens a Postgres connection that does not exist in CI. The
+    supported way to swap a dependency is app.dependency_overrides.
+    """
+    app.dependency_overrides[get_database_session] = lambda: mock_db_session
+    yield mock_db_session
+    app.dependency_overrides.pop(get_database_session, None)
+
+
+@pytest.fixture
 def sample_user():
     """Sample user for testing."""
     user = MagicMock(spec=User)
@@ -46,30 +60,28 @@ def sample_user():
 class TestUserRegistration:
     """Tests for user registration endpoint."""
 
-    def test_register_success(self, test_client, mock_db_session, sample_user):
+    def test_register_success(self, test_client, override_db, sample_user):
         """Test successful user registration."""
         # Mock database to return None (no existing user)
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = None
-        mock_db_session.execute = AsyncMock(return_value=mock_result)
+        override_db.execute = AsyncMock(return_value=mock_result)
 
         # Mock refresh to set user ID
         async def mock_refresh(user):
             user.id = 1
             user.username = "newuser"
 
-        mock_db_session.refresh = mock_refresh
+        override_db.refresh = mock_refresh
 
-        with patch("app.api.v1.auth.get_database_session", return_value=mock_db_session):
-            with patch("app.core.dependencies.get_database_session", return_value=mock_db_session):
-                response = test_client.post(
-                    "/api/v1/auth/register",
-                    json={
-                        "username": "newuser",
-                        "email": "newuser@example.com",
-                        "password": "SecureP@ss123",
-                    },
-                )
+        response = test_client.post(
+            "/api/v1/auth/register",
+            json={
+                "username": "newuser",
+                "email": "newuser@example.com",
+                "password": "SecureP@ss123",
+            },
+        )
 
         # Should return 201 with access token
         assert response.status_code == 201
@@ -77,28 +89,26 @@ class TestUserRegistration:
         assert "access_token" in data
         assert data["token_type"] == "bearer"
 
-    def test_register_duplicate_username(self, test_client, mock_db_session, sample_user):
+    def test_register_duplicate_username(self, test_client, override_db, sample_user):
         """Test registration with existing username."""
         # Mock database to return existing user
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = sample_user
-        mock_db_session.execute = AsyncMock(return_value=mock_result)
+        override_db.execute = AsyncMock(return_value=mock_result)
 
-        with patch("app.api.v1.auth.get_database_session", return_value=mock_db_session):
-            with patch("app.core.dependencies.get_database_session", return_value=mock_db_session):
-                response = test_client.post(
-                    "/api/v1/auth/register",
-                    json={
-                        "username": "testuser",  # Already exists
-                        "email": "different@example.com",
-                        "password": "SecureP@ss123",
-                    },
-                )
+        response = test_client.post(
+            "/api/v1/auth/register",
+            json={
+                "username": "testuser",  # Already exists
+                "email": "different@example.com",
+                "password": "SecureP@ss123",
+            },
+        )
 
         assert response.status_code == 400
         assert "already registered" in response.json()["detail"].lower()
 
-    def test_register_duplicate_email(self, test_client, mock_db_session, sample_user):
+    def test_register_duplicate_email(self, test_client, override_db, sample_user):
         """Test registration with existing email."""
         # Create a user with matching email but different username
         existing_user = MagicMock(spec=User)
@@ -107,18 +117,16 @@ class TestUserRegistration:
 
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = existing_user
-        mock_db_session.execute = AsyncMock(return_value=mock_result)
+        override_db.execute = AsyncMock(return_value=mock_result)
 
-        with patch("app.api.v1.auth.get_database_session", return_value=mock_db_session):
-            with patch("app.core.dependencies.get_database_session", return_value=mock_db_session):
-                response = test_client.post(
-                    "/api/v1/auth/register",
-                    json={
-                        "username": "newuser",
-                        "email": "test@example.com",  # Already exists
-                        "password": "SecureP@ss123",
-                    },
-                )
+        response = test_client.post(
+            "/api/v1/auth/register",
+            json={
+                "username": "newuser",
+                "email": "test@example.com",  # Already exists
+                "password": "SecureP@ss123",
+            },
+        )
 
         assert response.status_code == 400
         assert "already registered" in response.json()["detail"].lower()
@@ -139,7 +147,7 @@ class TestUserRegistration:
 class TestUserLogin:
     """Tests for user login endpoints."""
 
-    def test_login_success(self, test_client, mock_db_session, sample_user):
+    def test_login_success(self, test_client, override_db, sample_user):
         """Test successful login."""
         # Set up correct password hash for "password123"
         import bcrypt
@@ -148,43 +156,39 @@ class TestUserLogin:
 
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = sample_user
-        mock_db_session.execute = AsyncMock(return_value=mock_result)
+        override_db.execute = AsyncMock(return_value=mock_result)
 
-        with patch("app.api.v1.auth.get_database_session", return_value=mock_db_session):
-            with patch("app.core.dependencies.get_database_session", return_value=mock_db_session):
-                response = test_client.post(
-                    "/api/v1/auth/login",
-                    json={
-                        "username": "testuser",
-                        "password": "password123",
-                    },
-                )
+        response = test_client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": "testuser",
+                "password": "password123",
+            },
+        )
 
         assert response.status_code == 200
         data = response.json()
         assert "access_token" in data
         assert data["token_type"] == "bearer"
 
-    def test_login_invalid_username(self, test_client, mock_db_session):
+    def test_login_invalid_username(self, test_client, override_db):
         """Test login with non-existent username."""
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = None
-        mock_db_session.execute = AsyncMock(return_value=mock_result)
+        override_db.execute = AsyncMock(return_value=mock_result)
 
-        with patch("app.api.v1.auth.get_database_session", return_value=mock_db_session):
-            with patch("app.core.dependencies.get_database_session", return_value=mock_db_session):
-                response = test_client.post(
-                    "/api/v1/auth/login",
-                    json={
-                        "username": "nonexistent",
-                        "password": "password123",
-                    },
-                )
+        response = test_client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": "nonexistent",
+                "password": "password123",
+            },
+        )
 
         assert response.status_code == 401
         assert "incorrect" in response.json()["detail"].lower()
 
-    def test_login_invalid_password(self, test_client, mock_db_session, sample_user):
+    def test_login_invalid_password(self, test_client, override_db, sample_user):
         """Test login with wrong password."""
         import bcrypt
 
@@ -192,17 +196,15 @@ class TestUserLogin:
 
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = sample_user
-        mock_db_session.execute = AsyncMock(return_value=mock_result)
+        override_db.execute = AsyncMock(return_value=mock_result)
 
-        with patch("app.api.v1.auth.get_database_session", return_value=mock_db_session):
-            with patch("app.core.dependencies.get_database_session", return_value=mock_db_session):
-                response = test_client.post(
-                    "/api/v1/auth/login",
-                    json={
-                        "username": "testuser",
-                        "password": "wrongpassword",
-                    },
-                )
+        response = test_client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": "testuser",
+                "password": "wrongpassword",
+            },
+        )
 
         assert response.status_code == 401
         assert "incorrect" in response.json()["detail"].lower()
@@ -234,7 +236,7 @@ class TestLogout:
 class TestPasswordChange:
     """Tests for password change endpoint."""
 
-    def test_change_password_success(self, test_client, mock_db_session, sample_user):
+    def test_change_password_success(self, test_client, override_db, sample_user):
         """Test successful password change."""
         import bcrypt
 
@@ -242,28 +244,26 @@ class TestPasswordChange:
 
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = sample_user
-        mock_db_session.execute = AsyncMock(return_value=mock_result)
+        override_db.execute = AsyncMock(return_value=mock_result)
 
         # Create a valid token for the test user
         from app.core.token import token_helper
 
         token = token_helper.create_access_token(data={"sub": "testuser", "id": "1"})
 
-        with patch("app.api.v1.auth.get_database_session", return_value=mock_db_session):
-            with patch("app.core.dependencies.get_database_session", return_value=mock_db_session):
-                response = test_client.put(
-                    "/api/v1/auth/change-password",
-                    json={
-                        "current_password": "oldpassword123",
-                        "new_password": "newpassword456",
-                    },
-                    headers={"Authorization": f"Bearer {token}"},
-                )
+        response = test_client.put(
+            "/api/v1/auth/change-password",
+            json={
+                "current_password": "oldpassword123",
+                "new_password": "newpassword456",
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
 
         assert response.status_code == 200
         assert "updated" in response.json()["message"].lower()
 
-    def test_change_password_wrong_current(self, test_client, mock_db_session, sample_user):
+    def test_change_password_wrong_current(self, test_client, override_db, sample_user):
         """Test password change with wrong current password."""
         import bcrypt
 
@@ -271,22 +271,20 @@ class TestPasswordChange:
 
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = sample_user
-        mock_db_session.execute = AsyncMock(return_value=mock_result)
+        override_db.execute = AsyncMock(return_value=mock_result)
 
         from app.core.token import token_helper
 
         token = token_helper.create_access_token(data={"sub": "testuser", "id": "1"})
 
-        with patch("app.api.v1.auth.get_database_session", return_value=mock_db_session):
-            with patch("app.core.dependencies.get_database_session", return_value=mock_db_session):
-                response = test_client.put(
-                    "/api/v1/auth/change-password",
-                    json={
-                        "current_password": "wrongpassword",
-                        "new_password": "newpassword456",
-                    },
-                    headers={"Authorization": f"Bearer {token}"},
-                )
+        response = test_client.put(
+            "/api/v1/auth/change-password",
+            json={
+                "current_password": "wrongpassword",
+                "new_password": "newpassword456",
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
 
         assert response.status_code == 400
         assert "incorrect" in response.json()["detail"].lower()
@@ -307,22 +305,20 @@ class TestPasswordChange:
 class TestTokenValidation:
     """Tests for token validation."""
 
-    def test_valid_token_accepted(self, test_client, mock_db_session, sample_user):
+    def test_valid_token_accepted(self, test_client, override_db, sample_user):
         """Test that valid tokens are accepted."""
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = sample_user
-        mock_db_session.execute = AsyncMock(return_value=mock_result)
+        override_db.execute = AsyncMock(return_value=mock_result)
 
         from app.core.token import token_helper
 
         token = token_helper.create_access_token(data={"sub": "testuser", "id": "1"})
 
-        with patch("app.api.v1.auth.get_database_session", return_value=mock_db_session):
-            with patch("app.core.dependencies.get_database_session", return_value=mock_db_session):
-                response = test_client.get(
-                    "/api/v1/users/me",
-                    headers={"Authorization": f"Bearer {token}"},
-                )
+        response = test_client.get(
+            "/api/v1/users/me",
+            headers={"Authorization": f"Bearer {token}"},
+        )
 
         # Should not return 401 - token is valid
         assert response.status_code != 401 or "credentials" not in response.json().get("detail", "").lower()

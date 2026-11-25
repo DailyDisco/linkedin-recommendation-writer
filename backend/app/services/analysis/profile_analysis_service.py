@@ -364,8 +364,8 @@ class ProfileAnalysisService:
         """Analyze user activity patterns from repositories."""
         total_stars = sum(repo.get("stargazers_count", 0) for repo in repositories)
         total_forks = sum(repo.get("forks_count", 0) for repo in repositories)
-        languages = {}
-        topics = []
+        languages: Dict[str, int] = {}
+        topics: List[str] = []
 
         for repo in repositories:
             # Count languages
@@ -380,7 +380,7 @@ class ProfileAnalysisService:
         primary_language = max(languages.items(), key=lambda x: x[1]) if languages else None
 
         # Find most common topics
-        topic_counts = {}
+        topic_counts: Dict[str, int] = {}
         for topic in topics:
             topic_counts[topic] = topic_counts.get(topic, 0) + 1
 
@@ -452,7 +452,7 @@ class ProfileAnalysisService:
 
     def _analyze_collaboration_patterns(self, repositories: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Analyze collaboration patterns and team-oriented contributions."""
-        collaboration_indicators = {"team_size_signals": [], "collaboration_evidence": [], "leadership_indicators": []}
+        collaboration_indicators: Dict[str, Any] = {"team_size_signals": [], "collaboration_evidence": [], "leadership_indicators": []}
 
         for repo in repositories:
             contributors_count = repo.get("contributors_count", 0)

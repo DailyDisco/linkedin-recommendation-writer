@@ -213,9 +213,9 @@ async def get_task_status(task_id: str) -> dict:
 
 @router.get("/user/{username}", response_model=ProfileAnalysisResponse)
 async def get_github_profile(
+    background_tasks: BackgroundTasks,
     username: str = Depends(validate_github_username),
     force_refresh: bool = False,
-    background_tasks: BackgroundTasks = None,
     github_user_service: GitHubUserService = Depends(get_github_service),
 ) -> Optional[ProfileAnalysisResponse]:
     """Get a GitHub profile analysis (convenience endpoint - uses background processing)."""
@@ -243,9 +243,9 @@ async def get_github_profile(
 
 @router.get("/user/{username}/async")
 async def get_github_profile_async(
+    background_tasks: BackgroundTasks,
     username: str = Depends(validate_github_username),
     force_refresh: bool = False,
-    background_tasks: BackgroundTasks = None,
 ) -> dict:
     """Get a GitHub profile analysis asynchronously (returns task ID immediately)."""
 

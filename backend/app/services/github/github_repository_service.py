@@ -764,7 +764,7 @@ class GitHubRepositoryService:
                 ".zig": "Zig",
             }
 
-            language_counts = {}
+            language_counts: Dict[str, int] = {}
 
             # Count files by language for user's commits only
             for commit in commits:
@@ -805,7 +805,7 @@ class GitHubRepositoryService:
 
     def _validate_repo_only_isolation(self, result: Dict[str, Any], target_username: str) -> Dict[str, Any]:
         """Validate that repo_only result contains ONLY data from the target user."""
-        validation = {"is_valid": True, "issues": [], "warnings": []}
+        validation: Dict[str, Any] = {"is_valid": True, "issues": [], "warnings": []}
 
         # Check commits - all should be from target user
         commits = result.get("commits", [])

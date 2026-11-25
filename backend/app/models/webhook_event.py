@@ -1,8 +1,10 @@
 """Stripe webhook event model for idempotency and debugging."""
 
 from datetime import datetime, timezone
+from typing import Any, Optional
 
 from sqlalchemy import JSON, Column, DateTime, Integer, String, Text
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
 
@@ -12,13 +14,13 @@ class StripeWebhookEvent(Base):
 
     __tablename__ = "stripe_webhook_events"
 
-    id = Column(Integer, primary_key=True, index=True)
-    stripe_event_id = Column(String(255), nullable=False, unique=True, index=True)
-    event_type = Column(String(255), nullable=False, index=True)
-    payload = Column(JSON, nullable=False)
-    processed_at = Column(DateTime(timezone=True), nullable=True)
-    error = Column(Text, nullable=True)
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    stripe_event_id: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
+    event_type: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    payload: Mapped[Any] = mapped_column(JSON, nullable=False)
+    processed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     @property
     def is_processed(self) -> bool:

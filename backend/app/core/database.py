@@ -2,7 +2,7 @@
 
 import logging
 import os
-from typing import Any, AsyncGenerator, Dict
+from typing import Any, AsyncGenerator, Dict, Optional
 
 import sqlalchemy as sa
 from sqlalchemy import text
@@ -107,8 +107,9 @@ async def run_migrations() -> None:
                 return "users" in existing_tables
 
             # Helper function to stamp database to a specific revision
-            def stamp_database(revision: str):
-                command.stamp(alembic_cfg, revision)
+            def stamp_database(revision: Optional[str]):
+                if revision:
+                    command.stamp(alembic_cfg, revision)
 
             # Check current database version using run_sync to avoid greenlet issues
             async with engine.begin() as conn:
@@ -217,7 +218,7 @@ async def test_database_connection() -> dict:
     """Test database connection with detailed diagnostics."""
     from app.core.config import settings
 
-    result = {
+    result: Dict[str, Any] = {
         "database_url_configured": bool(settings.DATABASE_URL),
         "database_url_preview": None,
         "connection_test": "not_attempted",
